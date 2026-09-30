@@ -1,5 +1,7 @@
 # Owlbear Rodeo Legacy
 
+> **This is an unofficial fork** ([owlbear-rodeo-bun](https://github.com/spitefulFr0g/owlbear-rodeo-bun)) that packages Owlbear Rodeo 1.0 as a single executable you can run yourself. It is not affiliated with or supported by the Owlbear Rodeo team. The original project is [owlbear-rodeo/owlbear-rodeo-legacy](https://github.com/owlbear-rodeo/owlbear-rodeo-legacy).
+
 ![Demo Image](/demo.jpg)
 
 This is the source code for Owlbear Rodeo 1.0 released for your non-profit, non-commercial, private use.
@@ -37,6 +39,39 @@ The pointer tool has a nice network interpolation model. This idea was expanded 
 
 ## Install
 
+### Standalone executable
+
+One file runs both the website and the game server. Start it on the computer that hosts the game:
+
+```
+./owlbear-rodeo-linux-x64            # Linux
+owlbear-rodeo-windows-x64.exe        # Windows
+```
+
+It prints the addresses your players can open, for example `http://192.168.1.20:9000`. Players on the same network can use that address directly. Players on the internet need you to forward the port on your router and share your public address.
+
+Options (each also has an environment variable):
+
+| Flag | Environment | Default | Purpose |
+| --- | --- | --- | --- |
+| `--port`, `-p` | `PORT` | `9000` | Port to listen on |
+| `--allow-origin` | `ALLOW_ORIGIN` | same origin only | Regex of extra origins allowed to connect |
+| `--ice-servers` | `ICE_SERVERS_FILE` | Google's public STUN server | JSON file shaped like `backend/ice.json`, for example to add a TURN server |
+
+Audio sharing only works over HTTPS or on `localhost`, so it is unavailable to players connecting over plain HTTP.
+
+#### Building the executable
+
+You need [Bun](https://bun.sh) and Docker. Docker is only used to build the frontend with Node 16. In `/backend`, run:
+
+```
+bun install
+bun run build:frontend   # builds the website into /build (a few minutes, ~5GB RAM)
+bun run build            # writes dist/owlbear-rodeo-linux-x64 and dist/owlbear-rodeo-windows-x64.exe
+```
+
+Pass a target to build just one, such as `bun run build linux-x64`. Use `bun run build:frontend --local` to build with a local Node 16 and Yarn instead of Docker.
+
 ### Production (or for non-developers)
 
 The easiest way to host Owlbear Rodeo is by using a cloud provider.
@@ -52,6 +87,8 @@ Once deployed Render will provide a URL for you to share with your players.
 
 #### **Docker**
 
+Note: the Docker setup has not been updated for this fork's Bun backend yet.
+
 To use the project with docker you can run the following from the root directory of the project:
 
 ```
@@ -64,19 +101,16 @@ Note: You will need to increase your max memory allowed in Docker to 5GB in orde
 
 If you don't want to use Docker you can run both the backend and frontend manually.
 
-Before running the commands you will need both `NodeJS v16` and `Yarn` installed.
+The backend needs [Bun](https://bun.sh). The frontend needs `NodeJS v16` and `Yarn`.
 
-To build and run the backend in `/backend` run:
-
-```
-yarn build
-```
-
-and:
+To run the backend in `/backend` run:
 
 ```
-yarn start
+bun install
+bun run dev
 ```
+
+`bun run dev` restarts on changes and accepts connections from the frontend dev server on port 3000. Run the backend tests with `bun test`.
 
 To run the frontend in the root folder run:
 

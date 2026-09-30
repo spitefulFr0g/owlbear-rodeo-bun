@@ -6,12 +6,6 @@ export default class HealthcheckController extends Controller {
 
   routes = [
     {
-      path: "/",
-      method: Methods.GET,
-      handler: this.handleHome.bind(this),
-      localMiddleware: []
-    },
-    {
       path: "/health",
       method: Methods.GET,
       handler: this.handleHealthcheck.bind(this),
@@ -19,10 +13,6 @@ export default class HealthcheckController extends Controller {
     },
   ];
 
-
-  async handleHome(req: Request, res: Response, next: NextFunction): Promise<void> {
-    res.sendStatus(200);
-  }
 
   async handleHealthcheck(req: Request, res: Response, next: NextFunction): Promise<void> {
     res.sendStatus(200);
