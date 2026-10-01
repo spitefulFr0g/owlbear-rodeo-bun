@@ -63,21 +63,20 @@ class Session extends EventEmitter {
    */
   async connect() {
     try {
-      if (
-        !process.env.REACT_APP_BROKER_URL ||
-        process.env.REACT_APP_MAINTENANCE === "true"
-      ) {
+      if (process.env.REACT_APP_MAINTENANCE === "true") {
         this.emit("status", "offline");
         return;
       }
-      this.socket = io(process.env.REACT_APP_BROKER_URL!, {
+      // The server hosts the frontend, so connect back to the same origin
+      // unless a separate broker is configured (e.g. the CRA dev server)
+      const brokerUrl =
+        process.env.REACT_APP_BROKER_URL || window.location.origin;
+      this.socket = io(brokerUrl, {
         withCredentials: true,
         parser: msgParser,
         transports: ["websocket"],
       });
-      const response = await fetch(
-        `${process.env.REACT_APP_BROKER_URL}/iceservers`
-      );
+      const response = await fetch(`${brokerUrl}/iceservers`);
       if (!response.ok) {
         throw Error("Unable to fetch ICE servers");
       }

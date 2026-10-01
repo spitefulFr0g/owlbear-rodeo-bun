@@ -1,49 +1,78 @@
-import cors, { CorsOptions } from "cors";
+import cors from "cors";
 import express, { Application, RequestHandler } from "express";
 import helmet from "helmet";
+import { networkInterfaces } from "os";
 import { Server } from "socket.io";
 // @ts-ignore
 import msgParser from "socket.io-msgpack-parser";
 import AppServer from "./entities/AppServer";
 import Controller from "./controllers/Controller";
 import GameServer from "./entities/GameServer";
-import Global from "./entities/Global";
 import HealthcheckController from "./controllers/HealthcheckController";
 import IceServer from "./entities/IceServer";
 import IceServerController from "./controllers/IceServerController";
+import { parseConfig, USAGE } from "./config";
+import { frontendHandler } from "./frontend";
+import { lanUrls } from "./lanUrls";
+import { isOriginAllowed } from "./origin";
+import frontendAssets from "./generated/frontendAssets";
+
+let config;
+try {
+  config = parseConfig(process.argv.slice(2), process.env);
+} catch (error: any) {
+  console.error(`${error.message}\n\n${USAGE}`);
+  process.exit(1);
+}
+if (config.help) {
+  console.log(USAGE);
+  process.exit(0);
+}
+const { allowOrigin } = config;
+
+const iceServer = new IceServer(config.iceServersFile);
+try {
+  await iceServer.getIceServers();
+} catch (error: any) {
+  console.error(
+    `Unable to load ICE servers from ${config.iceServersFile}: ${error.message}`
+  );
+  process.exit(1);
+}
 
 const app: Application = express();
-const port: string | number = Global.CONNECTION_PORT;
-const server = new AppServer(app, port);
-
-const whitelist = new RegExp(Global.ORIGIN_WHITELIST);
+const server = new AppServer(app, config.port);
 
 const io = new Server(server, {
   cookie: false,
-  cors: {
-    origin: whitelist,
-    methods: ["GET", "POST"],
-    credentials: true,
+  allowRequest: (req, callback) => {
+    callback(
+      null,
+      isOriginAllowed(req.headers.origin, req.headers.host, allowOrigin)
+    );
   },
   serveClient: false,
   maxHttpBufferSize: 1e7,
   parser: msgParser,
 });
 
-const corsConfig: CorsOptions = {
-  origin: function (origin: any, callback: any) {
-    if (!origin || whitelist.test(origin)) {
-      return callback(null, true);
-    }
-    const msg =
-      "The CORS policy for this site does not allow access from the specified Origin.";
-    return callback(new Error(msg), false);
-  },
-};
+const corsConfig = cors((req, callback) => {
+  const allowed = isOriginAllowed(
+    req.headers.origin,
+    req.headers.host,
+    allowOrigin
+  );
+  callback(null, { origin: allowed, credentials: true });
+});
 
-const iceServer = new IceServer();
-
-const globalMiddleware: Array<RequestHandler> = [helmet(), cors(corsConfig)];
+const globalMiddleware: Array<RequestHandler> = [
+  helmet({
+    // The frontend relies on inline scripts, blob: images and WebAssembly
+    contentSecurityPolicy: false,
+    crossOriginEmbedderPolicy: false,
+  }),
+  corsConfig,
+];
 
 const controllers: Array<Controller> = [
   new HealthcheckController(),
@@ -52,7 +81,20 @@ const controllers: Array<Controller> = [
 
 server.loadMiddleware(globalMiddleware);
 server.loadControllers(controllers);
-const httpServer = server.run();
+server.loadMiddleware([frontendHandler(frontendAssets)]);
+
+const httpServer = server.run(() => {
+  const urls = [
+    `http://localhost:${config.port}`,
+    ...lanUrls(config.port, networkInterfaces()),
+  ];
+  console.log(`Owlbear Rodeo is running at:\n  ${urls.join("\n  ")}`);
+  if (!frontendAssets["/index.html"]) {
+    console.warn(
+      "No frontend is embedded in this build, so only the game server is available."
+    );
+  }
+});
 const game = new GameServer(io);
 game.initaliseSocketServer(httpServer);
 game.run();

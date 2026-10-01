@@ -13,10 +13,8 @@ export default class AppServer extends Server {
     this.port = port;
   }
 
-  public run(): http.Server {
-    return this.app.listen(this.port, () => {
-      console.log(`The server is running on port ${this.port}`);
-    });
+  public run(onListening: () => void): http.Server {
+    return this.app.listen(this.port, onListening);
   }
 
   public loadMiddleware(middlewares: Array<RequestHandler>): void {
