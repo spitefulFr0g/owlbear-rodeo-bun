@@ -56,7 +56,10 @@ Options (each also has an environment variable):
 | --- | --- | --- | --- |
 | `--port`, `-p` | `PORT` | `9000` | Port to listen on |
 | `--allow-origin` | `ALLOW_ORIGIN` | same origin only | Regex of extra origins allowed to connect |
-| `--ice-servers` | `ICE_SERVERS_FILE` | Google's public STUN server | JSON file shaped like `backend/ice.json`, for example to add a TURN server |
+| `--data-dir` | `DATA_DIR` | `data` beside the executable | Folder where maps and tokens used in games are kept |
+| `--ice-servers` | `ICE_SERVERS_FILE` | Google's public STUN server | JSON file shaped like `backend/ice.json`. Only used for audio sharing, see [Troubleshooting](#troubleshooting) |
+
+Maps and tokens are sent to the server over HTTP and kept in the data folder, so players load them from the server and no direct connection between players is needed. Each image can be up to 64MB. Nothing is removed from the data folder automatically.
 
 Audio sharing only works over HTTPS or on `localhost`, so it is unavailable to players connecting over plain HTTP.
 
@@ -122,13 +125,32 @@ yarn start
 
 **Custom Images Aren't Showing on Other Computers**
 
-Custom images are transferred using WebRTC in order to navigate some networks you must define a STUN/TURN server.
+Custom images go through the server, so STUN and TURN servers make no difference to them. Check that the player can reach the server and that the server can write to its data folder (`--data-dir`). The player who added the image has to be in the game once so their browser can send it to the server.
 
-You can read more about this topic here https://developer.mozilla.org/en-US/docs/Web/API/WebRTC_API/Protocols
+**Audio Sharing Isn't Working Between Some Players**
 
-While there are some freely available STUN servers, most TURN servers charge you for the bandwidth used.
+Audio sharing is the only feature that still uses WebRTC, a direct connection between players. Some networks block direct connections, in which case audio has to be relayed through a TURN server. Owlbear Rodeo doesn't include one, but you can point it at one you run yourself (for example [coturn](https://github.com/coturn/coturn)) or rent.
 
-To change the STUN/TURN configuration you can edit the `/backend/ice.json` file.
+Copy `/backend/ice.json`, add your TURN server and start the server with `--ice-servers`:
+
+```json
+{
+  "iceServers": [
+    { "urls": "stun:stun.l.google.com:19302" },
+    {
+      "urls": "turn:turn.example.com:3478",
+      "username": "owlbear",
+      "credential": "a-password-for-this-server-only"
+    }
+  ]
+}
+```
+
+```
+./owlbear-rodeo-linux-x64 --ice-servers ./ice.json
+```
+
+The contents of this file are public. The server hands them to every browser that asks, before any game is joined, so anyone who can open your server can read the username and credential and use your TURN server. Use credentials made only for this purpose and limit bandwidth on the TURN server.
 
 ---
 

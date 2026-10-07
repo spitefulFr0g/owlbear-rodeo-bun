@@ -13,6 +13,7 @@ type MapLoadingContextValue = {
   isLoading: boolean;
   assetLoadStart: (id: string) => void;
   assetProgressUpdate: (update: MapLoadingProgressUpdate) => void;
+  assetLoadCancel: (id: string) => void;
   loadingProgressRef: React.MutableRefObject<number>;
 };
 
@@ -58,10 +59,33 @@ export function MapLoadingProvider({
     }
   }, []);
 
+  // Stop waiting for an asset that failed to load
+  const assetLoadCancel = useCallback((id) => {
+    if (!(id in assetProgressRef.current)) {
+      return;
+    }
+    const { [id]: _, ...remaining } = assetProgressRef.current;
+    assetProgressRef.current = remaining;
+    let complete = 0;
+    const progresses = Object.values(remaining);
+    for (let progress of progresses) {
+      complete += progress.count / progress.total;
+    }
+    // Nothing left to wait for
+    if (complete === progresses.length) {
+      loadingProgressRef.current = progresses.length > 0 ? 1 : 0;
+      setIsLoading(false);
+      assetProgressRef.current = {};
+    } else {
+      loadingProgressRef.current = complete / progresses.length;
+    }
+  }, []);
+
   const value = {
     assetLoadStart,
     isLoading,
     assetProgressUpdate,
+    assetLoadCancel,
     loadingProgressRef,
   };
 
