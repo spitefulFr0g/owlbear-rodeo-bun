@@ -4,6 +4,7 @@ import { Socket, Server as IOServer } from "socket.io";
 import Auth from "./Auth";
 import GameRepository from "./GameRepository";
 import GameState from "./GameState";
+import JoinTokens from "./JoinTokens";
 import { Update } from "../helpers/diff";
 import { Map } from "../types/Map";
 import { MapState } from "../types/MapState";
@@ -14,9 +15,11 @@ import { Pointer } from "../types/Pointer";
 export default class GameServer {
   private readonly io: IOServer;
   private gameRepo;
+  private readonly joinTokens: JoinTokens;
 
-  constructor(io: IOServer) {
+  constructor(io: IOServer, joinTokens: JoinTokens) {
     this.io = io;
+    this.joinTokens = joinTokens;
     this.gameRepo = new GameRepository();
   }
 
@@ -39,6 +42,7 @@ export default class GameServer {
       });
 
       socket.on("disconnecting", async () => {
+        this.joinTokens.revoke(socket.id);
         try {
           let gameId: string;
           if (_gameId) {
@@ -90,9 +94,13 @@ export default class GameServer {
               await gameState.joinGame(gameId);
             } else {
               socket.emit("auth_error");
+              return;
             }
           }
-          this.io.to(gameId).emit("joined_game", socket.id);
+          // Only the player who joined gets the token for the asset routes
+          const token = this.joinTokens.issue(socket.id, gameId);
+          socket.emit("joined_game", socket.id, token);
+          socket.to(gameId).emit("joined_game", socket.id);
         } catch (error) {
           console.error("JOIN_ERROR", error);
         }

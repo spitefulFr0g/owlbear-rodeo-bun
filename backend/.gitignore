@@ -120,3 +120,6 @@ src/generated
 
 # Compiled executables
 dist
+
+# Default data directory when running from source
+/data

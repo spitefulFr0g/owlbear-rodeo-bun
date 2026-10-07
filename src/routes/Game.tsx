@@ -51,6 +51,12 @@ function Game() {
         setPeerError("WebRTC not supported.");
       } else if (error.code === "ERR_CREATE_OFFER") {
         setPeerError("Unable to connect to party.");
+      } else if (
+        error.code === "ERR_ICE_CONNECTION_FAILURE" ||
+        error.code === "ERR_CONNECTION_FAILURE"
+      ) {
+        // Peer connections are only used for audio sharing
+        setPeerError("Unable to connect to a player for audio sharing.");
       }
     }
     session.on("peerError", handlePeerError);

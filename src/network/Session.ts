@@ -45,6 +45,17 @@ class Session extends EventEmitter {
     return this.socket?.id;
   }
 
+  /**
+   * The server the session is connected to
+   */
+  brokerUrl: string = "";
+
+  /**
+   * Proof that we have joined a game, needed to use the server's asset store.
+   * Only set while joined.
+   */
+  joinToken?: string;
+
   _iceServers: RTCIceServer[] = [];
 
   // Store party id and password for reconnect
@@ -71,6 +82,7 @@ class Session extends EventEmitter {
       // unless a separate broker is configured (e.g. the CRA dev server)
       const brokerUrl =
         process.env.REACT_APP_BROKER_URL || window.location.origin;
+      this.brokerUrl = brokerUrl;
       this.socket = io(brokerUrl, {
         withCredentials: true,
         parser: msgParser,
@@ -316,7 +328,11 @@ class Session extends EventEmitter {
     }
   }
 
-  _handleJoinedGame() {
+  // Sent when anyone joins the game, the token only comes with our own join
+  _handleJoinedGame(_id: string, token?: string) {
+    if (token) {
+      this.joinToken = token;
+    }
     this.emit("status", "joined");
   }
 
@@ -357,6 +373,8 @@ class Session extends EventEmitter {
   }
 
   _handleSocketDisconnect() {
+    // The server forgets the token when the socket disconnects
+    this.joinToken = undefined;
     this.emit("status", "reconnecting");
     for (let peer of Object.values(this.peers)) {
       peer.connection && peer.connection.destroy();
