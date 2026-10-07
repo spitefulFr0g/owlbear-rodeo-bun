@@ -24,3 +24,5 @@ yarn-error.log*
 
 # typescript
 tsconfig.tsbuildinfo
+# local offline mirror of docs.owlbear.rodeo (see reference-docs/scrape_docs.py)
+/reference-docs/
