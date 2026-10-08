@@ -35,8 +35,16 @@ A person in a room who has not signed in to an account.
 _Avoid_: Guest, visitor
 
 **Presence**:
-One person's live connection to a room: their name, colour, role and the scene they are viewing. It exists only while they are connected.
+One person's live connection to a room: their name, colour, role and the scene they are viewing, plus their shared dice rolls and timer. It exists only while they are connected.
 _Avoid_: Party member, peer, session
+
+**Dice roll**:
+The dice a person has thrown in their dice tray and the result. A shared roll is part of that person's presence, seen by everyone in the room whatever scene they are viewing, and is never saved.
+_Avoid_: Roll history, roll log
+
+**Timer**:
+A countdown one person starts, shown to everyone in the room. It is part of that person's presence and ends when they disconnect.
+_Avoid_: Clock, stopwatch, turn timer
 
 ### Canvas
 
@@ -64,6 +72,10 @@ _Avoid_: Z-order, category, level
 An image item on the Character, Mount, Prop or Attachment layer.
 _Avoid_: Mini, piece, sprite
 
+**Status ring**:
+A coloured ring drawn around a token to mark a condition. A token can carry several.
+_Avoid_: Condition marker, status effect, aura
+
 **Note**:
 A short piece of plain text on a coloured square, placed on the Note layer.
 _Avoid_: Sticky, memo, comment
@@ -79,6 +91,10 @@ _Avoid_: Player view, spectator, second screen, popout
 **Display link**:
 The address that opens a room as a cast display.
 _Avoid_: Cast link, view link, spectator link
+
+**Extension**:
+An optional add-on that gives a room a feature the base does not have. Not built yet. A first-party extension would ship with the server; a third-party extension would be added by its manifest address.
+_Avoid_: Plugin, add-on, module, mod
 
 ### Library
 
