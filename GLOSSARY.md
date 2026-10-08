@@ -64,6 +64,22 @@ _Avoid_: Z-order, category, level
 An image item on the Character, Mount, Prop or Attachment layer.
 _Avoid_: Mini, piece, sprite
 
+**Note**:
+A short piece of plain text on a coloured square, placed on the Note layer.
+_Avoid_: Sticky, memo, comment
+
+**Hidden item**:
+An item that only its creator and the GM can see. New notes and text start hidden, and only the GM or a trusted player can show theirs to everyone.
+_Avoid_: Private item, invisible item, secret item
+
+**Cast display**:
+A view-only connection to a room, made to be shown on a shared screen. It shows what a player sees with no interface, follows the GM's view, and is not a player.
+_Avoid_: Player view, spectator, second screen, popout
+
+**Display link**:
+The address that opens a room as a cast display.
+_Avoid_: Cast link, view link, spectator link
+
 ### Library
 
 **Asset**:
