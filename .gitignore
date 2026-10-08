@@ -26,3 +26,6 @@ yarn-error.log*
 tsconfig.tsbuildinfo
 # local offline mirror of docs.owlbear.rodeo (see reference-docs/scrape_docs.py)
 /reference-docs/
+
+# agent worktrees
+/.claude/worktrees/
