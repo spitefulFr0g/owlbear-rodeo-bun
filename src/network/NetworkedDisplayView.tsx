@@ -18,6 +18,9 @@ import Session from "./Session";
 
 // Send view updates every 50ms (20fps), as the pointer does
 const sendTickRate = 50;
+// The server drops views that arrive before it knows who we are or which map
+// is shown, so repeat a view that stays still
+const resendInterval = 2000;
 
 type NetworkedDisplayViewProps = {
   session: Session;
@@ -41,6 +44,7 @@ function NetworkedDisplayView({ session, mapId }: NetworkedDisplayViewProps) {
   });
 
   const sentViewRef = useRef<DisplayView | null>(null);
+  const sentTimeRef = useRef(0);
 
   // The server forgets the view when we rejoin, so send it again
   useEffect(() => {
@@ -82,12 +86,18 @@ function NetworkedDisplayView({ session, mapId }: NetworkedDisplayViewProps) {
         return;
       }
       const sent = sentViewRef.current;
-      if (sent && sent.mapId === mapId && isSameMapRect(sent, rect)) {
+      if (
+        sent &&
+        sent.mapId === mapId &&
+        isSameMapRect(sent, rect) &&
+        time - sentTimeRef.current < resendInterval
+      ) {
         return;
       }
       const view = { mapId, ...rect };
       session.socket.emit("display_view", view);
       sentViewRef.current = view;
+      sentTimeRef.current = time;
     }
 
     return () => {
