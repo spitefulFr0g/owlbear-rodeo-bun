@@ -63,6 +63,12 @@ const layout = `
     accountId TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
     expiresAt INTEGER NOT NULL
   );
+  CREATE TABLE IF NOT EXISTS room_assets (
+    roomId TEXT NOT NULL REFERENCES rooms(id) ON DELETE CASCADE,
+    assetId TEXT NOT NULL REFERENCES assets(id) ON DELETE CASCADE,
+    PRIMARY KEY (roomId, assetId)
+  );
+  CREATE INDEX IF NOT EXISTS room_assets_asset ON room_assets(assetId);
   CREATE TABLE IF NOT EXISTS metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 `;
 
@@ -116,6 +122,21 @@ export class OwlbearDatabase {
 
   roomsForGM(accountId: string): RoomRecord[] {
     return this.connection.query<RoomRecord, [string]>("SELECT * FROM rooms WHERE gmAccountId = ? ORDER BY name, id").all(accountId);
+  }
+
+  /** Saved UTF-8 document bytes plus each image this room has used. */
+  roomSizeBytes(roomId: string): number {
+    return this.connection.query<{ sizeBytes: number }, [string]>(`
+      SELECT length(CAST(document AS BLOB)) + COALESCE((
+        SELECT SUM(assets.size) FROM room_assets
+        JOIN assets ON assets.id = room_assets.assetId WHERE room_assets.roomId = rooms.id
+      ), 0) AS sizeBytes FROM rooms WHERE id = ?`).get(roomId)?.sizeBytes ?? 0;
+  }
+
+  recordRoomAsset(roomId: string, assetId: string): void {
+    this.connection.query(`INSERT OR IGNORE INTO room_assets (roomId, assetId)
+      SELECT rooms.id, assets.id FROM rooms, assets WHERE rooms.id = ? AND assets.id = ?`)
+      .run(roomId, assetId);
   }
 
   asset(id: string): AssetRecord | undefined {
