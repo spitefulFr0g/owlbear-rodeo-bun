@@ -1,4 +1,5 @@
-import { Clock } from "../clock";
+import AttemptLimiter from "../AttemptLimiter";
+import { realClock, Clock } from "../clock";
 import { OwlbearDatabase } from "../database";
 /* eslint-disable no-underscore-dangle */
 import { Server as HttpServer } from "http";
@@ -18,9 +19,11 @@ import { Pointer } from "../types/Pointer";
 export default class GameServer {
   private readonly io: IOServer;
   private gameRepo;
+  private readonly attempts: AttemptLimiter;
   private readonly joinTokens: JoinTokens;
 
-  constructor(io: IOServer, joinTokens: JoinTokens, database?: OwlbearDatabase, clock?: Clock) {
+  constructor(io: IOServer, joinTokens: JoinTokens, database?: OwlbearDatabase, clock?: Clock, attempts?: AttemptLimiter) {
+    this.attempts = attempts ?? new AttemptLimiter(clock ?? realClock);
     this.io = io;
     this.joinTokens = joinTokens;
     this.gameRepo = new GameRepository(database, clock);
@@ -124,6 +127,12 @@ export default class GameServer {
             return;
           }
 
+          const keys = [`room:id:${gameId}`, `room:address:${socket.handshake.address}`];
+          const retryAfterSeconds = this.attempts.retryAfterSeconds(keys);
+          if (retryAfterSeconds) {
+            socket.emit("auth_wait", retryAfterSeconds);
+            return;
+          }
           const created = this.gameRepo.isGameCreated(gameId);
           if (!created) {
             // Create a game and join
@@ -137,6 +146,7 @@ export default class GameServer {
             if (res) {
               await gameState.joinGame(gameId);
             } else {
+              this.attempts.wrong(keys);
               socket.emit("auth_error");
               return;
             }
