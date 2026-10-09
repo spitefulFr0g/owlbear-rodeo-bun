@@ -54,9 +54,28 @@ Decided for this release:
 | --- | --- |
 | 3. Permanent rooms | A room is saved to the data directory as an opaque, versioned document a few seconds after each change, and is kept until its GM deletes it. Rooms, and later accounts and library records, are kept in one SQLite database in the data directory, and asset bytes stay as files ([ADR 0009](adr/0009-records-in-one-sqlite-database.md)). The asset records move into the database, which also records which rooms have used each image. The supported backup is to stop the server and copy the data directory, and this is documented. |
 | 4. Accounts and the room list | First-run setup of the administrator, sign-in, invite and reset links. Creating a room needs an account ([ADR 0001](adr/0001-accounts-gate-creation.md)). The room list creates, renames, opens and deletes rooms and shows each room's size: its saved document plus every image the room has used. Deleting a room removes the images no other room uses. Rooms get a random id in their link and a name the GM can change. Invite Players copies the link. An administrator sees every room and the server total, can delete any room, and takes over the rooms of an account they remove. |
-| 5. Roles, first build, and sessions | GM, trusted player and player. Player colour. The room switches, checked on the server, which refuses room and scene settings changes from anyone but the GM. The session, started and ended by the GM, and the default welcome screen that players and cast displays see outside one. |
+| 5. Roles, first build, and sessions | GM, trusted player and player. Player colour. The room switches except Owner Only, checked on the server, which refuses room and scene settings changes from anyone but the GM. The session, started and ended by the GM, and the default welcome screen that players and cast displays see outside one. |
 
 Steps 3 and 4 always ship in the same release. Saved rooms without accounts would make every room created by visiting a link permanent, with nobody able to list or delete them.
+
+Decided for this release:
+
+- **Sign-in:** a browser stays signed in through a cookie holding a random token, and the record is saved in the database, so a restart signs nobody out. A sign-in lasts 30 days from its last use and ends on sign-out or a password reset. The cookie is `HttpOnly` and `SameSite=Lax`, and `Secure` only when the request came over HTTPS, so a plain-HTTP home network keeps working. A server reachable from the internet needs HTTPS in front of it, and the documentation says so.
+- **Sign-in and the join token:** they stay separate. The sign-in says who a person is. The join token is issued per connection and says which room that connection is in and as what: GM, player or cast display. The account that owns a room is its GM on every connection it opens. Everyone else is a player, signed in or not.
+- **Limits on attempts:** five wrong passwords for one account, or from one address, within 15 minutes refuse further attempts for 5 minutes the first time and for 15 minutes each time after that. The count starts over after a successful sign-in to that account, or after 24 hours without a wrong attempt. Counts are kept in memory, so a restart clears them. The same limit applies to room passwords. Nothing locks an account for good.
+- **Accounts:** a username and a password of at least 8 characters, and nothing else. Usernames are 3 to 32 characters and unique whatever their capitals. An invite link is single-use and expires after 7 days, and the invited person picks their own username and password. A reset link works the same way for an existing account. An account changes its own password by giving the current one, which signs out its other browsers. Changing a username is Later.
+- **Administrators:** there can be several. An administrator can make another account an administrator or take that away, and the last one cannot be removed or demoted. Removing an account signs it out everywhere at once and passes its rooms to the administrator who removed it.
+- **Reopening setup:** a command-line flag lets the next visitor create one new administrator, alongside everything that exists. It works once per start, and the server prints a warning while setup is open.
+- **Home page:** before setup, every page shows the setup form. Signed out, the home page is the sign-in form, and players arrive only by a room link. Signed in, it is the room list. A room link that does not exist shows "room not found" and creates nothing.
+- **Room links:** a random id of 16 letters and digits. Room links from v0.1.0 stop working, because those rooms were never saved.
+- **Room password:** optional, set by the GM when creating the room or later in its settings, and saved with the room. The signed-in GM is never asked for it. Changing it does not disconnect anyone already in the room.
+- **What a saved room holds:** the current map, its state (tokens, drawings, fog and notes), the list of images in use, the name, the password, the display link's token, the trusted players and the room switches. Not saved: who is connected, dice, timers, and the cast display's view and freeze. The GM's other maps stay in their browser until step 9, so a GM who signs in on a second device finds the room and its current map, and not their map library.
+- **Saving:** a room is written about three seconds after its last change, and once more on a clean shutdown.
+- **Deleting a room:** the people in it are disconnected and told that the room was deleted.
+- **Display link:** it no longer changes on a restart. A "new display link" action in the room's settings replaces the token and disconnects the cast displays using the old one.
+- **Trusted players:** remembered against the random id a player's browser keeps, and saved with the room. The GM marks and unmarks players from the party list. A trusted player who clears their browser or changes device is an ordinary player until marked again.
+- **Room switches:** five in this release, checked by the kind of change: tokens, drawing, notes and text, fog, and uploads. A new room has tokens, drawing, and notes and text on, and fog and uploads off. Owner Only needs a check on each item, so it arrives with step 6 and is not shown before then. Only the GM can change the map. With uploads off, a player can place only the built-in tokens and the images already in the room.
+- **Sessions:** outside a session, the server withholds the map and its state from players and cast displays. When a session ends, they return to the welcome screen at once and their changes are refused. A GM connected from two devices is the GM on both, and the five-minute timeout starts when the last of those connections drops. A server restart ends any running session.
 
 ### v0.3.0: the item model
 
@@ -97,7 +116,6 @@ Decisions that are known to be needed and are not made yet, with the step that n
 
 | Question | Needed by |
 | --- | --- |
-| How sign-in sessions work, how they relate to the join token, and what limits apply to sign-in attempts. | Step 4 |
 | What one world unit is (pixels at a fixed cell size, or grid cells) and where a scene's origin sits. | Step 6 |
 | Whether the transport stays on socket.io. | Step 6 |
 | Whether extensions written for `@owlbear-rodeo/sdk` should load unchanged. | The extension platform |
@@ -220,7 +238,7 @@ Added by the decision:
 
 | Feature | Verdict | Step | Note |
 | --- | --- | --- | --- |
-| Room switches: tokens, drawing, notes and text, fog, Owner Only, uploads | In | 5 | Set per room and applied to all of its scenes. |
+| Room switches: tokens, drawing, notes and text, fog, uploads | In | 5 | Set per room and applied to all of its scenes. Owner Only joins them in step 6. |
 | Trusted player | In | 5 | Marked per room by the GM. |
 | Locked items refuse changes from every player | In | 6 | Only the GM locks and unlocks. |
 | Kicking or banning a player | Later | | Changing the room password covers it for now. |

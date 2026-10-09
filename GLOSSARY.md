@@ -14,6 +14,18 @@ _Avoid_: Campaign, game, party
 An identity on one server that a person signs in to. Only an account can create a room.
 _Avoid_: User, login, profile
 
+**Sign-in**:
+The standing recognition of one browser as an account, from signing in until signing out, a password reset or a long stretch without use.
+_Avoid_: Session, login session, auth session
+
+**Invite link**:
+A one-time address an administrator hands to a person so they can create their own account. It stops working once used or after a few days.
+_Avoid_: Registration link, signup link
+
+**Reset link**:
+A one-time address an administrator hands to an account's owner so they can choose a new password.
+_Avoid_: Recovery link, password link
+
 **Administrator**:
 An account that manages the other accounts on a server, and can see and delete any room on it. The first account, made at setup, is an administrator.
 _Avoid_: Admin user, owner, superuser
