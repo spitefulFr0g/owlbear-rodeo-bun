@@ -39,7 +39,14 @@ export function frontendHandler(assets: AssetMap): RequestHandler {
       next();
       return;
     }
-    const asset = resolveAsset(req.path, assets);
+    let pathname: string;
+    try {
+      pathname = decodeURIComponent(req.path);
+    } catch {
+      res.sendStatus(400);
+      return;
+    }
+    const asset = resolveAsset(pathname, assets);
     if (!asset) {
       next();
       return;
