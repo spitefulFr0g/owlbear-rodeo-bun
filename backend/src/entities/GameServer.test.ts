@@ -23,8 +23,8 @@ afterEach(() => {
 
 afterAll(async () => { await server.dispose(); });
 
-function client(): Socket {
-  const socket = server.connect();
+function client(signedIn = false): Socket {
+  const socket = server.connect(signedIn ? cookie : undefined);
   sockets.push(socket);
   return socket;
 }
@@ -99,7 +99,7 @@ function displayToken(socket: Socket): Promise<string | null> {
 }
 
 async function owner(gameId: string) {
-  const socket = client();
+  const socket = client(true);
   await join(socket, gameId, "secret");
   socket.emit("player_state", { userId: "gm", nickname: "GM" });
   socket.emit("map", { id: "map-1", owner: "gm" });
@@ -157,7 +157,7 @@ test("a cast display receives initial and live state without player presence", a
   expect(events.map(([event]) => event)).toEqual([
     "party_state", "map_state", "map", "manifest", "joined_display", "display_frozen",
   ]);
-  expect(events[0][1]).toEqual({ [player.id!]: { userId: "gm", nickname: "GM" } });
+  expect(events[0][1]).toEqual({ [player.id!]: { userId: "gm", nickname: "GM", role: "gm" } });
   expect(events[1][1]).toEqual({ mapId: "map-1", notes: {} });
   expect(events[2][1]).toEqual({ id: "map-1", owner: "gm" });
   expect(events[3][1]).toEqual({ mapId: "map-1", assets: [] });
@@ -226,7 +226,7 @@ for (const [event, payload] of [
     const observer = client();
     const snapshot = record(observer);
     await joinDisplay(observer, gameId, token);
-    expect(snapshot[0][1]).toEqual({ [player.id!]: { userId: "gm", nickname: "GM" } });
+    expect(snapshot[0][1]).toEqual({ [player.id!]: { userId: "gm", nickname: "GM", role: "gm" } });
     expect(snapshot[1][1]).toEqual({ mapId: "map-1", notes: {} });
     expect(snapshot[2][1]).toEqual({ id: "map-1", owner: "gm" });
     expect(snapshot[3][1]).toEqual({ mapId: "map-1", assets: [] });
@@ -246,7 +246,7 @@ test("a cast display cannot rejoin as a player or join a second room", async () 
   display.emit("join_display", rooms.get("display-second-room")!, secondToken);
   await refused;
   expect(events.map(([event]) => event)).toEqual(["display_error"]);
-  const player = client();
+  const player = client(true);
   await join(player, "display-single-room", "secret");
   const received = next(display, "map");
   player.emit("map", { id: "still-first-room", owner: "gm" });
@@ -266,7 +266,7 @@ test("a pending player join cannot also join as a cast display", async () => {
   await pause();
   expect(events.some(([event]) => event === "joined_display")).toBe(false);
   expect(events.some(([event]) => event === "display_error")).toBe(true);
-  const observer = client();
+  const observer = client(true);
   await join(observer, "display-pending-player", "secret");
   const received = next(socket, "map");
   observer.emit("map", { id: "player-room", owner: "gm" });

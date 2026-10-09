@@ -46,10 +46,10 @@ test("joining carries the name and renaming reaches players and cast displays wi
   try {
     const { cookie } = await setupAdministrator(server);
     const room = await createRoom(server, cookie, "Before");
-    const player = server.connect();
+    const player = server.connect(cookie);
     const joined = nextMessage(player, "joined_game");
     player.emit("join_game", room.id, "");
-    expect((await joined)[2]).toEqual({ room: { name: "Before" } });
+    expect((await joined)[2]).toEqual({ role: "gm", room: { name: "Before" } });
     const peer = await server.joinRoom(room.id);
     const party = nextMessage(peer.socket, "party_state");
     player.emit("player_state", { userId: "gm" });
@@ -99,7 +99,7 @@ test("renamed rooms keep their GM, name, document and link across restart and im
   try {
     const { cookie } = await setupAdministrator(server);
     const room = await createRoom(server, cookie, "Before");
-    const player = await server.joinRoom(room.id);
+    const player = await server.joinRoomAsGM(room.id, cookie);
     player.socket.emit("map", { id: "saved", owner: "gm" });
     const peer = await server.joinRoom(room.id);
     expect(peer.state.map).toEqual({ id: "saved", owner: "gm" });

@@ -7,7 +7,7 @@ import { randomBytes } from "crypto";
  */
 export default class JoinTokens {
   private readonly gameByToken = new Map<
-    string, { gameId: string; role: "player" | "display" }
+    string, { gameId: string; role: "gm" | "player" | "display" }
   >();
   private readonly tokenBySocket = new Map<string, string>();
 
@@ -15,7 +15,7 @@ export default class JoinTokens {
   issue(
     socketId: string,
     gameId: string,
-    role: "player" | "display" = "player"
+    role: "gm" | "player" | "display" = "player"
   ): string {
     this.revoke(socketId);
     const token = randomBytes(32).toString("base64url");
@@ -25,7 +25,8 @@ export default class JoinTokens {
   }
 
   canUpload(token: string): boolean {
-    return this.gameByToken.get(token)?.role === "player";
+    const role = this.gameByToken.get(token)?.role;
+    return role === "gm" || role === "player";
   }
 
   revoke(socketId: string): void {
