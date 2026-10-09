@@ -120,3 +120,16 @@ export async function setupAdministrator(server: Pick<RunningServer, "address">,
   const cookie = response.headers.get("set-cookie")!.split(";")[0];
   return { account, cookie };
 }
+
+/** Signs in through HTTP and keeps the cookie for later browser requests. */
+export async function signIn(server: Pick<RunningServer, "address">, username: string, password: string) {
+  const response = await fetch(`${server.address}/api/sign-in`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ username, password }),
+  });
+  if (response.status !== 200) throw new Error(`Sign-in failed: ${await response.text()}`);
+  const { account } = await response.json() as { account: import("../accounts/Accounts").Account };
+  const cookie = response.headers.get("set-cookie")!.split(";")[0];
+  return { account, cookie };
+}
