@@ -32,14 +32,13 @@ export default class GameServer {
     this.io.on("connect", async (socket: Socket) => {
       const gameState = new GameState(this.io, socket, this.gameRepo);
       let _gameId: string;
-      let castDisplay = false;
       let joining = false;
 
       // Cast displays may only request read access. New write events are
       // refused here too, before any handler can change or forward state.
       socket.use(([event], next) => {
         if (
-          castDisplay && event !== "get_display_token" && event !== "join_display"
+          socket.data.castDisplay && event !== "get_display_token" && event !== "join_display"
         ) return;
         next();
       });
@@ -47,7 +46,7 @@ export default class GameServer {
       socket.on("get_display_token", (answer: (token: string | null) => void) => {
         if (typeof answer !== "function") return;
         const gameId = gameState.getGameId();
-        if (castDisplay || !gameId) {
+        if (socket.data.castDisplay || !gameId) {
           answer(null);
           return;
         }
@@ -70,7 +69,6 @@ export default class GameServer {
           socket.emit("display_error");
           return;
         }
-        castDisplay = true;
         socket.data.castDisplay = true;
         _gameId = gameId;
         await gameState.joinGame(gameId, true);
@@ -83,7 +81,7 @@ export default class GameServer {
 
       socket.on("disconnecting", async () => {
         this.joinTokens.revoke(socket.id);
-        if (castDisplay) return;
+        if (socket.data.castDisplay) return;
         try {
           let gameId: string;
           if (_gameId) {
@@ -111,7 +109,7 @@ export default class GameServer {
       });
 
       socket.on("join_game", async (gameId: string, password: string) => {
-        if (joining || castDisplay || gameState.getGameId()) return;
+        if (joining || socket.data.castDisplay || gameState.getGameId()) return;
         joining = true;
         const auth = new Auth();
 
@@ -154,7 +152,7 @@ export default class GameServer {
 
       const followedGame = () => {
         const gameId = gameState.getGameId();
-        if (!gameId || castDisplay) return;
+        if (!gameId || socket.data.castDisplay) return;
         const game = this.gameRepo.games[gameId];
         const player = game.getPartyState()[socket.id];
         const map = game.getState("map") as Map | undefined;
@@ -215,8 +213,10 @@ export default class GameServer {
           if (previousMap?.id !== map?.id) {
             game.latestDisplayView = undefined;
             game.shownDisplayView = undefined;
-            game.displayFrozen = false;
-            this.io.to(gameId).emit("display_frozen", false);
+            if (game.displayFrozen) {
+              game.displayFrozen = false;
+              this.io.to(gameId).emit("display_frozen", false);
+            }
           }
           this.gameRepo.setState(gameId, "map", map);
           const state = this.gameRepo.getState(gameId, "map");

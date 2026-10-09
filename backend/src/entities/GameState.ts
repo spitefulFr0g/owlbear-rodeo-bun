@@ -15,7 +15,6 @@ export default class GameState {
 
   getGameId(): string | undefined {
     let gameId;
-    // eslint-disable-next-line no-restricted-syntax
     for (const room of this.socket.rooms) {
       if (room !== this.socket.id) {
         gameId = room;

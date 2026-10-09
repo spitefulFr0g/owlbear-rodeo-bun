@@ -31,10 +31,15 @@ export function parseConfig(
       port: { type: "string", short: "p" },
       "allow-origin": { type: "string" },
       "data-dir": { type: "string" },
+      "ice-servers": { type: "string" },
       help: { type: "boolean", short: "h" },
     },
     strict: true,
   });
+
+  if (values["ice-servers"] !== undefined || env.ICE_SERVERS_FILE !== undefined) {
+    console.warn("Warning: --ice-servers / ICE_SERVERS_FILE no longer does anything because peer-to-peer connections were removed.");
+  }
 
   return {
     port: parsePort(values.port ?? env.PORT ?? "9000"),

@@ -180,7 +180,7 @@ test("a cast display receives initial and live state without player presence", a
   display.disconnect();
   await until(() => joinTokens.verify(joinToken) === undefined);
   await pause();
-  expect(playerEvents).toEqual([["display_frozen", false]]);
+  expect(playerEvents).toEqual([]);
 });
 
 for (const [label, room, token] of [
@@ -346,6 +346,36 @@ test("freeze holds the shown view for joining displays and unfreeze sends the la
   await pause();
   expect(events.slice(-2)).toEqual([["display_frozen", false], ["display_view", latest]]);
   expect(lateEvents.slice(-2)).toEqual([["display_frozen", false], ["display_view", latest]]);
+});
+
+test("switching maps through none broadcasts unfreeze only once and forgets unfrozen views", async () => {
+  const gameId = "display-map-switch";
+  const { socket: player, token } = await owner(gameId);
+  const display = client();
+  await joinDisplay(display, gameId, token);
+  player.emit("display_view", view);
+  player.emit("display_freeze", true);
+  await displayToken(player);
+  await pause();
+  const events = record(display);
+  const playerEvents = record(player);
+  player.emit("map", null);
+  player.emit("map", { id: "map-2", owner: "gm" });
+  await displayToken(player);
+  await pause();
+  expect(events.filter(([event]) => event === "display_frozen")).toEqual([["display_frozen", false]]);
+  expect(playerEvents).toEqual([["display_frozen", false]]);
+  player.emit("display_view", { ...view, mapId: "map-2" });
+  await displayToken(player);
+  player.emit("map", null);
+  player.emit("map", { id: "map-3", owner: "gm" });
+  await displayToken(player);
+  await pause();
+  expect(events.filter(([event]) => event === "display_frozen")).toEqual([["display_frozen", false]]);
+  const late = client();
+  const lateEvents = record(late);
+  await joinDisplay(late, gameId, token);
+  expect(lateEvents.filter(([event]) => event === "display_view")).toEqual([]);
 });
 
 for (const replacement of [null, { id: "map-2", owner: "gm" }]) {
