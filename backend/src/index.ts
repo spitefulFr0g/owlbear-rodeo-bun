@@ -4,7 +4,6 @@ import helmet from "helmet";
 import { networkInterfaces } from "os";
 import { join, resolve } from "path";
 import { Server } from "socket.io";
-// @ts-ignore
 import msgParser from "socket.io-msgpack-parser";
 import AppServer from "./entities/AppServer";
 import AssetController from "./controllers/AssetController";
@@ -32,7 +31,7 @@ if (config.help) {
   console.log(USAGE);
   process.exit(0);
 }
-const { allowOrigin } = config;
+const { allowOrigin, port, dataDir: configuredDataDir } = config;
 
 const iceServer = new IceServer(config.iceServersFile);
 try {
@@ -48,7 +47,7 @@ try {
 const MAX_ASSET_BYTES = 64 * 1024 * 1024;
 
 const dataDir = resolve(
-  config.dataDir ?? defaultDataDir(process.execPath, Bun.main, process.cwd())
+  configuredDataDir ?? defaultDataDir(process.execPath, Bun.main, process.cwd())
 );
 const assetStore = new FsAssetStore(join(dataDir, "assets"), MAX_ASSET_BYTES);
 try {
@@ -63,7 +62,7 @@ try {
 const joinTokens = new JoinTokens();
 
 const app: Application = express();
-const server = new AppServer(app, config.port);
+const server = new AppServer(app, port);
 
 const io = new Server(server, {
   cookie: false,
@@ -107,9 +106,11 @@ server.loadControllers(controllers);
 server.loadMiddleware([frontendHandler(frontendAssets)]);
 
 const httpServer = server.run(() => {
+  const address = httpServer.address();
+  const boundPort = typeof address === "object" && address ? address.port : port;
   const urls = [
-    `http://localhost:${config.port}`,
-    ...lanUrls(config.port, networkInterfaces()),
+    `http://localhost:${boundPort}`,
+    ...lanUrls(boundPort, networkInterfaces()),
   ];
   console.log(`Owlbear Rodeo is running at:\n  ${urls.join("\n  ")}`);
   console.log(`Maps and tokens are kept in ${dataDir}`);
