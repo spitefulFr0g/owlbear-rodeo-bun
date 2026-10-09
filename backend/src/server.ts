@@ -1,3 +1,4 @@
+import AdministratorController from "./controllers/AdministratorController";
 import AttemptLimiter from "./AttemptLimiter";
 import cors from "cors";
 import RoomController from "./controllers/RoomController";
@@ -119,6 +120,7 @@ export async function startServer(options: ServerOptions): Promise<RunningServer
   const game = new GameServer(io, joinTokens, database, options.clock, attempts);
   app.use("/api", new RoomController(accounts, database, game.gameRepo, (id, name) => io.to(id).emit("room_state", { name })).setRoutes());
   app.use("/api", new InviteController(accounts).setRoutes());
+  app.use("/api", new AdministratorController(accounts, game.gameRepo).setRoutes());
   server.loadControllers(controllers);
   server.loadMiddleware([frontendHandler(frontendAssets)]);
 
