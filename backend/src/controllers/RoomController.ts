@@ -26,7 +26,7 @@ export default class RoomController {
   setRoutes(): Router {
     const router = Router();
     router.use("/rooms", (req, res, next) => {
-      const account = this.accounts.resolveAccount(req, token => res.cookie("owlbear_sign_in", token, lastingSignInCookieOptions));
+      const account = this.accounts.resolveAccount(req, token => res.cookie("owlbear_sign_in", token, lastingSignInCookieOptions(req)));
       if (!account) {
         res.status(401).json({ error: "not_signed_in", message: "Sign in to manage your rooms." });
         return;

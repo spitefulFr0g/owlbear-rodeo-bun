@@ -9,6 +9,7 @@ export interface Config {
   dataDir?: string;
   help: boolean;
   reopenSetup: boolean;
+  behindProxy: boolean;
 }
 
 export const USAGE = `Usage: owlbear-rodeo [options]
@@ -22,6 +23,8 @@ Options:
                              executable)
       --reopen-setup         Let the next visitor create one new administrator
                              (once per start; no environment variable)
+      --behind-proxy         Trust the nearest proxy's forwarded address and
+                             protocol (proxy must append/replace these headers)
   -h, --help                 Show this help`;
 
 export function parseConfig(
@@ -35,6 +38,7 @@ export function parseConfig(
       "allow-origin": { type: "string" },
       "data-dir": { type: "string" },
       "reopen-setup": { type: "boolean" },
+      "behind-proxy": { type: "boolean" },
       "ice-servers": { type: "string" },
       help: { type: "boolean", short: "h" },
     },
@@ -51,6 +55,7 @@ export function parseConfig(
     dataDir: values["data-dir"] || env.DATA_DIR || undefined,
     help: values.help ?? false,
     reopenSetup: values["reopen-setup"] ?? false,
+    behindProxy: values["behind-proxy"] ?? false,
   };
 }
 

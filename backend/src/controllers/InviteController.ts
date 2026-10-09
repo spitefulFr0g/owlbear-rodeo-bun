@@ -43,7 +43,7 @@ export default class InviteController extends Controller {
       res.status(status).json({ error: result.error, message });
       return;
     }
-    res.cookie("owlbear_sign_in", result.token, lastingSignInCookieOptions);
+    res.cookie("owlbear_sign_in", result.token, lastingSignInCookieOptions(req));
     res.status(201).json({ account: result.account });
   }
 }

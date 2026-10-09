@@ -36,6 +36,7 @@ export interface ServerOptions {
   allowOrigin: RegExp | null;
   clock: Clock;
   reopenSetup?: boolean;
+  behindProxy?: boolean;
   databaseUpgrades?: readonly UpgradeStep[];
 }
 
@@ -66,6 +67,7 @@ export async function startServer(options: ServerOptions): Promise<RunningServer
   const joinTokens = new JoinTokens();
 
   const app: Application = express();
+  app.set("behindProxy", options.behindProxy ?? false);
   const server = new AppServer(app, port);
 
   const io = new Server({
@@ -116,7 +118,7 @@ export async function startServer(options: ServerOptions): Promise<RunningServer
   app.options("*", (_req, res) => res.sendStatus(204));
   app.use("/api", new SetupController(accounts).setRoutes());
   app.use("/api", new SignInController(accounts, attempts).setRoutes());
-  const game = new GameServer(io, joinTokens, database, options.clock, attempts);
+  const game = new GameServer(io, joinTokens, database, options.clock, attempts, options.behindProxy);
   app.use("/api", new RoomController(accounts, database, game.gameRepo, (id, name) => io.to(id).emit("room_state", { name })).setRoutes());
   app.use("/api", new InviteController(accounts).setRoutes());
   server.loadControllers(controllers);

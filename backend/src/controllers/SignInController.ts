@@ -1,3 +1,4 @@
+import { clientAddress } from "../clientRequest";
 import AttemptLimiter from "../AttemptLimiter";
 import express, { Request, Response, RequestHandler, NextFunction } from "express";
 import { lastingSignInCookieOptions, signInCookieOptions } from "../accounts/signInCookie";
@@ -24,14 +25,14 @@ export default class SignInController extends Controller {
 
   private signOut(req: Request, res: Response): void {
     this.accounts.signOut(req);
-    res.clearCookie("owlbear_sign_in", signInCookieOptions);
+    res.clearCookie("owlbear_sign_in", signInCookieOptions(req));
     res.status(204).end();
   }
 
   private async signIn(req: Request, res: Response): Promise<void> {
     const { username, password } = req.body ?? {};
     const nameKey = `sign-in:name:${typeof username === "string" ? username.toLowerCase() : ""}`;
-    const keys = [nameKey, `sign-in:address:${req.socket.remoteAddress}`];
+    const keys = [nameKey, `sign-in:address:${clientAddress(req, req.app.get("behindProxy") === true)}`];
     const retryAfterSeconds = this.attempts.retryAfterSeconds(keys);
     if (retryAfterSeconds) {
       res.status(429).json({ error: "too_many_attempts", message: "Too many incorrect passwords; please wait before trying again.", retryAfterSeconds });
@@ -45,7 +46,7 @@ export default class SignInController extends Controller {
       return;
     }
     this.attempts.reset(nameKey);
-    res.cookie("owlbear_sign_in", result.token, lastingSignInCookieOptions);
+    res.cookie("owlbear_sign_in", result.token, lastingSignInCookieOptions(req));
     res.json({ account: result.account });
   }
 }
