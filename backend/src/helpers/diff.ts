@@ -3,7 +3,7 @@ import get from "lodash.get";
 const { applyChange } = diff;
 
 export function applyChanges<LHS>(target: LHS, changes: Diff<LHS, any>[]) {
-  for (let change of changes) {
+  for (const change of changes) {
     if (change.path && (change.kind === "E" || change.kind === "A")) {
       // If editing an object or array ensure that the value exists
       const valid = get(target, change.path) !== undefined;

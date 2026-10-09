@@ -7,11 +7,10 @@
     "moduleDetection": "force",
     "types": ["bun"],
     "allowSyntheticDefaultImports": true,
-    "resolveJsonModule": true,
     "noEmit": true,
     "strict": true,
     "noFallthroughCasesInSwitch": true,
     "skipLibCheck": true
   },
-  "include": ["./src/**/*", "./scripts/**/*", "ice.json"]
+  "include": ["./src/**/*", "./scripts/**/*"]
 }

@@ -2,6 +2,7 @@
 import { Server as HttpServer } from "http";
 import { Socket, Server as IOServer } from "socket.io";
 import Auth from "./Auth";
+import { DisplayView } from "../types/DisplayView";
 import GameRepository from "./GameRepository";
 import GameState from "./GameState";
 import JoinTokens from "./JoinTokens";
@@ -31,18 +32,56 @@ export default class GameServer {
     this.io.on("connect", async (socket: Socket) => {
       const gameState = new GameState(this.io, socket, this.gameRepo);
       let _gameId: string;
+      let joining = false;
 
-      socket.on("signal", (data: string) => {
-        try {
-          const { to, signal } = JSON.parse(data);
-          this.io.to(to).emit("signal", { from: socket.id, signal });
-        } catch (error) {
-          console.error("SIGNAL_ERROR", error);
+      // Cast displays may only request read access. New write events are
+      // refused here too, before any handler can change or forward state.
+      socket.use(([event], next) => {
+        if (
+          socket.data.castDisplay && event !== "get_display_token" && event !== "join_display"
+        ) return;
+        next();
+      });
+
+      socket.on("get_display_token", (answer: (token: string | null) => void) => {
+        if (typeof answer !== "function") return;
+        const gameId = gameState.getGameId();
+        if (socket.data.castDisplay || !gameId) {
+          answer(null);
+          return;
         }
+        const player = this.gameRepo.getPartyState(gameId)[socket.id];
+        const map = this.gameRepo.getState(gameId, "map") as Map | undefined;
+        answer(
+          player?.userId && map && player.userId === map.owner
+            ? this.gameRepo.games[gameId].displayToken
+            : null
+        );
+      });
+
+      socket.on("join_display", async (gameId: string, displayToken: string) => {
+        if (
+          joining || gameState.getGameId() || typeof gameId !== "string" ||
+          typeof displayToken !== "string" ||
+          !this.gameRepo.isGameCreated(gameId) ||
+          this.gameRepo.games[gameId].displayToken !== displayToken
+        ) {
+          socket.emit("display_error");
+          return;
+        }
+        socket.data.castDisplay = true;
+        _gameId = gameId;
+        await gameState.joinGame(gameId, true);
+        const token = this.joinTokens.issue(socket.id, gameId, "display");
+        socket.emit("joined_display", socket.id, token);
+        const game = this.gameRepo.games[gameId];
+        socket.emit("display_frozen", game.displayFrozen);
+        if (game.shownDisplayView) socket.emit("display_view", game.shownDisplayView);
       });
 
       socket.on("disconnecting", async () => {
         this.joinTokens.revoke(socket.id);
+        if (socket.data.castDisplay) return;
         try {
           let gameId: string;
           if (_gameId) {
@@ -70,8 +109,9 @@ export default class GameServer {
       });
 
       socket.on("join_game", async (gameId: string, password: string) => {
+        if (joining || socket.data.castDisplay || gameState.getGameId()) return;
+        joining = true;
         const auth = new Auth();
-        _gameId = gameId;
 
         try {
           if (typeof gameId !== "string" || typeof password !== "string") {
@@ -97,12 +137,59 @@ export default class GameServer {
               return;
             }
           }
+          _gameId = gameId;
           // Only the player who joined gets the token for the asset routes
           const token = this.joinTokens.issue(socket.id, gameId);
           socket.emit("joined_game", socket.id, token);
+          socket.emit("display_frozen", this.gameRepo.games[gameId].displayFrozen);
           socket.to(gameId).emit("joined_game", socket.id);
         } catch (error) {
           console.error("JOIN_ERROR", error);
+        } finally {
+          joining = false;
+        }
+      });
+
+      const followedGame = () => {
+        const gameId = gameState.getGameId();
+        if (!gameId || socket.data.castDisplay) return;
+        const game = this.gameRepo.games[gameId];
+        const player = game.getPartyState()[socket.id];
+        const map = game.getState("map") as Map | undefined;
+        if (player?.userId && map && player.userId === map.owner) return game;
+      };
+
+      const forwardView = (gameId: string, view: DisplayView) => {
+        for (const id of this.io.sockets.adapter.rooms.get(gameId) || []) {
+          const display = this.io.sockets.sockets.get(id);
+          if (display?.data.castDisplay) display.emit("display_view", view);
+        }
+      };
+
+      socket.on("display_view", (view: DisplayView) => {
+        const game = followedGame();
+        if (
+          !game || !view || typeof view.mapId !== "string" ||
+          view.mapId !== (game.getState("map") as Map).id ||
+          ![view.x, view.y, view.width, view.height].every(
+            (value) => typeof value === "number" && Number.isFinite(value)
+          ) || view.width <= 0 || view.height <= 0
+        ) return;
+        game.latestDisplayView = view;
+        if (!game.displayFrozen) {
+          game.shownDisplayView = view;
+          forwardView(game.gameId, view);
+        }
+      });
+
+      socket.on("display_freeze", (frozen: boolean) => {
+        const game = followedGame();
+        if (!game || typeof frozen !== "boolean" || frozen === game.displayFrozen) return;
+        game.displayFrozen = frozen;
+        this.io.to(game.gameId).emit("display_frozen", frozen);
+        if (!frozen && game.latestDisplayView) {
+          game.shownDisplayView = game.latestDisplayView;
+          forwardView(game.gameId, game.latestDisplayView);
         }
       });
 
@@ -121,6 +208,16 @@ export default class GameServer {
             }
           }
 
+          const game = this.gameRepo.games[gameId];
+          const previousMap = game.getState("map") as Map | undefined;
+          if (previousMap?.id !== map?.id) {
+            game.latestDisplayView = undefined;
+            game.shownDisplayView = undefined;
+            if (game.displayFrozen) {
+              game.displayFrozen = false;
+              this.io.to(gameId).emit("display_frozen", false);
+            }
+          }
           this.gameRepo.setState(gameId, "map", map);
           const state = this.gameRepo.getState(gameId, "map");
           socket.broadcast.to(gameId).emit("map", state);

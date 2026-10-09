@@ -15,7 +15,6 @@ export default class GameState {
 
   getGameId(): string | undefined {
     let gameId;
-    // eslint-disable-next-line no-restricted-syntax
     for (const room of this.socket.rooms) {
       if (room !== this.socket.id) {
         gameId = room;
@@ -24,7 +23,7 @@ export default class GameState {
     return gameId;
   }
 
-  async joinGame(gameId: string): Promise<void> {
+  async joinGame(gameId: string, castDisplay = false): Promise<void> {
     await this.socket.join(gameId);
 
     const partyState = this.gameRepository.getPartyState(gameId);
@@ -39,7 +38,7 @@ export default class GameState {
     const manifest = this.gameRepository.getState(gameId, "manifest");
     this.socket.emit("manifest", manifest);
 
-    this.socket.to(gameId).emit("player_joined", this.socket.id);
+    if (!castDisplay) this.socket.to(gameId).emit("player_joined", this.socket.id);
   }
 
   async broadcastPlayerState(
