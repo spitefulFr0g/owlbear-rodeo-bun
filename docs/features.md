@@ -52,8 +52,8 @@ Decided for this release:
 
 | Step | What is built |
 | --- | --- |
-| 3. Permanent rooms | A room is saved to the data directory as an opaque, versioned document a few seconds after each change, and is kept until its GM deletes it. A copy of the data directory is the supported backup, and this is documented. |
-| 4. Accounts and the room list | First-run setup of the administrator, sign-in, invite and reset links. Creating a room needs an account ([ADR 0001](adr/0001-accounts-gate-creation.md)). The room list creates, renames, opens and deletes rooms and shows each room's size. Rooms get a random id in their link and a name the GM can change. Invite Players copies the link. An administrator sees every room and the server total, can delete any room, and takes over the rooms of an account they remove. |
+| 3. Permanent rooms | A room is saved to the data directory as an opaque, versioned document a few seconds after each change, and is kept until its GM deletes it. Rooms, and later accounts and library records, are kept in one SQLite database in the data directory, and asset bytes stay as files ([ADR 0009](adr/0009-records-in-one-sqlite-database.md)). The asset records move into the database, which also records which rooms have used each image. The supported backup is to stop the server and copy the data directory, and this is documented. |
+| 4. Accounts and the room list | First-run setup of the administrator, sign-in, invite and reset links. Creating a room needs an account ([ADR 0001](adr/0001-accounts-gate-creation.md)). The room list creates, renames, opens and deletes rooms and shows each room's size: its saved document plus every image the room has used. Deleting a room removes the images no other room uses. Rooms get a random id in their link and a name the GM can change. Invite Players copies the link. An administrator sees every room and the server total, can delete any room, and takes over the rooms of an account they remove. |
 | 5. Roles, first build, and sessions | GM, trusted player and player. Player colour. The room switches, checked on the server, which refuses room and scene settings changes from anyone but the GM. The session, started and ended by the GM, and the default welcome screen that players and cast displays see outside one. |
 
 Steps 3 and 4 always ship in the same release. Saved rooms without accounts would make every room created by visiting a link permanent, with nobody able to list or delete them.
@@ -97,7 +97,6 @@ Decisions that are known to be needed and are not made yet, with the step that n
 
 | Question | Needed by |
 | --- | --- |
-| Where rooms, accounts and library records live in the data directory: plain files or an embedded database. See [Decide how the server stores rooms, accounts and library records](https://github.com/spitefulFr0g/owlbear-rodeo-bun/issues/26). | Step 3 |
 | How sign-in sessions work, how they relate to the join token, and what limits apply to sign-in attempts. | Step 4 |
 | What one world unit is (pixels at a fixed cell size, or grid cells) and where a scene's origin sits. | Step 6 |
 | Whether the transport stays on socket.io. | Step 6 |
@@ -168,7 +167,7 @@ Added by the decision:
 
 ### C. Storage, accounts and rooms
 
-Decisions: [Decide the access model: server password, local accounts, or both](https://github.com/spitefulFr0g/owlbear-rodeo-bun/issues/10) and [Screen storage and rooms (section C)](https://github.com/spitefulFr0g/owlbear-rodeo-bun/issues/13).
+Decisions: [Decide the access model: server password, local accounts, or both](https://github.com/spitefulFr0g/owlbear-rodeo-bun/issues/10), [Screen storage and rooms (section C)](https://github.com/spitefulFr0g/owlbear-rodeo-bun/issues/13) and [Decide how the server stores rooms, accounts and library records](https://github.com/spitefulFr0g/owlbear-rodeo-bun/issues/26).
 
 | Feature | Verdict | Step | Note |
 | --- | --- | --- | --- |
@@ -183,9 +182,9 @@ Decisions: [Decide the access model: server password, local accounts, or both](h
 | Enabled-extension list | Later | | With extensions. |
 | Request to join with GM approval | Later | | The room password stays the only gate on joining. |
 | Invite Players button that copies the link | In | 4 | |
-| Storage manager: usage | In | 4 | Per room on the room list; the server total for the administrator. |
+| Storage manager: usage | In | 4 | Per room on the room list; the server total for the administrator. An image used in two rooms counts in both, and the server total counts disk space actually used. |
 | Storage manager: quotas | Later | | Today's per-file size cap stays. |
-| Storage manager: backup export and import | In as a copy of the data directory. Later: in-app export and import of one room | 3 | |
+| Storage manager: backup export and import | In as a copy of the data directory. Later: in-app export and import of one room | 3 | Taken with the server stopped. A snapshot written by the running server is Later. |
 | Converter from 1.0 data | Out for placed state. In: the browser library import | 9 | Read from the browser's own database by any signed-in account; there is no file route. |
 | Room metadata bag | Later | | With extensions. |
 
