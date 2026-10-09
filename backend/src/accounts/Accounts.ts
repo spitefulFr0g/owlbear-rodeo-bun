@@ -118,6 +118,54 @@ export default class Accounts {
     });
   }
 
+  createResetLink(accountId: string): { token: string; expiresAt: number } | null {
+    if (!this.database.connection.query("SELECT 1 FROM accounts WHERE id = ?").get(accountId)) return null;
+    const token = randomBytes(32).toString("hex");
+    const expiresAt = this.clock.now() + 7 * 24 * 60 * 60 * 1000;
+    this.database.connection.query("INSERT INTO resets (tokenHash, accountId, expiresAt) VALUES (?, ?, ?)").run(this.tokenHash(token), accountId, expiresAt);
+    return { token, expiresAt };
+  }
+
+  resetAccount(token: string): Account | null {
+    const row = this.database.connection.query<{ id: string; username: string; administrator: number }, [string, number]>(
+      "SELECT accounts.id, username, administrator FROM resets JOIN accounts ON accounts.id = resets.accountId WHERE tokenHash = ? AND expiresAt > ?"
+    ).get(this.tokenHash(token), this.clock.now());
+    return row ? { ...row, administrator: !!row.administrator } : null;
+  }
+
+  async acceptReset(token: string, password: unknown) {
+    if (!this.resetAccount(token)) return { error: "link_invalid" } as const;
+    if (typeof password !== "string" || password.length < 8) return { error: "password_too_short" } as const;
+    const passwordHash = await new Auth().createPasswordHash(password);
+    return this.database.transaction(() => {
+      const account = this.resetAccount(token);
+      if (!account) return { error: "link_invalid" } as const;
+      this.database.connection.query("UPDATE accounts SET passwordHash = ? WHERE id = ?").run(passwordHash, account.id);
+      this.database.connection.query("DELETE FROM resets WHERE tokenHash = ?").run(this.tokenHash(token));
+      this.database.connection.query("DELETE FROM sign_ins WHERE accountId = ?").run(account.id);
+      const signInToken = randomBytes(32).toString("hex");
+      this.database.connection.query("INSERT INTO sign_ins (tokenHash, accountId, createdAt, lastUsedAt) VALUES (?, ?, ?, ?)").run(this.tokenHash(signInToken), account.id, this.clock.now(), this.clock.now());
+      return { account, token: signInToken };
+    });
+  }
+
+  async changePassword(request: Pick<IncomingMessage, "headers">, currentPassword: unknown, newPassword: unknown) {
+    const account = this.resolveAccount(request);
+    if (!account) return { error: "not_signed_in" } as const;
+    const row = this.database.connection.query<{ passwordHash: string }, [string]>("SELECT passwordHash FROM accounts WHERE id = ?").get(account.id);
+    if (!row || typeof currentPassword !== "string" || !await new Auth().checkPassword(currentPassword, row.passwordHash)) return { error: "wrong_password" } as const;
+    if (typeof newPassword !== "string" || newPassword.length < 8) return { error: "password_too_short" } as const;
+    const passwordHash = await new Auth().createPasswordHash(newPassword);
+    return this.database.transaction(() => {
+      // Password hashing yields: a reset or another change may have ended this sign-in meanwhile.
+      if (!this.resolveAccount(request)) return { error: "not_signed_in" } as const;
+      const changed = this.database.connection.query("UPDATE accounts SET passwordHash = ? WHERE id = ? AND passwordHash = ?").run(passwordHash, account.id, row.passwordHash);
+      if (!changed.changes) return { error: "wrong_password" } as const;
+      this.database.connection.query("DELETE FROM sign_ins WHERE accountId = ? AND tokenHash != ?").run(account.id, this.tokenHash(this.signInToken(request)!));
+      return {};
+    });
+  }
+
   hasAdministrator(): boolean {
     return !!this.database.connection.query("SELECT 1 FROM accounts WHERE administrator = 1 LIMIT 1").get();
   }

@@ -58,6 +58,11 @@ const layout = `
     tokenHash TEXT PRIMARY KEY,
     expiresAt INTEGER NOT NULL
   );
+  CREATE TABLE IF NOT EXISTS resets (
+    tokenHash TEXT PRIMARY KEY,
+    accountId TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+    expiresAt INTEGER NOT NULL
+  );
   CREATE TABLE IF NOT EXISTS metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 `;
 

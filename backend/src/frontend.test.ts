@@ -67,13 +67,13 @@ test("serves URL-encoded asset filenames through HTTP", async () => {
   }
 });
 
-test("serves index.html for invite and administration browser pages through HTTP", async () => {
+test("serves index.html for invite, reset and administration browser pages through HTTP", async () => {
   const app = express();
   app.use(frontendHandler({ "/index.html": import.meta.path }));
   const server = app.listen(0);
   try {
     const { port } = server.address() as AddressInfo;
-    for (const path of ["/invite/abc123", "/admin"]) {
+    for (const path of ["/invite/abc123", "/reset/abc123", "/admin"]) {
       const response = await fetch(`http://localhost:${port}${path}`);
       expect(response.status).toBe(200);
       expect(response.headers.get("content-type")).toContain("text/html");
