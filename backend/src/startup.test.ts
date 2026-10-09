@@ -123,3 +123,19 @@ test("a damaged SQLite database refuses startup without emptying it", async () =
     expect(await readFile(path)).toEqual(damaged);
   } finally { await rm(dir, { recursive: true, force: true }); }
 });
+
+test("an older signed layout version is upgraded only once", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "owlbear-startup-"));
+  try {
+    await olderDatabase(dir, "saved");
+    const db = new Database(join(dir, "owlbear.db"));
+    db.exec("PRAGMA user_version = -1");
+    db.close();
+    const before = await readFile(join(dir, "owlbear.db"));
+    const server = await startTestServer(undefined, dir);
+    try {
+      await server.restart();
+      expect(await readFile(join(dir, "owlbear.db.before-upgrade"))).toEqual(before);
+    } finally { await server.stop(); }
+  } finally { await rm(dir, { recursive: true, force: true }); }
+});

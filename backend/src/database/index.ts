@@ -37,7 +37,7 @@ export class OwlbearDatabase {
           if (step.version > version && step.version <= LAYOUT_VERSION) this.connection.exec(step.sql);
         }
         this.connection.exec(layout);
-        if (this.connection.query<{ user_version: number }, []>("PRAGMA user_version").get()?.user_version === 0) {
+        if (!existing || version < LAYOUT_VERSION) {
           this.connection.exec(`PRAGMA user_version = ${LAYOUT_VERSION}`);
         }
       });
