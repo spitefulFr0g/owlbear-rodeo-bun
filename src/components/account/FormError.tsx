@@ -19,9 +19,11 @@ function FormError({ error }: { error?: ApiError }) {
   }
   return (
     <Text as="p" variant="body2" my={2} role="alert" sx={{ color: "error" }}>
-      {error.message}
-      {error.retryAfterSeconds !== undefined &&
-        ` Try again in ${formatWait(error.retryAfterSeconds)}.`}
+      {error.retryAfterSeconds === undefined
+        ? error.message
+        : `Too many wrong passwords. Try again in ${formatWait(
+            error.retryAfterSeconds
+          )}.`}
     </Text>
   );
 }
