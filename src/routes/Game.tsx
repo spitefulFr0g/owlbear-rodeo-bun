@@ -23,6 +23,7 @@ import { AssetsProvider, AssetURLsProvider } from "../contexts/AssetsContext";
 import { MapDataProvider } from "../contexts/MapDataContext";
 import { TokenDataProvider } from "../contexts/TokenDataContext";
 import { MapLoadingProvider } from "../contexts/MapLoadingContext";
+import { RoomProvider } from "../contexts/RoomContext";
 
 import NetworkedMapAndTokens from "../network/NetworkedMapAndTokens";
 import NetworkedParty from "../network/NetworkedParty";
@@ -100,57 +101,59 @@ function Game() {
   const mapStageRef = useRef<Konva.Stage | null>(null);
 
   return (
-    <AssetsProvider>
-      <AssetURLsProvider>
-        <MapLoadingProvider>
-          <MapDataProvider>
-            <TokenDataProvider>
-              <PlayerProvider session={session}>
-                <PartyProvider session={session}>
-                  <MapStageProvider value={mapStageRef}>
-                    <Flex
-                      sx={{
-                        justifyContent: "space-between",
-                        flexGrow: 1,
-                        height: "100%",
-                      }}
-                    >
-                      <NetworkedParty session={session} gameId={gameId} />
-                      <NetworkedMapAndTokens session={session} />
-                    </Flex>
-                    <OfflineBanner isOpen={sessionStatus === "offline"} />
-                    <ReconnectBanner
-                      isOpen={sessionStatus === "reconnecting"}
-                    />
-                    <AuthModal
-                      isOpen={sessionStatus === "auth"}
-                      waitUntil={authWaitUntil}
-                      onSubmit={handleAuthSubmit}
-                    />
-                    <GameExpiredModal
-                      isOpen={gameExpired}
-                      onRequestClose={() => setGameExpired(false)}
-                    />
-                    <ForceUpdateModal
-                      isOpen={sessionStatus === "needs_update"}
-                    />
-                    {!sessionStatus && <LoadingOverlay />}
-                    {sessionStatus && databaseStatus === "upgrading" && (
-                      <UpgradingLoadingOverlay />
-                    )}
-                    <MaintenanceModal
-                      isOpen={maintenance}
-                      onRequestClose={() => setMaintenance(false)}
-                    />
-                    <MapLoadingOverlay />
-                  </MapStageProvider>
-                </PartyProvider>
-              </PlayerProvider>
-            </TokenDataProvider>
-          </MapDataProvider>
-        </MapLoadingProvider>
-      </AssetURLsProvider>
-    </AssetsProvider>
+    <RoomProvider session={session}>
+      <AssetsProvider>
+        <AssetURLsProvider>
+          <MapLoadingProvider>
+            <MapDataProvider>
+              <TokenDataProvider>
+                <PlayerProvider session={session}>
+                  <PartyProvider session={session}>
+                    <MapStageProvider value={mapStageRef}>
+                      <Flex
+                        sx={{
+                          justifyContent: "space-between",
+                          flexGrow: 1,
+                          height: "100%",
+                        }}
+                      >
+                        <NetworkedParty session={session} gameId={gameId} />
+                        <NetworkedMapAndTokens session={session} />
+                      </Flex>
+                      <OfflineBanner isOpen={sessionStatus === "offline"} />
+                      <ReconnectBanner
+                        isOpen={sessionStatus === "reconnecting"}
+                      />
+                      <AuthModal
+                        isOpen={sessionStatus === "auth"}
+                        waitUntil={authWaitUntil}
+                        onSubmit={handleAuthSubmit}
+                      />
+                      <GameExpiredModal
+                        isOpen={gameExpired}
+                        onRequestClose={() => setGameExpired(false)}
+                      />
+                      <ForceUpdateModal
+                        isOpen={sessionStatus === "needs_update"}
+                      />
+                      {!sessionStatus && <LoadingOverlay />}
+                      {sessionStatus && databaseStatus === "upgrading" && (
+                        <UpgradingLoadingOverlay />
+                      )}
+                      <MaintenanceModal
+                        isOpen={maintenance}
+                        onRequestClose={() => setMaintenance(false)}
+                      />
+                      <MapLoadingOverlay />
+                    </MapStageProvider>
+                  </PartyProvider>
+                </PlayerProvider>
+              </TokenDataProvider>
+            </MapDataProvider>
+          </MapLoadingProvider>
+        </AssetURLsProvider>
+      </AssetsProvider>
+    </RoomProvider>
   );
 }
 
