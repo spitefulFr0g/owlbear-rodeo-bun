@@ -36,9 +36,11 @@ function RoomList() {
     try {
       setRooms(await listRooms());
     } catch (error) {
-      if (error instanceof ApiError) {
-        setError(error);
-      }
+      setError(
+        error instanceof ApiError
+          ? error
+          : new ApiError("unknown", "Unable to load your rooms.", 0)
+      );
     }
   }, []);
 
