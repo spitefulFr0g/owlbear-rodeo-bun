@@ -60,6 +60,11 @@ export default class AssetController extends Controller {
       res.sendStatus(401);
       return;
     }
+    if (req.method === "PUT" && !this.joinTokens.canUpload(token)) {
+      req.resume();
+      res.sendStatus(403);
+      return;
+    }
     next();
   }
 

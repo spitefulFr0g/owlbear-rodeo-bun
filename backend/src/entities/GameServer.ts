@@ -31,6 +31,50 @@ export default class GameServer {
     this.io.on("connect", async (socket: Socket) => {
       const gameState = new GameState(this.io, socket, this.gameRepo);
       let _gameId: string;
+      let castDisplay = false;
+      let joining = false;
+
+      // Cast displays may only request read access. New write events are
+      // refused here too, before any handler can change or forward state.
+      socket.use(([event], next) => {
+        if (
+          castDisplay && event !== "get_display_token" && event !== "join_display"
+        ) return;
+        next();
+      });
+
+      socket.on("get_display_token", (answer: (token: string | null) => void) => {
+        if (typeof answer !== "function") return;
+        const gameId = gameState.getGameId();
+        if (castDisplay || !gameId) {
+          answer(null);
+          return;
+        }
+        const player = this.gameRepo.getPartyState(gameId)[socket.id];
+        const map = this.gameRepo.getState(gameId, "map") as Map | undefined;
+        answer(
+          player?.userId && map && player.userId === map.owner
+            ? this.gameRepo.games[gameId].displayToken
+            : null
+        );
+      });
+
+      socket.on("join_display", async (gameId: string, displayToken: string) => {
+        if (
+          joining || gameState.getGameId() || typeof gameId !== "string" ||
+          typeof displayToken !== "string" ||
+          !this.gameRepo.isGameCreated(gameId) ||
+          this.gameRepo.games[gameId].displayToken !== displayToken
+        ) {
+          socket.emit("display_error");
+          return;
+        }
+        castDisplay = true;
+        _gameId = gameId;
+        await gameState.joinGame(gameId, true);
+        const token = this.joinTokens.issue(socket.id, gameId, "display");
+        socket.emit("joined_display", socket.id, token);
+      });
 
       socket.on("signal", (data: string) => {
         try {
@@ -43,6 +87,7 @@ export default class GameServer {
 
       socket.on("disconnecting", async () => {
         this.joinTokens.revoke(socket.id);
+        if (castDisplay) return;
         try {
           let gameId: string;
           if (_gameId) {
@@ -70,8 +115,9 @@ export default class GameServer {
       });
 
       socket.on("join_game", async (gameId: string, password: string) => {
+        if (joining || castDisplay || gameState.getGameId()) return;
+        joining = true;
         const auth = new Auth();
-        _gameId = gameId;
 
         try {
           if (typeof gameId !== "string" || typeof password !== "string") {
@@ -97,12 +143,15 @@ export default class GameServer {
               return;
             }
           }
+          _gameId = gameId;
           // Only the player who joined gets the token for the asset routes
           const token = this.joinTokens.issue(socket.id, gameId);
           socket.emit("joined_game", socket.id, token);
           socket.to(gameId).emit("joined_game", socket.id);
         } catch (error) {
           console.error("JOIN_ERROR", error);
+        } finally {
+          joining = false;
         }
       });
 
