@@ -93,6 +93,20 @@ describe("asset routes", () => {
   });
 
   describe("auth", () => {
+    test("cast display tokens allow downloads but refuse uploads", async () => {
+      await upload("display-download");
+      const displayToken = joinTokens.issue("display-socket", "game-1", "display");
+      const authorization = `Bearer ${displayToken}`;
+      const response = await download("display-download", "GET", authorization);
+      expect(response.status).toBe(200);
+      expect(new Uint8Array(await response.arrayBuffer())).toEqual(png);
+      expect((await download("display-download", "HEAD", authorization)).status).toBe(200);
+      expect((await upload("display-upload", png, { Authorization: authorization })).status).toBe(403);
+      expect((await download("display-upload")).status).toBe(404);
+      joinTokens.revoke("display-socket");
+      expect((await download("display-download", "GET", authorization)).status).toBe(401);
+    });
+
     test("reject requests without a join token", async () => {
       await upload("guarded");
       for (const method of ["GET", "HEAD", "PUT"]) {
