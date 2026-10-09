@@ -15,17 +15,23 @@ export interface Account {
 const UNKNOWN_PASSWORD_HASH = "$2b$10$Y0Lpwb.O8hQl95PBTsjx6u4vkMkcws1/I4A4eB51H6UqIXfFoZh4S";
 
 export default class Accounts {
-  constructor(private readonly database: OwlbearDatabase, private readonly clock: Clock) {}
+  constructor(private readonly database: OwlbearDatabase, private readonly clock: Clock, private reopenSetup = false) {}
 
-  async setup(username: string, password: string): Promise<{ account: Account; token: string } | null> {
-    if (this.hasAdministrator()) return null;
+  setupState(): "required" | "open" | "closed" {
+    return this.reopenSetup ? "open" : this.hasAdministrator() ? "closed" : "required";
+  }
+
+  async setup(username: string, password: string): Promise<{ account: Account; token: string } | "username_taken" | null> {
+    if (this.setupState() === "closed") return null;
     const passwordHash = await new Auth().createPasswordHash(password);
     return this.database.transaction(() => {
-      if (this.hasAdministrator()) return null;
+      if (this.setupState() === "closed") return null;
+      if (this.database.connection.query("SELECT 1 FROM accounts WHERE username = ? COLLATE NOCASE").get(username)) return "username_taken";
       const account = { id: randomUUID(), username, administrator: true };
       this.database.connection.query("INSERT INTO accounts (id, username, passwordHash, administrator) VALUES (?, ?, ?, 1)").run(account.id, username, passwordHash);
       const token = randomBytes(32).toString("hex");
       this.database.connection.query("INSERT INTO sign_ins (tokenHash, accountId, createdAt, lastUsedAt) VALUES (?, ?, ?, ?)").run(this.tokenHash(token), account.id, this.clock.now(), this.clock.now());
+      this.reopenSetup = false;
       return { account, token };
     });
   }

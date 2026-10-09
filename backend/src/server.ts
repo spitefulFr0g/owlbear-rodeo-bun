@@ -35,6 +35,7 @@ export interface ServerOptions {
   port: number;
   allowOrigin: RegExp | null;
   clock: Clock;
+  reopenSetup?: boolean;
   databaseUpgrades?: readonly UpgradeStep[];
 }
 
@@ -60,7 +61,7 @@ export async function startServer(options: ServerOptions): Promise<RunningServer
     throw new Error(`Unable to use the data directory ${dataDir}: ${error.message}\nChoose another with --data-dir.`);
   }
 
-  const accounts = new Accounts(database, options.clock);
+  const accounts = new Accounts(database, options.clock, options.reopenSetup);
   const attempts = new AttemptLimiter(options.clock);
   const joinTokens = new JoinTokens();
 
@@ -144,7 +145,8 @@ export async function startServer(options: ServerOptions): Promise<RunningServer
   const urls = [`http://localhost:${boundPort}`, ...lanUrls(boundPort, networkInterfaces())];
   console.log(`Owlbear Rodeo is running at:\n  ${urls.join("\n  ")}`);
   console.log(`Maps and tokens are kept in ${dataDir}`);
-  console.log(accounts.hasAdministrator() ? "An administrator exists; setup is closed." : "No administrator exists; setup is required.");
+  if (accounts.setupState() === "open") console.warn("Warning: setup is open; the next visitor can create one new administrator.");
+  else console.log(accounts.hasAdministrator() ? "An administrator exists; setup is closed." : "No administrator exists; setup is required.");
   if (!frontendAssets["/index.html"]) {
     console.warn("No frontend is embedded in this build, so only the game server is available.");
   }

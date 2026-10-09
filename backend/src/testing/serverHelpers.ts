@@ -94,11 +94,11 @@ export async function startTestServer(prepare?: (dataDir: string) => Promise<voi
       });
     },
     stop: () => server.stop(),
-    async restart() {
+    async restart(overrides: { reopenSetup?: boolean } = {}) {
       await server.stop();
       for (const socket of sockets) socket.disconnect();
       sockets.clear();
-      server = await startServer(options);
+      server = await startServer({ ...options, ...overrides });
     },
     async dispose() {
       await server.stop();

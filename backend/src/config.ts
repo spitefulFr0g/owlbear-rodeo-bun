@@ -8,6 +8,7 @@ export interface Config {
   /** Directory that uploaded assets are kept in. */
   dataDir?: string;
   help: boolean;
+  reopenSetup: boolean;
 }
 
 export const USAGE = `Usage: owlbear-rodeo [options]
@@ -19,6 +20,8 @@ Options:
       --data-dir <dir>       Directory to keep uploaded maps and tokens in
                              (env DATA_DIR, default "data" beside the
                              executable)
+      --reopen-setup         Let the next visitor create one new administrator
+                             (once per start; no environment variable)
   -h, --help                 Show this help`;
 
 export function parseConfig(
@@ -31,6 +34,7 @@ export function parseConfig(
       port: { type: "string", short: "p" },
       "allow-origin": { type: "string" },
       "data-dir": { type: "string" },
+      "reopen-setup": { type: "boolean" },
       "ice-servers": { type: "string" },
       help: { type: "boolean", short: "h" },
     },
@@ -46,6 +50,7 @@ export function parseConfig(
     allowOrigin: parseOrigin(values["allow-origin"] ?? env.ALLOW_ORIGIN),
     dataDir: values["data-dir"] || env.DATA_DIR || undefined,
     help: values.help ?? false,
+    reopenSetup: values["reopen-setup"] ?? false,
   };
 }
 
