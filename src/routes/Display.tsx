@@ -106,8 +106,7 @@ function Display() {
           This display link no longer works
         </Text>
         <Text as="p" variant="body2" mt={2} sx={{ maxWidth: "420px" }}>
-          The link changes when the server restarts. Open the game and use the
-          display button to get a new one.
+          Open the game and use the display button to get a new one.
         </Text>
       </Flex>
     );
