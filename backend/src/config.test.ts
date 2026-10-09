@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, spyOn, test } from "bun:test";
 import { defaultDataDir, parseConfig } from "./config";
 
 describe("parseConfig", () => {
@@ -45,6 +45,32 @@ describe("parseConfig", () => {
   test("accepts --flag=value and -p", () => {
     expect(parseConfig(["--port=4000"], {}).port).toBe(4000);
     expect(parseConfig(["-p", "4001"], {}).port).toBe(4001);
+  });
+
+  test("accepts the removed ICE option and warns once even with the environment set", () => {
+    const warning = spyOn(console, "warn").mockImplementation(() => undefined);
+    try {
+      expect(parseConfig(["--ice-servers", "/missing/ice.json"], {
+        ICE_SERVERS_FILE: "/also-missing/ice.json",
+      })).toEqual({ port: 9000, allowOrigin: null, dataDir: undefined, help: false });
+      expect(warning.mock.calls).toEqual([[
+        "Warning: --ice-servers / ICE_SERVERS_FILE no longer does anything because peer-to-peer connections were removed.",
+      ]]);
+    } finally {
+      warning.mockRestore();
+    }
+  });
+
+  test("warns when only the removed ICE environment variable is set", () => {
+    const warning = spyOn(console, "warn").mockImplementation(() => undefined);
+    try {
+      expect(parseConfig([], { ICE_SERVERS_FILE: "/missing/ice.json" }).port).toBe(9000);
+      expect(warning.mock.calls).toEqual([[
+        "Warning: --ice-servers / ICE_SERVERS_FILE no longer does anything because peer-to-peer connections were removed.",
+      ]]);
+    } finally {
+      warning.mockRestore();
+    }
   });
 
   test("recognises --help", () => {
