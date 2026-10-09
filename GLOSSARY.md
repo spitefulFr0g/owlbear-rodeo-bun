@@ -141,3 +141,11 @@ _Avoid_: My assets, personal library, global library
 **Server set**:
 The built-in maps and tokens that come with the server. Read-only and available in every room.
 _Avoid_: Default assets, starter set, built-ins
+
+**Folder**:
+A named group of assets inside one library. Folders are one level deep, and an asset is in at most one.
+_Avoid_: Group, collection, tag
+
+**Browser library**:
+The maps and tokens a person uploaded before libraries moved to the server, kept in their own browser. It is brought into their account library once, by an import.
+_Avoid_: Local library, old library, 1.0 library
