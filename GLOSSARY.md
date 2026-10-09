@@ -27,8 +27,12 @@ Anyone in a room who is not its GM. A GM who joins their own room without signin
 _Avoid_: User, participant, member
 
 **Trusted player**:
-A player the GM has marked to receive the room's wider set of permissions.
+A player the GM has marked in one room as able to use every tool, whatever the room's switches say. A trusted player still cannot change the Map layer, the scene's settings or the room's settings.
 _Avoid_: Co-GM, moderator, assistant
+
+**Room switch**:
+A setting the GM turns on or off for a whole room to say what its players may do: tokens, drawing, notes and text, fog, Owner Only and uploads.
+_Avoid_: Edit flag, permission, layer permission
 
 **Anonymous player**:
 A person in a room who has not signed in to an account.
@@ -76,6 +80,18 @@ _Avoid_: Background, battlemap
 One thing placed on the canvas, such as an image, a shape or a piece of text. Every item has a position, a layer and an owner.
 _Avoid_: Object, element, node, entity
 
+**Owner**:
+The one person an item belongs to. It starts as whoever created the item, and the GM can give it to someone else.
+_Avoid_: Creator, author
+
+**Owner Only**:
+A room switch that limits each player to moving the tokens they own. Off in a new room.
+_Avoid_: Token lock, restricted movement
+
+**Locked item**:
+An item the GM has pinned so that no player can change it, trusted or not.
+_Avoid_: Frozen item, pinned item
+
 **Layer**:
 The fixed band an item is drawn in, which decides what covers what.
 _Avoid_: Z-order, category, level
@@ -93,7 +109,7 @@ A short piece of plain text on a coloured square, placed on the Note layer.
 _Avoid_: Sticky, memo, comment
 
 **Hidden item**:
-An item that only its creator and the GM can see. New notes and text start hidden, and only the GM or a trusted player can show theirs to everyone.
+An item that only its owner and the GM can see. New notes and text start hidden, and only the GM or a trusted player can show theirs to everyone.
 _Avoid_: Private item, invisible item, secret item
 
 **Cast display**:

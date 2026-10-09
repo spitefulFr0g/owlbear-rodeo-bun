@@ -2,9 +2,9 @@
 status: accepted
 ---
 
-# A hidden item is seen by its creator and the GM
+# A hidden item is seen by its owner and the GM
 
-The reference gives every item a `visible` flag that means one thing: the GM has hidden this item from the players. We wanted something the reference does not have, which is that any player can write notes for themselves, while only the GM and trusted players can put a note in front of the whole table. We decided to use the one flag for both. A hidden item is sent to its creator and to the GM and to nobody else. New notes and text start hidden for everyone. A player who is not trusted cannot change the flag on their own notes and text, so theirs stay hidden.
+The reference gives every item a `visible` flag that means one thing: the GM has hidden this item from the players. We wanted something the reference does not have, which is that any player can write notes for themselves, while only the GM and trusted players can put a note in front of the whole table. We decided to use the one flag for both. A hidden item is sent to its owner and to the GM and to nobody else. New notes and text start hidden for everyone. A player who is not trusted cannot change the flag on their own notes and text, so theirs stay hidden.
 
 ## Considered options
 
@@ -15,10 +15,12 @@ The reference gives every item a `visible` flag that means one thing: the GM has
 
 ## Consequences
 
-- The server filters hidden items per connection by creator and role. A client is never sent a hidden item it may not see.
-- A token the GM hides is hidden by the same rule, so the GM is its creator and no player receives it.
+- The server filters hidden items per connection by owner and role. A client is never sent a hidden item it may not see.
+- A token the GM hides is hidden by the same rule, so while the GM is its owner no player receives it. If the GM gives a hidden token to a player, that player sees it too.
 - The rule covers both notes and text typed on the canvas, so the text tool cannot be used to get around it.
-- A cast display is not a creator and not the GM, so it never shows hidden items.
+- A cast display is not an owner and not the GM, so it never shows hidden items.
 - Being allowed to show an item is part of the trusted player's permissions, which the roles and permissions ticket defines.
+
+This record first said "creator". The roles and permissions ticket made creator and owner one concept: the owner starts as the creator and the GM can change it.
 
 Full detail: [Screen grid, fog, drawing, text and presentation features (sections H, I, K, L, M)](https://github.com/spitefulFr0g/owlbear-rodeo-bun/issues/18).
