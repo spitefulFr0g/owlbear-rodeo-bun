@@ -101,7 +101,7 @@ export async function startServer(options: ServerOptions): Promise<RunningServer
 
   const controllers: Array<Controller> = [
     new HealthcheckController(),
-    new AssetController(assetStore, joinTokens, MAX_ASSET_BYTES),
+    new AssetController(assetStore, joinTokens, MAX_ASSET_BYTES, database),
   ];
 
   server.loadMiddleware(globalMiddleware);

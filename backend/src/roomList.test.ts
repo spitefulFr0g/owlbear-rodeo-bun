@@ -12,7 +12,7 @@ test("an account creates named rooms with server links and lists them by name", 
     const response = await request(server, "POST", undefined, cookie, { name: "  Zebra  " });
     expect(response.status).toBe(201);
     const { room } = await response.json() as any;
-    expect(room).toEqual({ id: expect.stringMatching(/^[A-Za-z0-9]{16}$/), name: "Zebra", hasPassword: false });
+    expect(room).toEqual({ id: expect.stringMatching(/^[A-Za-z0-9]{16}$/), name: "Zebra", hasPassword: false, sizeBytes: 2 });
     const second = await request(server, "POST", undefined, cookie, { name: "Alpha", password: "secret" });
     const { room: alpha } = await second.json() as any;
     expect(alpha.id).not.toBe(room.id);
@@ -65,9 +65,9 @@ test("joining carries the name and renaming reaches players and cast displays wi
     const notifications = [player, peer.socket, display].map(socket => nextMessage(socket, "room_state"));
     const response = await request(server, "PATCH", `/api/rooms/${room.id}`, cookie, { name: "  After  " });
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ room: { ...room, name: "After" } });
+    expect(await response.json()).toEqual({ room: { ...room, name: "After", sizeBytes: 33 } });
     for (const notification of notifications) expect(await notification).toEqual([{ name: "After" }]);
-    expect(await (await request(server, "GET", undefined, cookie)).json()).toEqual({ rooms: [{ ...room, name: "After" }] });
+    expect(await (await request(server, "GET", undefined, cookie)).json()).toEqual({ rooms: [{ ...room, name: "After", sizeBytes: 33 }] });
     await server.joinRoom(room.id);
   } finally { await server.dispose(); }
 });
@@ -104,11 +104,11 @@ test("renamed rooms keep their GM, name, document and link across restart and im
     expect((await request(server, "PATCH", `/api/rooms/${room.id}`, cookie, { name: "After" })).status).toBe(200);
     const copy = await server.durableCopy();
     try {
-      expect(await (await request(copy, "GET", undefined, cookie)).json()).toEqual({ rooms: [{ ...room, name: "After" }] });
+      expect(await (await request(copy, "GET", undefined, cookie)).json()).toEqual({ rooms: [{ ...room, name: "After", sizeBytes: 35 }] });
       expect((await copy.joinRoom(room.id)).state.map).toEqual({ id: "saved", owner: "gm" });
     } finally { await copy.dispose(); }
     await server.restart();
-    expect(await (await request(server, "GET", undefined, cookie)).json()).toEqual({ rooms: [{ ...room, name: "After" }] });
+    expect(await (await request(server, "GET", undefined, cookie)).json()).toEqual({ rooms: [{ ...room, name: "After", sizeBytes: 35 }] });
     expect((await request(server, "PATCH", `/api/rooms/${room.id}`, cookie, { name: "Again" })).status).toBe(200);
     expect((await server.joinRoom(room.id)).state.map).toEqual({ id: "saved", owner: "gm" });
   } finally { await server.dispose(); }

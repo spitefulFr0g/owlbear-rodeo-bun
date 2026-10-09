@@ -18,7 +18,7 @@ const roomName: RequestHandler = (req, res, next) => {
   });
 };
 
-export interface Room { id: string; name: string; hasPassword: boolean }
+export interface Room { id: string; name: string; hasPassword: boolean; sizeBytes: number }
 
 export default class RoomController {
   constructor(private readonly accounts: Accounts, private readonly database: OwlbearDatabase, private readonly rooms: GameRepository, private readonly renamed: (id: string, name: string) => void) {}
@@ -35,7 +35,7 @@ export default class RoomController {
       next();
     });
     router.get("/rooms", (_req, res) => {
-      res.json({ rooms: this.database.roomsForGM(res.locals.account.id).map(room => ({ id: room.id, name: room.name, hasPassword: !!room.hasPassword })) });
+      res.json({ rooms: this.database.roomsForGM(res.locals.account.id).map(room => ({ id: room.id, name: room.name, hasPassword: !!room.hasPassword, sizeBytes: this.database.roomSizeBytes(room.id) })) });
     });
     router.post("/rooms", roomName, async (req, res, next) => {
       try {
@@ -50,7 +50,7 @@ export default class RoomController {
         game.gmAccountId = res.locals.account.id;
         game.hasPassword = password !== "";
         this.rooms.save(id);
-        res.status(201).json({ room: { id, name: game.name, hasPassword: game.hasPassword } });
+        res.status(201).json({ room: { id, name: game.name, hasPassword: game.hasPassword, sizeBytes: this.database.roomSizeBytes(game.gameId) } });
       } catch (error) { next(error); }
     });
     router.patch("/rooms/:id", (req, res, next) => {
@@ -68,7 +68,7 @@ export default class RoomController {
       game.name = req.body.name;
       this.rooms.save(game.gameId);
       this.renamed(game.gameId, game.name);
-      res.json({ room: { id: game.gameId, name: game.name, hasPassword: game.hasPassword } });
+      res.json({ room: { id: game.gameId, name: game.name, hasPassword: game.hasPassword, sizeBytes: this.database.roomSizeBytes(game.gameId) } });
     });
     return router;
   }
