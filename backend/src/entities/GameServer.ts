@@ -139,7 +139,8 @@ export default class GameServer {
           }
           const hash = this.gameRepo.getGamePasswordHash(gameId);
           if (!await auth.checkPassword(password, hash)) {
-            this.attempts.wrong(keys);
+            // Opening a room's link sends no password; only a guess is counted
+            if (password !== "") this.attempts.wrong(keys);
             socket.emit("auth_error");
             return;
           }
