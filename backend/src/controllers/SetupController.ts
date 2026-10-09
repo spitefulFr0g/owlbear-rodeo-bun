@@ -1,4 +1,5 @@
 import express, { Request, Response, RequestHandler, NextFunction } from "express";
+import { lastingSignInCookieOptions } from "../accounts/signInCookie";
 import Accounts from "../accounts/Accounts";
 import Controller, { Methods } from "./Controller";
 
@@ -21,7 +22,7 @@ export default class SetupController extends Controller {
   ];
 
   private status(req: Request, res: Response): void {
-    res.json({ setup: this.accounts.hasAdministrator() ? "closed" : "required", account: this.accounts.resolveAccount(req) });
+    res.json({ setup: this.accounts.hasAdministrator() ? "closed" : "required", account: this.accounts.resolveAccount(req, token => res.cookie("owlbear_sign_in", token, lastingSignInCookieOptions)) });
   }
 
   private async setup(req: Request, res: Response): Promise<void> {
@@ -48,7 +49,7 @@ export default class SetupController extends Controller {
       return;
     }
     console.log(`Administrator created: ${result.account.username}`);
-    res.cookie("owlbear_sign_in", result.token, { httpOnly: true, sameSite: "lax", path: "/", maxAge: 30 * 24 * 60 * 60 * 1000 });
+    res.cookie("owlbear_sign_in", result.token, lastingSignInCookieOptions);
     res.status(201).json({ account: result.account });
   }
 }
