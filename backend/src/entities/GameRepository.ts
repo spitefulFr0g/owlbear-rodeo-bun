@@ -1,3 +1,5 @@
+import { Clock } from "../clock";
+import { OwlbearDatabase } from "../database";
 import { PlayerState } from "../types/PlayerState";
 import { PartyState } from "../types/PartyState";
 import { MapState } from "../types/MapState";
@@ -8,7 +10,9 @@ import Game from "./Game";
 export default class GameRepository {
   games: Record<string, Game>;
 
-  constructor() {
+  private readonly pending = new globalThis.Map<string, { since: number; cancel: () => void }>();
+
+  constructor(private readonly database?: OwlbearDatabase, private readonly clock?: Clock) {
     this.games = {};
   }
 
@@ -16,14 +20,41 @@ export default class GameRepository {
     const game = new Game(gameId, hash);
 
     this.games[gameId] = game;
+    this.changed(gameId);
   }
 
   isGameCreated(gameId: string): boolean {
     if (this.games[gameId] === undefined) {
-      return false;
+      const record = this.database?.room(gameId);
+      if (!record) return false;
+      const game = new Game(gameId, record.passwordHash, record.displayToken);
+      if (record.documentVersion === 1) game.state = JSON.parse(record.document);
+      this.games[gameId] = game;
     }
 
     return true;
+  }
+
+  private changed(gameId: string): void {
+    if (!this.database || !this.clock) return;
+    const previous = this.pending.get(gameId);
+    previous?.cancel();
+    const since = previous?.since ?? this.clock.now();
+    const delay = Math.min(3000, Math.max(0, since + 8000 - this.clock.now()));
+    const cancel = this.clock.after(delay, () => this.save(gameId));
+    this.pending.set(gameId, { since, cancel });
+  }
+
+  private save(gameId: string): void {
+    const game = this.games[gameId];
+    this.database?.saveRoom({ id: game.gameId, passwordHash: game.passwordHash,
+      displayToken: game.displayToken, documentVersion: 1, document: JSON.stringify(game.state) });
+    this.pending.get(gameId)?.cancel();
+    this.pending.delete(gameId);
+  }
+
+  flush(): void {
+    for (const gameId of this.pending.keys()) this.save(gameId);
   }
 
   getPartyState(gameId: string): PartyState {
@@ -46,6 +77,7 @@ export default class GameRepository {
     const game = this.games[gameId];
 
     game.setGamePasswordHash(hash);
+    this.changed(gameId);
   }
 
   setPlayerState(
@@ -65,6 +97,7 @@ export default class GameRepository {
   deleteGameData(gameId: string): void {
     const game = this.games[gameId];
     game.deleteGameData();
+    this.changed(gameId);
   }
 
   setState(
@@ -74,6 +107,7 @@ export default class GameRepository {
   ): void {
     const game = this.games[gameId];
     game.setState(field, value);
+    this.changed(gameId);
   }
 
   getState(

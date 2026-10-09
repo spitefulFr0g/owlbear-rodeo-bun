@@ -3,6 +3,14 @@ import { mkdirSync } from "fs";
 import { dirname } from "path";
 import type { AssetRecord } from "../entities/AssetStore";
 
+export interface RoomRecord {
+  id: string;
+  passwordHash: string;
+  displayToken: string;
+  documentVersion: number;
+  document: string;
+}
+
 export const LAYOUT_VERSION = 1;
 
 // All v0.2.0 tables belong here, in the same layout version. Nothing in
@@ -19,6 +27,13 @@ const layout = `
     createdAt TEXT NOT NULL
   );
   CREATE INDEX IF NOT EXISTS assets_hash ON assets(hash);
+  CREATE TABLE IF NOT EXISTS rooms (
+    id TEXT PRIMARY KEY,
+    passwordHash TEXT NOT NULL,
+    displayToken TEXT NOT NULL,
+    documentVersion INTEGER NOT NULL,
+    document TEXT NOT NULL
+  );
   CREATE TABLE IF NOT EXISTS metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 `;
 
@@ -50,6 +65,18 @@ export class OwlbearDatabase {
       }
       return result;
     })();
+  }
+
+  room(id: string): RoomRecord | undefined {
+    return this.connection.query<RoomRecord, [string]>("SELECT * FROM rooms WHERE id = ?").get(id) ?? undefined;
+  }
+
+  saveRoom(record: RoomRecord): void {
+    this.connection.query(`INSERT INTO rooms (id, passwordHash, displayToken, documentVersion, document)
+      VALUES (?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET
+      passwordHash = excluded.passwordHash, displayToken = excluded.displayToken,
+      documentVersion = excluded.documentVersion, document = excluded.document`)
+      .run(record.id, record.passwordHash, record.displayToken, record.documentVersion, record.document);
   }
 
   asset(id: string): AssetRecord | undefined {
