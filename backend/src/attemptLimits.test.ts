@@ -2,6 +2,8 @@ import { expect, test } from "bun:test";
 import { setupAdministrator, startTestServer } from "./testing/serverHelpers";
 
 const MINUTE = 60_000;
+// Tests that check many passwords: each check is a slow hash on purpose
+const SLOW = 30_000;
 function attempt(address: string, username = "Administrator", password = "wrong") {
   return fetch(`${address}/api/sign-in`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ username, password }) });
 }
@@ -137,7 +139,7 @@ test("room refusal tells only the joiner to wait and leaves existing players joi
     socket.emit("join_game", "room", "secret");
     expect((await joined)[1]).toBeString();
   } finally { await server.dispose(); }
-});
+}, SLOW);
 
 import { io, Socket } from "socket.io-client";
 import msgParser from "socket.io-msgpack-parser";
@@ -177,7 +179,7 @@ test("room counts span addresses while address counts span rooms with later refu
     await server.clock.advance(1);
     await joinAnswer(attacker, "room4", "secret", "joined_game");
   } finally { for (const socket of sockets) socket.disconnect(); await server.dispose(); }
-});
+}, SLOW);
 
 test("room attempts expire after fifteen minutes and room and address histories reset after twenty-four hours", async () => {
   const server = await startTestServer();
@@ -195,7 +197,7 @@ test("room attempts expire after fifteen minutes and room and address histories 
     for (let i = 0; i < 5; i++) await joinAnswer(socket, "room", "wrong", "auth_error");
     expect(await joinAnswer(socket, "room", "secret", "auth_wait")).toEqual([300]);
   } finally { await server.dispose(); }
-});
+}, SLOW);
 
 test("an account count resets after exactly twenty-four hours without a wrong attempt", async () => {
   const server = await startTestServer();
@@ -238,10 +240,22 @@ test("a room's second and later refusals last fifteen minutes and a successful j
     await setupAdministrator(server);
     await server.joinRoom("room", "secret");
     for (let round = 0; round < 3; round++) {
-      for (let i = 0; i < 5; i++) await joinAnswer(connect(2 + round * 10 + i), "room", "", "auth_error");
+      for (let i = 0; i < 5; i++) await joinAnswer(connect(2 + round * 10 + i), "room", "wrong", "auth_error");
       expect(await joinAnswer(connect(60 + round), "room", "secret", "auth_wait")).toEqual([round === 0 ? 300 : 900]);
       await server.clock.advance((round === 0 ? 5 : 15) * MINUTE);
       await joinAnswer(connect(70 + round), "room", "secret", "joined_game");
     }
+  } finally { for (const socket of sockets) socket.disconnect(); await server.dispose(); }
+}, SLOW);
+
+test("opening a password room without a password is asked for it and never counted as a wrong one", async () => {
+  const server = await startTestServer();
+  const sockets: Socket[] = [];
+  const connect = (source: number) => { const socket = roomSocket(server, `127.0.0.${source}`); sockets.push(socket); return socket; };
+  try {
+    await setupAdministrator(server);
+    await server.joinRoom("room", "secret");
+    for (let i = 0; i < 6; i++) await joinAnswer(connect(2 + i), "room", "", "auth_error");
+    await joinAnswer(connect(40), "room", "secret", "joined_game");
   } finally { for (const socket of sockets) socket.disconnect(); await server.dispose(); }
 });
