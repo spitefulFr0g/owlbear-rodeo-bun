@@ -104,6 +104,7 @@ export default class GameServer {
             }
           }
 
+          if (!this.gameRepo.games[gameId]) return;
           socket.to(gameId).emit("player_left", socket.id);
           // Delete player state from game
           this.gameRepo.deletePlayer(gameId, socket.id);
@@ -147,6 +148,11 @@ export default class GameServer {
             // Opening a room's link sends no password; only a guess is counted
             if (password !== "") this.attempts.wrong(keys);
             socket.emit("auth_error");
+            return;
+          }
+          // The room may have been deleted while its password was checked.
+          if (!this.gameRepo.isGameCreated(gameId)) {
+            socket.emit("room_not_found");
             return;
           }
           await gameState.joinGame(gameId);

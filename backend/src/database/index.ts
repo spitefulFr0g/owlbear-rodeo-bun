@@ -139,6 +139,20 @@ export class OwlbearDatabase {
       .run(roomId, assetId);
   }
 
+  deleteRoom(roomId: string): AssetRecord[] {
+    return this.transaction(() => {
+      const unused = this.connection.query<AssetRecord, [string]>(`
+        SELECT assets.* FROM assets JOIN room_assets ON room_assets.assetId = assets.id
+        WHERE room_assets.roomId = ? AND NOT EXISTS (
+          SELECT 1 FROM room_assets other WHERE other.assetId = assets.id AND other.roomId != room_assets.roomId
+        )`).all(roomId);
+      this.connection.query("DELETE FROM room_assets WHERE roomId = ?").run(roomId);
+      this.connection.query("DELETE FROM rooms WHERE id = ?").run(roomId);
+      for (const asset of unused) this.deleteAsset(asset.id);
+      return unused;
+    });
+  }
+
   asset(id: string): AssetRecord | undefined {
     return this.connection.query<AssetRecord, [string]>("SELECT * FROM assets WHERE id = ?").get(id) ?? undefined;
   }
