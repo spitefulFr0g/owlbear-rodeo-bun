@@ -1,13 +1,20 @@
 import { afterAll, afterEach, beforeAll, describe, expect, test } from "bun:test";
 import { Socket } from "socket.io-client";
-import { setupAdministrator, startTestServer } from "../testing/serverHelpers";
+import { createRoom, setupAdministrator, startTestServer } from "../testing/serverHelpers";
 
 let server: Awaited<ReturnType<typeof startTestServer>>;
 const sockets: Socket[] = [];
+let cookie: string;
+const rooms = new Map<string, string>();
+
+async function roomId(name: string, password = "") {
+  if (!rooms.has(name)) rooms.set(name, (await createRoom(server, cookie, name, password)).id);
+  return rooms.get(name)!;
+}
 
 beforeAll(async () => {
   server = await startTestServer();
-  await setupAdministrator(server);
+  ({ cookie } = await setupAdministrator(server));
 });
 
 afterEach(() => {
@@ -37,7 +44,7 @@ function next(socket: Socket, event: string): Promise<any[]> {
 async function join(socket: Socket, gameId: string, password = "") {
   const frozen = next(socket, "display_frozen");
   const joined = next(socket, "joined_game");
-  socket.emit("join_game", gameId, password);
+  socket.emit("join_game", await roomId(gameId, password), password);
   const result = await joined;
   await frozen;
   return result;
@@ -69,7 +76,7 @@ describe("joining a game", () => {
       joined = true;
     });
     const refused = next(intruder, "auth_error");
-    intruder.emit("join_game", "game-locked", "wrong");
+    intruder.emit("join_game", rooms.get("game-locked")!, "wrong");
     await refused;
     await new Promise((resolve) => setTimeout(resolve, 50));
     expect(joined).toBe(false);
@@ -120,7 +127,7 @@ describe("cast displays", () => {
 async function joinDisplay(socket: Socket, gameId: string, token: string | null) {
   const frozen = next(socket, "display_frozen");
   const joined = next(socket, "joined_display");
-  socket.emit("join_display", gameId, token);
+  socket.emit("join_display", rooms.get(gameId)!, token);
   const result = await joined;
   await frozen;
   await displayToken(socket);
@@ -184,7 +191,7 @@ for (const [label, room, token] of [
     const display = client();
     const events = record(display);
     const refused = next(display, "display_error");
-    display.emit("join_display", room, token);
+    display.emit("join_display", rooms.get(room) ?? room, token);
     await refused;
     player.emit("map", { id: "not-for-display", owner: "gm" });
     await pause();
@@ -234,9 +241,9 @@ test("a cast display cannot rejoin as a player or join a second room", async () 
   const display = client();
   await joinDisplay(display, "display-single-room", token);
   const events = record(display);
-  display.emit("join_game", "display-second-room", "secret");
+  display.emit("join_game", rooms.get("display-second-room")!, "secret");
   const refused = next(display, "display_error");
-  display.emit("join_display", "display-second-room", secondToken);
+  display.emit("join_display", rooms.get("display-second-room")!, secondToken);
   await refused;
   expect(events.map(([event]) => event)).toEqual(["display_error"]);
   const player = client();
@@ -248,12 +255,13 @@ test("a cast display cannot rejoin as a player or join a second room", async () 
 
 test("a pending player join cannot also join as a cast display", async () => {
   const { token } = await owner("display-pending-target");
+  const pendingRoom = await roomId("display-pending-player", "secret");
   const socket = client();
   await next(socket, "connect");
   const events = record(socket);
   const joined = next(socket, "joined_game");
-  socket.emit("join_game", "display-pending-player", "secret");
-  socket.emit("join_display", "display-pending-target", token);
+  socket.emit("join_game", pendingRoom, "secret");
+  socket.emit("join_display", rooms.get("display-pending-target")!, token);
   await joined;
   await pause();
   expect(events.some(([event]) => event === "joined_display")).toBe(false);
@@ -332,7 +340,7 @@ test("freeze holds the shown view for joining displays and unfreeze sends the la
   expect(lateEvents).toEqual([
     ["party_state", expect.any(Object)], ["map_state", undefined],
     ["map", { id: "map-1", owner: "gm" }], ["manifest", undefined],
-    ["joined_display", lateDisplay.id, expect.any(String), { room: { name: "" } }],
+    ["joined_display", lateDisplay.id, expect.any(String), { room: { name: "display-freeze" } }],
     ["display_frozen", true], ["display_view", view],
   ]);
   player.emit("display_freeze", false);

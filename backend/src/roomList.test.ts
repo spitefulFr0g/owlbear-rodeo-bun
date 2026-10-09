@@ -116,18 +116,18 @@ test("renamed rooms keep their GM, name, document and link across restart and im
   } finally { await server.dispose(); }
 });
 
-test("unknown joined rooms have no GM or list entry and invalid renames change nothing", async () => {
+test("unknown rooms cannot be joined or renamed and invalid renames change nothing", async () => {
   const server = await startTestServer();
   try {
     const { cookie } = await setupAdministrator(server);
     const socket = server.connect();
-    const joined = nextMessage(socket, "joined_game");
+    const refused = nextMessage(socket, "room_not_found");
     socket.emit("join_game", "legacy-room", "");
-    expect((await joined)[2]).toEqual({ room: { name: "" } });
+    expect(await refused).toEqual([]);
     expect(await (await request(server, "GET", undefined, cookie)).json()).toEqual({ rooms: [] });
     const forbidden = await request(server, "PATCH", "/api/rooms/legacy-room", cookie, { name: "Stolen" });
-    expect(forbidden.status).toBe(403);
-    expect(await forbidden.json()).toMatchObject({ error: "not_room_gm" });
+    expect(forbidden.status).toBe(404);
+    expect(await forbidden.json()).toMatchObject({ error: "room_not_found" });
     const missing = await request(server, "PATCH", "/api/rooms/unknown", cookie, { name: "Missing" });
     expect(missing.status).toBe(404);
     expect(await missing.json()).toMatchObject({ error: "room_not_found" });
@@ -140,9 +140,9 @@ test("unknown joined rooms have no GM or list entry and invalid renames change n
     expect(await (await request(server, "GET", undefined, cookie)).json()).toEqual({ rooms: [room] });
     await server.restart();
     const rejoined = server.connect();
-    const info = nextMessage(rejoined, "joined_game");
+    const info = nextMessage(rejoined, "room_not_found");
     rejoined.emit("join_game", "legacy-room", "");
-    expect((await info)[2]).toEqual({ room: { name: "" } });
+    expect(await info).toEqual([]);
   } finally { await server.dispose(); }
 });
 

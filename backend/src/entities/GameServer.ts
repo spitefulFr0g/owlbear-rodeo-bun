@@ -128,35 +128,28 @@ export default class GameServer {
             return;
           }
 
+          if (!this.gameRepo.isGameCreated(gameId)) {
+            socket.emit("room_not_found");
+            return;
+          }
           const keys = [`room:id:${gameId}`, `room:address:${clientAddress(socket.request, this.behindProxy, socket.handshake.address)}`];
           const retryAfterSeconds = this.attempts.retryAfterSeconds(keys);
           if (retryAfterSeconds) {
             socket.emit("auth_wait", retryAfterSeconds);
             return;
           }
-          const created = this.gameRepo.isGameCreated(gameId);
-          if (!created) {
-            // Create a game and join
-            const hash = await auth.createPasswordHash(password);
-            this.gameRepo.setGameCreation(gameId, hash);
-            await gameState.joinGame(gameId);
-          } else {
-            // Join existing game
-            const hash = this.gameRepo.getGamePasswordHash(gameId);
-            const game = this.gameRepo.games[gameId];
-            // A browser sends the last password it used, which a room made
-            // without one must not refuse
-            const open = game.gmAccountId !== null && !game.hasPassword;
-            const res = open || await auth.checkPassword(password, hash);
-            if (res) {
-              await gameState.joinGame(gameId);
-            } else {
-              // Opening a room's link sends no password; only a guess is counted
-              if (password !== "") this.attempts.wrong(keys);
-              socket.emit("auth_error");
-              return;
-            }
+          const hash = this.gameRepo.getGamePasswordHash(gameId);
+          const game = this.gameRepo.games[gameId];
+          // A browser sends the last password it used, which a room made
+          // without one must not refuse
+          const open = game.gmAccountId !== null && !game.hasPassword;
+          if (!open && !await auth.checkPassword(password, hash)) {
+            // Opening a room's link sends no password; only a guess is counted
+            if (password !== "") this.attempts.wrong(keys);
+            socket.emit("auth_error");
+            return;
           }
+          await gameState.joinGame(gameId);
           _gameId = gameId;
           // Only the player who joined gets the token for the asset routes
           const token = this.joinTokens.issue(socket.id, gameId);
