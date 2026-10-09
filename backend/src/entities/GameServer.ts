@@ -76,15 +76,6 @@ export default class GameServer {
         socket.emit("joined_display", socket.id, token);
       });
 
-      socket.on("signal", (data: string) => {
-        try {
-          const { to, signal } = JSON.parse(data);
-          this.io.to(to).emit("signal", { from: socket.id, signal });
-        } catch (error) {
-          console.error("SIGNAL_ERROR", error);
-        }
-      });
-
       socket.on("disconnecting", async () => {
         this.joinTokens.revoke(socket.id);
         if (castDisplay) return;

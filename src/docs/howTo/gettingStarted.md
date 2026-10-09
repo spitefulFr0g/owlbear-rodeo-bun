@@ -2,7 +2,7 @@
    your players.
 
 2. Invite players with your unique URL from step 1.
-3. Share a map, roll dice or share audio with your players.
+3. Share a map or roll dice with your players.
 
    All data is saved automatically to your computer so next session simply use the same computer and all your maps and tokens will be ready to go.
 

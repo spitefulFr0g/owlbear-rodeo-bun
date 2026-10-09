@@ -53,7 +53,7 @@ function NetworkedMapPointer({ session, active }: NetworkedMapPointerProps) {
     }
   }, [userId, localPointerState, pointerColor]);
 
-  // Send pointer updates every sendTickRate to peers to save on bandwidth
+  // Send pointer updates every sendTickRate to the server to save on bandwidth
   // We use requestAnimationFrame as setInterval was being blocked during
   // re-renders on Chrome with Windows
   const ownPointerUpdateRef = useRef<PointerState | null>(null);
@@ -159,7 +159,7 @@ function NetworkedMapPointer({ session, active }: NetworkedMapPointerProps) {
     };
   }, [session]);
 
-  // Animate to the peer pointer positions
+  // Animate to the other players' pointer positions
   useEffect(() => {
     let request = requestAnimationFrame(animate);
 

@@ -16,7 +16,6 @@ const usingDrawing = raw("../docs/howTo/usingDrawing.md");
 const usingDice = raw("../docs/howTo/usingDice.md");
 const usingFog = raw("../docs/howTo/usingFog.md");
 const usingMeasure = raw("../docs/howTo/usingMeasure.md");
-const sharingAudio = raw("../docs/howTo/sharingAudio.md");
 const usingPointer = raw("../docs/howTo/usingPointer.md");
 const usingTimer = raw("../docs/howTo/usingTimer.md");
 const usingNotes = raw("../docs/howTo/usingNotes.md");
@@ -135,14 +134,6 @@ function HowTo() {
             defaultOpen={location.hash === "#settings"}
           >
             <Markdown source={settings} assets={assets} />
-          </Accordion>
-        </div>
-        <div id="sharingAudio">
-          <Accordion
-            heading="Sharing Audio (Experimental)"
-            defaultOpen={location.hash === "#sharingAudio"}
-          >
-            <Markdown source={sharingAudio} assets={assets} />
           </Accordion>
         </div>
         <div id="shortcuts">

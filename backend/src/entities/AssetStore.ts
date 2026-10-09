@@ -210,7 +210,9 @@ export class FsAssetStore implements AssetStore {
   /** Runs tasks that change refs or blobs one at a time */
   private exclusive<T>(task: () => Promise<T>): Promise<T> {
     const run = this.queue.then(task, task);
-    this.queue = run.catch(() => {});
+    this.queue = run.catch(() => {
+      // Keep the queue available after a failed task; the caller receives the error.
+    });
     return run;
   }
 

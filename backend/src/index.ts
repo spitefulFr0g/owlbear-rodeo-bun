@@ -4,7 +4,6 @@ import helmet from "helmet";
 import { networkInterfaces } from "os";
 import { join, resolve } from "path";
 import { Server } from "socket.io";
-// @ts-ignore
 import msgParser from "socket.io-msgpack-parser";
 import AppServer from "./entities/AppServer";
 import AssetController from "./controllers/AssetController";
@@ -12,8 +11,6 @@ import { FsAssetStore } from "./entities/AssetStore";
 import Controller from "./controllers/Controller";
 import GameServer from "./entities/GameServer";
 import HealthcheckController from "./controllers/HealthcheckController";
-import IceServer from "./entities/IceServer";
-import IceServerController from "./controllers/IceServerController";
 import JoinTokens from "./entities/JoinTokens";
 import { defaultDataDir, parseConfig, USAGE } from "./config";
 import { frontendHandler } from "./frontend";
@@ -32,23 +29,13 @@ if (config.help) {
   console.log(USAGE);
   process.exit(0);
 }
-const { allowOrigin } = config;
-
-const iceServer = new IceServer(config.iceServersFile);
-try {
-  await iceServer.getIceServers();
-} catch (error: any) {
-  console.error(
-    `Unable to load ICE servers from ${config.iceServersFile}: ${error.message}`
-  );
-  process.exit(1);
-}
+const { allowOrigin, port, dataDir: configuredDataDir } = config;
 
 // The app tells players maps can be up to 50 MB. This leaves some headroom.
 const MAX_ASSET_BYTES = 64 * 1024 * 1024;
 
 const dataDir = resolve(
-  config.dataDir ?? defaultDataDir(process.execPath, Bun.main, process.cwd())
+  configuredDataDir ?? defaultDataDir(process.execPath, Bun.main, process.cwd())
 );
 const assetStore = new FsAssetStore(join(dataDir, "assets"), MAX_ASSET_BYTES);
 try {
@@ -63,7 +50,7 @@ try {
 const joinTokens = new JoinTokens();
 
 const app: Application = express();
-const server = new AppServer(app, config.port);
+const server = new AppServer(app, port);
 
 const io = new Server(server, {
   cookie: false,
@@ -98,7 +85,6 @@ const globalMiddleware: Array<RequestHandler> = [
 
 const controllers: Array<Controller> = [
   new HealthcheckController(),
-  new IceServerController(iceServer),
   new AssetController(assetStore, joinTokens, MAX_ASSET_BYTES),
 ];
 
@@ -107,9 +93,11 @@ server.loadControllers(controllers);
 server.loadMiddleware([frontendHandler(frontendAssets)]);
 
 const httpServer = server.run(() => {
+  const address = httpServer.address();
+  const boundPort = typeof address === "object" && address ? address.port : port;
   const urls = [
-    `http://localhost:${config.port}`,
-    ...lanUrls(config.port, networkInterfaces()),
+    `http://localhost:${boundPort}`,
+    ...lanUrls(boundPort, networkInterfaces()),
   ];
   console.log(`Owlbear Rodeo is running at:\n  ${urls.join("\n  ")}`);
   console.log(`Maps and tokens are kept in ${dataDir}`);

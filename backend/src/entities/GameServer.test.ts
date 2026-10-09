@@ -3,7 +3,6 @@ import { createServer, Server as HttpServer } from "http";
 import { AddressInfo } from "net";
 import { Server } from "socket.io";
 import { io as connect, Socket } from "socket.io-client";
-// @ts-ignore
 import msgParser from "socket.io-msgpack-parser";
 import GameServer from "./GameServer";
 import JoinTokens from "./JoinTokens";

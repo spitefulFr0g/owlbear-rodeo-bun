@@ -1,5 +1,7 @@
 import { describe, expect, test } from "bun:test";
-import { resolveAsset } from "./frontend";
+import express from "express";
+import { AddressInfo } from "net";
+import { frontendHandler, resolveAsset } from "./frontend";
 
 const assets = {
   "/index.html": "/bunfs/index.html",
@@ -48,4 +50,19 @@ describe("resolveAsset", () => {
     expect(resolveAsset("/", {})).toBeUndefined();
     expect(resolveAsset("/game/abc", {})).toBeUndefined();
   });
+});
+
+
+test("serves URL-encoded asset filenames through HTTP", async () => {
+  const app = express();
+  app.use(frontendHandler({ "/static/café map.txt": import.meta.path }));
+  const server = app.listen(0);
+  try {
+    const { port } = server.address() as AddressInfo;
+    const response = await fetch(`http://localhost:${port}/static/caf%C3%A9%20map.txt`);
+    expect(response.status).toBe(200);
+    expect(await response.text()).toContain("serves URL-encoded asset filenames through HTTP");
+  } finally {
+    server.close();
+  }
 });
