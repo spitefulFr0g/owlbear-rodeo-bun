@@ -27,6 +27,8 @@ class Session extends EventEmitter {
   // Store party id and password for reconnect
   _gameId: string = "";
   _password: string = "";
+  // Set when joined as a cast display
+  _displayToken?: string;
 
   /**
    * Connect to the websocket
@@ -50,6 +52,8 @@ class Session extends EventEmitter {
       this.socket.on("player_joined", this._handlePlayerJoined.bind(this));
       this.socket.on("player_left", this._handlePlayerLeft.bind(this));
       this.socket.on("joined_game", this._handleJoinedGame.bind(this));
+      this.socket.on("joined_display", this._handleJoinedDisplay.bind(this));
+      this.socket.on("display_error", this._handleDisplayError.bind(this));
       this.socket.on("auth_error", this._handleAuthError.bind(this));
       this.socket.on("game_expired", this._handleGameExpired.bind(this));
       this.socket.on("disconnect", this._handleSocketDisconnect.bind(this));
@@ -93,6 +97,29 @@ class Session extends EventEmitter {
     this.emit("status", "joining");
   }
 
+  /**
+   * Join a party as a cast display
+   *
+   * @param {string} gameId - the id of the party to join
+   * @param {string} displayToken - the token from the party's display link
+   */
+  joinDisplay(gameId: string, displayToken: string) {
+    this._gameId = gameId;
+    this._displayToken = displayToken;
+    this.socket?.emit("join_display", gameId, displayToken);
+    this.emit("status", "joining");
+  }
+
+  _handleJoinedDisplay(_id: string, token: string) {
+    this.joinToken = token;
+    this.emit("status", "joined");
+  }
+
+  // The display link was refused
+  _handleDisplayError() {
+    this.emit("status", "display_error");
+  }
+
   // Sent when anyone joins the game, the token only comes with our own join
   _handleJoinedGame(_id: string, token?: string) {
     if (token) {
@@ -125,7 +152,9 @@ class Session extends EventEmitter {
 
   _handleSocketReconnect() {
     if (this.socket) this.socket.sendBuffer = [];
-    if (this._gameId) {
+    if (this._gameId && this._displayToken !== undefined) {
+      this.joinDisplay(this._gameId, this._displayToken);
+    } else if (this._gameId) {
       this.joinGame(this._gameId, this._password);
     }
   }
@@ -143,6 +172,7 @@ export type SessionStatus =
   | "offline"
   | "reconnecting"
   | "auth"
+  | "display_error"
   | "needs_update";
 export type SessionStatusHandler = (status: SessionStatus) => void;
 

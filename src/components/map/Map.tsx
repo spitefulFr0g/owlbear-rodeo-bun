@@ -10,6 +10,9 @@ import DrawingTool from "../tools/DrawingTool";
 import FogTool from "../tools/FogTool";
 import MeasureTool from "../tools/MeasureTool";
 import NetworkedMapPointer from "../../network/NetworkedMapPointer";
+import NetworkedDisplayView from "../../network/NetworkedDisplayView";
+
+import DisplayControls from "../display/DisplayControls";
 
 import { useSettings } from "../../contexts/SettingsContext";
 import { useUserId } from "../../contexts/UserIdContext";
@@ -191,6 +194,7 @@ function Map({
               onUndo={onUndo}
               onRedo={onRedo}
             />
+            <DisplayControls map={map} session={session} />
             {tokenMenu}
             {noteMenu}
             {selectionMenu}
@@ -233,6 +237,9 @@ function Map({
           active={selectedToolId === "pointer"}
           session={session}
         />
+        {map && userId && map.owner === userId && (
+          <NetworkedDisplayView session={session} mapId={map.id} />
+        )}
         <MeasureTool map={map} active={selectedToolId === "measure"} />
         {selectionTool}
       </MapInteraction>
