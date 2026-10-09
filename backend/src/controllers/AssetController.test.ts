@@ -1,41 +1,33 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import express from "express";
-import { mkdtemp, rm } from "fs/promises";
-import { Server } from "http";
-import { AddressInfo } from "net";
-import { tmpdir } from "os";
-import { join } from "path";
-import { FsAssetStore } from "../entities/AssetStore";
-import JoinTokens from "../entities/JoinTokens";
-import AssetController from "./AssetController";
+import { io } from "socket.io-client";
+import msgParser from "socket.io-msgpack-parser";
+import { nextMessage, setupAdministrator, startTestServer } from "../testing/serverHelpers";
 
-const MAX_BYTES = 1024;
+const MAX_BYTES = 64 * 1024 * 1024;
 const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 1, 2, 3, 4]);
 
-let dir: string;
-let server: Server;
+let server: Awaited<ReturnType<typeof startTestServer>>;
 let baseUrl: string;
 let token: string;
-const joinTokens = new JoinTokens();
 
 beforeAll(async () => {
-  dir = await mkdtemp(join(tmpdir(), "asset-routes-"));
-  const store = new FsAssetStore(dir, MAX_BYTES);
-  await store.init();
-  const controller = new AssetController(store, joinTokens, MAX_BYTES);
-  const app = express();
-  app.use(controller.path, controller.setRoutes());
-  await new Promise<void>((resolve) => {
-    server = app.listen(0, resolve);
-  });
-  baseUrl = `http://localhost:${(server.address() as AddressInfo).port}`;
-  token = joinTokens.issue("socket-1", "game-1");
+  server = await startTestServer();
+  await setupAdministrator(server);
+  baseUrl = server.address;
+  token = (await server.joinRoom("game-1")).token;
 });
 
 afterAll(async () => {
-  server.close();
-  await rm(dir, { recursive: true, force: true });
+  await server.dispose();
 });
+
+async function waitForRevocation(token: string) {
+  const deadline = Date.now() + 2000;
+  while ((await download("display-download", "HEAD", `Bearer ${token}`)).status !== 401) {
+    if (Date.now() > deadline) throw new Error("Token was not revoked");
+    await new Promise(resolve => setTimeout(resolve, 5));
+  }
+}
 
 function upload(
   id: string,
@@ -95,7 +87,14 @@ describe("asset routes", () => {
   describe("auth", () => {
     test("cast display tokens allow downloads but refuse uploads", async () => {
       await upload("display-download");
-      const displayToken = joinTokens.issue("display-socket", "game-1", "display");
+      const owner = await server.joinRoom("game-1");
+      owner.socket.emit("player_state", { userId: "gm" });
+      owner.socket.emit("map", { id: "map", owner: "gm" });
+      const link = await new Promise<string>(resolve => owner.socket.emit("get_display_token", resolve));
+      const display = io(baseUrl, { parser: msgParser, transports: ["websocket"], reconnection: false });
+      const joined = nextMessage(display, "joined_display");
+      display.emit("join_display", "game-1", link);
+      const [, displayToken] = await joined;
       const authorization = `Bearer ${displayToken}`;
       const response = await download("display-download", "GET", authorization);
       expect(response.status).toBe(200);
@@ -103,7 +102,8 @@ describe("asset routes", () => {
       expect((await download("display-download", "HEAD", authorization)).status).toBe(200);
       expect((await upload("display-upload", png, { Authorization: authorization })).status).toBe(403);
       expect((await download("display-upload")).status).toBe(404);
-      joinTokens.revoke("display-socket");
+      display.disconnect();
+      await waitForRevocation(displayToken);
       expect((await download("display-download", "GET", authorization)).status).toBe(401);
     });
 
@@ -134,9 +134,11 @@ describe("asset routes", () => {
 
     test("reject a token after its socket has left", async () => {
       await upload("revoked");
-      const leaving = joinTokens.issue("socket-2", "game-1");
+      const connection = await server.joinRoom("game-1");
+      const leaving = connection.token;
       expect((await download("revoked", "GET", `Bearer ${leaving}`)).status).toBe(200);
-      joinTokens.revoke("socket-2");
+      connection.socket.disconnect();
+      await waitForRevocation(leaving);
       expect((await download("revoked", "GET", `Bearer ${leaving}`)).status).toBe(401);
     });
   });

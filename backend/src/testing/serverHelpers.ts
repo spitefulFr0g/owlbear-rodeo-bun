@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from "fs/promises";
+import { cp, mkdtemp, rm } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
 import { io, Socket } from "socket.io-client";
@@ -63,17 +63,35 @@ export async function startTestServer(prepare?: (dataDir: string) => Promise<voi
     throw error;
   }
   const sockets = new Set<Socket>();
+  const connect = () => {
+    const socket = io(server.address, { parser: msgParser, transports: ["websocket"], reconnection: false });
+    sockets.add(socket);
+    return socket;
+  };
   return {
     clock,
+    connect,
     get address() { return server.address; },
     async joinRoom(roomId: string, password = "") {
-      const socket = io(server.address, { parser: msgParser, transports: ["websocket"], reconnection: false });
-      sockets.add(socket);
+      const socket = connect();
+      const map = nextMessage(socket, "map");
+      const mapState = nextMessage(socket, "map_state");
+      const manifest = nextMessage(socket, "manifest");
+      const party = nextMessage(socket, "party_state");
       const joined = nextMessage(socket, "joined_game");
       const frozen = nextMessage(socket, "display_frozen");
       socket.emit("join_game", roomId, password);
-      const [[, token]] = await Promise.all([joined, frozen]);
-      return { socket, token: token as string };
+      const [[, token], [displayFrozen]] = await Promise.all([joined, frozen]);
+      const [[savedMap], [savedState], [savedManifest], [partyState]] = await Promise.all([map, mapState, manifest, party]);
+      return { socket, token: token as string, state: { map: savedMap, mapState: savedState, manifest: savedManifest, partyState }, displayFrozen };
+    },
+    // Capture durable files without invoking the clean-stop flush. The tests
+    // recover this copy through a second whole server, never through SQLite.
+    async durableCopy() {
+      return startTestServer(async (copyDir) => {
+        await cp(join(dataDir, "owlbear.db"), join(copyDir, "owlbear.db"));
+        await cp(join(dataDir, "assets"), join(copyDir, "assets"), { recursive: true });
+      });
     },
     stop: () => server.stop(),
     async restart() {
@@ -88,4 +106,17 @@ export async function startTestServer(prepare?: (dataDir: string) => Promise<voi
       await rm(dataDir, { recursive: true, force: true });
     },
   };
+}
+
+/** Creates the first administrator through the same setup route a browser uses. */
+export async function setupAdministrator(server: Pick<RunningServer, "address">, username = "Administrator", password = "test-password") {
+  const response = await fetch(`${server.address}/api/setup`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ username, password }),
+  });
+  if (response.status !== 201) throw new Error(`Administrator setup failed: ${await response.text()}`);
+  const { account } = await response.json() as { account: import("../accounts/Accounts").Account };
+  const cookie = response.headers.get("set-cookie")!.split(";")[0];
+  return { account, cookie };
 }

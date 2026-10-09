@@ -10,13 +10,14 @@ export default class Game {
   displayFrozen = false;
   latestDisplayView?: DisplayView;
   shownDisplayView?: DisplayView;
-  readonly displayToken = randomBytes(32).toString("base64url");
+  readonly displayToken: string;
   gameId: string;
   partyState: PartyState;
   passwordHash: string;
   state: Record<string, MapState | Manifest | Map>;
 
-  constructor(gameId: string, hash: string) {
+  constructor(gameId: string, hash: string, displayToken = randomBytes(32).toString("base64url")) {
+    this.displayToken = displayToken;
     this.gameId = gameId;
     this.partyState = {};
     this.passwordHash = hash;
