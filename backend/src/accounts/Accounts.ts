@@ -166,6 +166,29 @@ export default class Accounts {
     });
   }
 
+  setAdministrator(id: string, administrator: boolean) {
+    return this.database.transaction(() => {
+      const account = this.list().find(account => account.id === id);
+      if (!account) return { error: "account_not_found" } as const;
+      if (account.administrator && !administrator && this.list().filter(account => account.administrator).length === 1) return { error: "last_administrator" } as const;
+      this.database.connection.query("UPDATE accounts SET administrator = ? WHERE id = ?").run(Number(administrator), id);
+      return { account: { ...account, administrator } };
+    });
+  }
+
+  removeAccount(id: string, callerId: string) {
+    return this.database.transaction(() => {
+      const account = this.list().find(account => account.id === id);
+      if (!account) return { error: "account_not_found" } as const;
+      if (id === callerId) return { error: "cannot_remove_self" } as const;
+      if (account.administrator && this.list().filter(account => account.administrator).length === 1) return { error: "last_administrator" } as const;
+      this.database.connection.query("UPDATE rooms SET gmAccountId = ? WHERE gmAccountId = ?").run(callerId, id);
+      this.database.connection.query("DELETE FROM sign_ins WHERE accountId = ?").run(id);
+      this.database.connection.query("DELETE FROM accounts WHERE id = ?").run(id);
+      return { removed: true } as const;
+    });
+  }
+
   hasAdministrator(): boolean {
     return !!this.database.connection.query("SELECT 1 FROM accounts WHERE administrator = 1 LIMIT 1").get();
   }
