@@ -15,6 +15,7 @@ import { useServerStatus } from "../contexts/ServerStatusContext";
 import { signOut } from "../network/api";
 
 import SignIn from "./SignIn";
+import Setup from "./Setup";
 
 function Home() {
   const [isGettingStartedModalOpen, setIsGettingStartedModalOpen] =
@@ -26,7 +27,10 @@ function Home() {
     setPassword("");
   }, [setPassword]);
 
-  const { account, refresh } = useServerStatus();
+  const { account, setup, refresh } = useServerStatus();
+
+  // While the host has setup reopened a visitor is offered it first
+  const [prefersSignIn, setPrefersSignIn] = useState(false);
 
   async function handleSignOut() {
     try {
@@ -37,6 +41,9 @@ function Home() {
   }
 
   if (!account) {
+    if (setup === "open" && !prefersSignIn) {
+      return <Setup reopened onSignInInstead={() => setPrefersSignIn(true)} />;
+    }
     return <SignIn />;
   }
 
