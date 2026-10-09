@@ -34,7 +34,7 @@ function RoomList() {
   const load = useCallback(async () => {
     setError(undefined);
     try {
-      setRooms(await listRooms());
+      setRooms(sortByName(await listRooms()));
     } catch (error) {
       setError(
         error instanceof ApiError
