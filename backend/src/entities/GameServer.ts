@@ -142,7 +142,11 @@ export default class GameServer {
           } else {
             // Join existing game
             const hash = this.gameRepo.getGamePasswordHash(gameId);
-            const res = await auth.checkPassword(password, hash);
+            const game = this.gameRepo.games[gameId];
+            // A browser sends the last password it used, which a room made
+            // without one must not refuse
+            const open = game.gmAccountId !== null && !game.hasPassword;
+            const res = open || await auth.checkPassword(password, hash);
             if (res) {
               await gameState.joinGame(gameId);
             } else {
