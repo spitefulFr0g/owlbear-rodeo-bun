@@ -56,23 +56,37 @@ function DisplayControls({ map, session }: DisplayControlsProps) {
     }
     let active = true;
     let retry: ReturnType<typeof setTimeout>;
+    // Only one request at a time, counting the wait before a retry
+    let requesting = false;
     function request() {
-      session.socket?.emit("get_display_token", (token: string | null) => {
+      if (requesting || !session.socket?.connected) {
+        return;
+      }
+      requesting = true;
+      session.socket.emit("get_display_token", (token: string | null) => {
         if (!active) {
           return;
         }
         setDisplayToken(token);
         // Our map may not have reached the server yet
-        if (!token) {
-          retry = setTimeout(request, 1000);
+        if (token) {
+          requesting = false;
+        } else {
+          retry = setTimeout(() => {
+            requesting = false;
+            request();
+          }, 1000);
         }
       });
     }
     // The token changes with the server, so ask again when we rejoin
     function handleStatus(status: string) {
       if (status === "joined") {
-        clearTimeout(retry);
         request();
+      } else {
+        // An answer to a request made before the connection dropped never comes
+        clearTimeout(retry);
+        requesting = false;
       }
     }
     request();
