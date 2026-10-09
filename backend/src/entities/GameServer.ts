@@ -128,7 +128,7 @@ export default class GameServer {
             return;
           }
 
-          const keys = [`room:id:${gameId}`, `room:address:${clientAddress(socket.request, this.behindProxy)}`];
+          const keys = [`room:id:${gameId}`, `room:address:${clientAddress(socket.request, this.behindProxy, socket.handshake.address)}`];
           const retryAfterSeconds = this.attempts.retryAfterSeconds(keys);
           if (retryAfterSeconds) {
             socket.emit("auth_wait", retryAfterSeconds);

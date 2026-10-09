@@ -7,9 +7,9 @@ function nearestForwardedValue(request: IncomingMessage, header: string): string
 }
 
 /** Trust one proxy hop: it must append or replace the visitor's headers. */
-export function clientAddress(request: IncomingMessage, behindProxy: boolean): string | undefined {
+export function clientAddress(request: IncomingMessage, behindProxy: boolean, directAddress = request.socket.remoteAddress): string | undefined {
   return (behindProxy ? nearestForwardedValue(request, "x-forwarded-for") : undefined)
-    ?? request.socket.remoteAddress;
+    ?? directAddress;
 }
 
 export function requestIsHttps(request: IncomingMessage, behindProxy: boolean): boolean {
