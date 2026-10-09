@@ -1,4 +1,7 @@
+import AttemptLimiter from "./AttemptLimiter";
 import cors from "cors";
+import RoomController from "./controllers/RoomController";
+import InviteController from "./controllers/InviteController";
 import Accounts from "./accounts/Accounts";
 import { setupLock } from "./accounts/setupLock";
 import { apiOrigin } from "./accounts/apiOrigin";
@@ -32,6 +35,7 @@ export interface ServerOptions {
   port: number;
   allowOrigin: RegExp | null;
   clock: Clock;
+  reopenSetup?: boolean;
   databaseUpgrades?: readonly UpgradeStep[];
 }
 
@@ -57,7 +61,8 @@ export async function startServer(options: ServerOptions): Promise<RunningServer
     throw new Error(`Unable to use the data directory ${dataDir}: ${error.message}\nChoose another with --data-dir.`);
   }
 
-  const accounts = new Accounts(database, options.clock);
+  const accounts = new Accounts(database, options.clock, options.reopenSetup);
+  const attempts = new AttemptLimiter(options.clock);
   const joinTokens = new JoinTokens();
 
   const app: Application = express();
@@ -110,7 +115,10 @@ export async function startServer(options: ServerOptions): Promise<RunningServer
   app.use(setupLock(accounts, frontendAssets));
   app.options("*", (_req, res) => res.sendStatus(204));
   app.use("/api", new SetupController(accounts).setRoutes());
-  app.use("/api", new SignInController(accounts).setRoutes());
+  app.use("/api", new SignInController(accounts, attempts).setRoutes());
+  const game = new GameServer(io, joinTokens, database, options.clock, attempts);
+  app.use("/api", new RoomController(accounts, database, game.gameRepo, (id, name) => io.to(id).emit("room_state", { name })).setRoutes());
+  app.use("/api", new InviteController(accounts).setRoutes());
   server.loadControllers(controllers);
   server.loadMiddleware([frontendHandler(frontendAssets)]);
 
@@ -123,7 +131,6 @@ export async function startServer(options: ServerOptions): Promise<RunningServer
       next();
     });
   });
-  const game = new GameServer(io, joinTokens, database, options.clock);
   const httpServer = await new Promise<import("http").Server>((resolve, reject) => {
     const listening = server.run(() => resolve(listening));
     listening.once("error", reject);
@@ -138,7 +145,8 @@ export async function startServer(options: ServerOptions): Promise<RunningServer
   const urls = [`http://localhost:${boundPort}`, ...lanUrls(boundPort, networkInterfaces())];
   console.log(`Owlbear Rodeo is running at:\n  ${urls.join("\n  ")}`);
   console.log(`Maps and tokens are kept in ${dataDir}`);
-  console.log(accounts.hasAdministrator() ? "An administrator exists; setup is closed." : "No administrator exists; setup is required.");
+  if (accounts.setupState() === "open") console.warn("Warning: setup is open; the next visitor can create one new administrator.");
+  else console.log(accounts.hasAdministrator() ? "An administrator exists; setup is closed." : "No administrator exists; setup is required.");
   if (!frontendAssets["/index.html"]) {
     console.warn("No frontend is embedded in this build, so only the game server is available.");
   }

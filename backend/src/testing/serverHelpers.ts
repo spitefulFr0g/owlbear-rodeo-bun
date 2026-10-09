@@ -94,11 +94,11 @@ export async function startTestServer(prepare?: (dataDir: string) => Promise<voi
       });
     },
     stop: () => server.stop(),
-    async restart() {
+    async restart(overrides: { reopenSetup?: boolean } = {}) {
       await server.stop();
       for (const socket of sockets) socket.disconnect();
       sockets.clear();
-      server = await startServer(options);
+      server = await startServer({ ...options, ...overrides });
     },
     async dispose() {
       await server.stop();
@@ -129,6 +129,32 @@ export async function signIn(server: Pick<RunningServer, "address">, username: s
     body: JSON.stringify({ username, password }),
   });
   if (response.status !== 200) throw new Error(`Sign-in failed: ${await response.text()}`);
+  const { account } = await response.json() as { account: import("../accounts/Accounts").Account };
+  const cookie = response.headers.get("set-cookie")!.split(";")[0];
+  return { account, cookie };
+}
+
+/** Creates a room through the signed-in HTTP route. */
+export async function createRoom(server: Pick<RunningServer, "address">, cookie: string, name: string, password?: string) {
+  const response = await fetch(`${server.address}/api/rooms`, {
+    method: "POST", headers: { Cookie: cookie, "Content-Type": "application/json" },
+    body: JSON.stringify({ name, password }),
+  });
+  if (response.status !== 201) throw new Error(`Room creation failed: ${await response.text()}`);
+  return (await response.json() as { room: import("../controllers/RoomController").Room }).room;
+}
+
+/** Creates an ordinary account through an administrator's invite link. */
+export async function inviteAccount(server: Pick<RunningServer, "address">, administratorCookie: string, username: string, password: string) {
+  const invite = await fetch(`${server.address}/api/admin/invites`, {
+    method: "POST", headers: { Cookie: administratorCookie },
+  });
+  if (invite.status !== 201) throw new Error(`Invite creation failed: ${await invite.text()}`);
+  const { token } = await invite.json() as { token: string };
+  const response = await fetch(`${server.address}/api/invites/${token}`, {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ username, password }),
+  });
+  if (response.status !== 201) throw new Error(`Invite acceptance failed: ${await response.text()}`);
   const { account } = await response.json() as { account: import("../accounts/Accounts").Account };
   const cookie = response.headers.get("set-cookie")!.split(";")[0];
   return { account, cookie };

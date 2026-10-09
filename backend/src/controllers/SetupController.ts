@@ -22,11 +22,11 @@ export default class SetupController extends Controller {
   ];
 
   private status(req: Request, res: Response): void {
-    res.json({ setup: this.accounts.hasAdministrator() ? "closed" : "required", account: this.accounts.resolveAccount(req, token => res.cookie("owlbear_sign_in", token, lastingSignInCookieOptions)) });
+    res.json({ setup: this.accounts.setupState(), account: this.accounts.resolveAccount(req, token => res.cookie("owlbear_sign_in", token, lastingSignInCookieOptions)) });
   }
 
   private async setup(req: Request, res: Response): Promise<void> {
-    if (this.accounts.hasAdministrator()) {
+    if (this.accounts.setupState() === "closed") {
       res.status(409).json({ error: "setup_closed", message: "An administrator already exists, so setup is closed." });
       return;
     }
@@ -44,6 +44,10 @@ export default class SetupController extends Controller {
       return;
     }
     const result = await this.accounts.setup(username, password);
+    if (result === "username_taken") {
+      res.status(409).json({ error: "username_taken", message: "That username is already taken; choose another." });
+      return;
+    }
     if (!result) {
       res.status(409).json({ error: "setup_closed", message: "An administrator already exists, so setup is closed." });
       return;

@@ -6,6 +6,9 @@ import type { AssetRecord } from "../entities/AssetStore";
 
 export interface RoomRecord {
   id: string;
+  name: string;
+  gmAccountId: string | null;
+  hasPassword: number;
   passwordHash: string;
   displayToken: string;
   documentVersion: number;
@@ -30,6 +33,9 @@ const layout = `
   CREATE INDEX IF NOT EXISTS assets_hash ON assets(hash);
   CREATE TABLE IF NOT EXISTS rooms (
     id TEXT PRIMARY KEY,
+    name TEXT NOT NULL DEFAULT '',
+    gmAccountId TEXT REFERENCES accounts(id),
+    hasPassword INTEGER NOT NULL DEFAULT 0,
     passwordHash TEXT NOT NULL,
     displayToken TEXT NOT NULL,
     documentVersion INTEGER NOT NULL,
@@ -48,6 +54,10 @@ const layout = `
     lastUsedAt INTEGER NOT NULL
   );
   CREATE INDEX IF NOT EXISTS sign_ins_account ON sign_ins(accountId);
+  CREATE TABLE IF NOT EXISTS invites (
+    tokenHash TEXT PRIMARY KEY,
+    expiresAt INTEGER NOT NULL
+  );
   CREATE TABLE IF NOT EXISTS metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 `;
 
@@ -91,11 +101,16 @@ export class OwlbearDatabase {
   }
 
   saveRoom(record: RoomRecord): void {
-    this.connection.query(`INSERT INTO rooms (id, passwordHash, displayToken, documentVersion, document)
-      VALUES (?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET
+    this.connection.query(`INSERT INTO rooms (id, passwordHash, displayToken, documentVersion, document, name, gmAccountId, hasPassword)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET
       passwordHash = excluded.passwordHash, displayToken = excluded.displayToken,
-      documentVersion = excluded.documentVersion, document = excluded.document`)
-      .run(record.id, record.passwordHash, record.displayToken, record.documentVersion, record.document);
+      documentVersion = excluded.documentVersion, document = excluded.document,
+      name = excluded.name, gmAccountId = excluded.gmAccountId, hasPassword = excluded.hasPassword`)
+      .run(record.id, record.passwordHash, record.displayToken, record.documentVersion, record.document, record.name, record.gmAccountId, record.hasPassword);
+  }
+
+  roomsForGM(accountId: string): RoomRecord[] {
+    return this.connection.query<RoomRecord, [string]>("SELECT * FROM rooms WHERE gmAccountId = ? ORDER BY name, id").all(accountId);
   }
 
   asset(id: string): AssetRecord | undefined {

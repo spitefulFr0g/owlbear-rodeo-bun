@@ -66,3 +66,18 @@ test("serves URL-encoded asset filenames through HTTP", async () => {
     server.close();
   }
 });
+
+test("serves index.html for invite and administration browser pages through HTTP", async () => {
+  const app = express();
+  app.use(frontendHandler({ "/index.html": import.meta.path }));
+  const server = app.listen(0);
+  try {
+    const { port } = server.address() as AddressInfo;
+    for (const path of ["/invite/abc123", "/admin"]) {
+      const response = await fetch(`http://localhost:${port}${path}`);
+      expect(response.status).toBe(200);
+      expect(response.headers.get("content-type")).toContain("text/html");
+      expect(await response.text()).toBe(await Bun.file(import.meta.path).text());
+    }
+  } finally { server.close(); }
+});
