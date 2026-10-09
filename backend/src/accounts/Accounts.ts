@@ -18,7 +18,9 @@ export default class Accounts {
   constructor(private readonly database: OwlbearDatabase, private readonly clock: Clock, private reopenSetup = false) {}
 
   setupState(): "required" | "open" | "closed" {
-    return this.reopenSetup ? "open" : this.hasAdministrator() ? "closed" : "required";
+    // With no administrator the flag changes nothing: setup is required anyway
+    if (!this.hasAdministrator()) return "required";
+    return this.reopenSetup ? "open" : "closed";
   }
 
   async setup(username: string, password: string): Promise<{ account: Account; token: string } | "username_taken" | null> {
