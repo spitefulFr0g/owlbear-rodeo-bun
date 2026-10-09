@@ -1,5 +1,6 @@
 import { Database } from "bun:sqlite";
-import { mkdirSync } from "fs";
+import { existsSync, mkdirSync } from "fs";
+import { inspectDatabase } from "./startup";
 import { dirname } from "path";
 import type { AssetRecord } from "../entities/AssetStore";
 
@@ -25,19 +26,24 @@ const layout = `
 export class OwlbearDatabase {
   readonly connection: Database;
 
-  constructor(path: string) {
+  constructor(path: string, upgrades: readonly import("./startup").UpgradeStep[] = []) {
     mkdirSync(dirname(path), { recursive: true });
+    const existing = existsSync(path);
+    const version = existing ? inspectDatabase(path, LAYOUT_VERSION) : LAYOUT_VERSION;
     this.connection = new Database(path, { create: true, strict: true });
     try {
       this.transaction(() => {
+        for (const step of upgrades) {
+          if (step.version > version && step.version <= LAYOUT_VERSION) this.connection.exec(step.sql);
+        }
         this.connection.exec(layout);
-        if (this.connection.query<{ user_version: number }, []>("PRAGMA user_version").get()?.user_version === 0) {
+        if (!existing || version < LAYOUT_VERSION) {
           this.connection.exec(`PRAGMA user_version = ${LAYOUT_VERSION}`);
         }
       });
     } catch (error) {
       this.close();
-      throw error;
+      throw new Error(`Unable to upgrade database ${path}: ${(error as Error).message}. Restore ${path}.before-upgrade with the server stopped, or use the previous executable.`);
     }
   }
 

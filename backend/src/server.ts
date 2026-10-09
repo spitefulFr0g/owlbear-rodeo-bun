@@ -1,5 +1,7 @@
 import cors from "cors";
 import { OwlbearDatabase } from "./database";
+import { lockDataDirectory } from "./database/directoryLock";
+import { upgradeSteps, UpgradeStep } from "./database/startup";
 import express, { Application, RequestHandler } from "express";
 import helmet from "helmet";
 import { networkInterfaces } from "os";
@@ -25,6 +27,7 @@ export interface ServerOptions {
   port: number;
   allowOrigin: RegExp | null;
   clock: Clock;
+  databaseUpgrades?: readonly UpgradeStep[];
 }
 
 export interface RunningServer {
@@ -38,7 +41,9 @@ export async function startServer(options: ServerOptions): Promise<RunningServer
   const MAX_ASSET_BYTES = 64 * 1024 * 1024;
 
   const dataDir = resolve(options.dataDir);
-  const database = new OwlbearDatabase(join(dataDir, "owlbear.db"));
+  const releaseDirectory = lockDataDirectory(dataDir);
+  try {
+  const database = new OwlbearDatabase(join(dataDir, "owlbear.db"), options.databaseUpgrades ?? upgradeSteps);
   const assetStore = new FsAssetStore(join(dataDir, "assets"), MAX_ASSET_BYTES, options.clock, database);
   try {
     await assetStore.init();
@@ -117,8 +122,12 @@ export async function startServer(options: ServerOptions): Promise<RunningServer
       stopping ??= new Promise<void>((resolve, reject) => {
         io.close((error?: Error) => error ? reject(error) : resolve());
         httpServer.closeIdleConnections();
-      }).finally(() => database.close());
+      }).finally(() => { database.close(); releaseDirectory(); });
       return stopping;
     },
   };
+  } catch (error) {
+    releaseDirectory();
+    throw error;
+  }
 }
