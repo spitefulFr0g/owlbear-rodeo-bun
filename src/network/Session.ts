@@ -42,6 +42,8 @@ class Session extends EventEmitter {
   _password: string = "";
   // Set when joined as a cast display
   _displayToken?: string;
+  // Set once we have left for good and the status is final
+  _left: boolean = false;
 
   /**
    * Connect to the websocket
@@ -70,6 +72,7 @@ class Session extends EventEmitter {
       this.socket.on("display_error", this._handleDisplayError.bind(this));
       this.socket.on("auth_error", this._handleAuthError.bind(this));
       this.socket.on("auth_wait", this._handleAuthWait.bind(this));
+      this.socket.on("room_not_found", this._handleRoomNotFound.bind(this));
       this.socket.on("game_expired", this._handleGameExpired.bind(this));
       this.socket.on("disconnect", this._handleSocketDisconnect.bind(this));
       this.socket.io.on("reconnect", this._handleSocketReconnect.bind(this));
@@ -172,7 +175,19 @@ class Session extends EventEmitter {
     this.emit("status", "auth");
   }
 
+  // The room link leads nowhere, there is nothing to reconnect to
+  _handleRoomNotFound() {
+    this._gameId = "";
+    this._left = true;
+    this.emit("status", "room_not_found");
+    this.socket?.disconnect();
+  }
+
   _handleSocketDisconnect() {
+    // A disconnect we asked for after the room turned out not to exist
+    if (this._left) {
+      return;
+    }
     // The server forgets the token when the socket disconnects
     this.joinToken = undefined;
     this.emit("status", "reconnecting");
@@ -200,6 +215,7 @@ export type SessionStatus =
   | "offline"
   | "reconnecting"
   | "auth"
+  | "room_not_found"
   | "display_error"
   | "needs_update";
 export type SessionStatusHandler = (status: SessionStatus) => void;

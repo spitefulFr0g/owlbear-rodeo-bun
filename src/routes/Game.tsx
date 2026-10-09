@@ -6,6 +6,7 @@ import Konva from "konva";
 import ReconnectBanner from "../components/banner/ReconnectBanner";
 import OfflineBanner from "../components/banner/OfflineBanner";
 import LoadingOverlay from "../components/LoadingOverlay";
+import RoomNotice from "../components/RoomNotice";
 import MapLoadingOverlay from "../components/map/MapLoadingOverlay";
 import UpgradingLoadingOverlay from "../components/UpgradingLoadingOverlay";
 
@@ -99,6 +100,15 @@ function Game() {
   // A ref to the Konva stage
   // the ref will be assigned in the MapInteraction component
   const mapStageRef = useRef<Konva.Stage | null>(null);
+
+  if (sessionStatus === "room_not_found") {
+    return (
+      <RoomNotice title="Room not found">
+        No room has this link. Check that all of it was copied, or ask your GM
+        for it again.
+      </RoomNotice>
+    );
+  }
 
   return (
     <RoomProvider session={session}>
