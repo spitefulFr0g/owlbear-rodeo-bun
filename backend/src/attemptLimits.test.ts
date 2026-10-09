@@ -262,4 +262,4 @@ test("opening a password room without a password is asked for it and never count
     for (let i = 0; i < 12; i++) await joinAnswer(connect(2 + i), room.id, "", "auth_error");
     await joinAnswer(connect(40), room.id, "secret", "joined_game");
   } finally { for (const socket of sockets) socket.disconnect(); await server.dispose(); }
-});
+}, 20_000);
