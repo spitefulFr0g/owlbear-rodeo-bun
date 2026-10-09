@@ -2,6 +2,7 @@ import cors from "cors";
 import Accounts from "./accounts/Accounts";
 import { setupLock } from "./accounts/setupLock";
 import { apiOrigin } from "./accounts/apiOrigin";
+import SignInController from "./controllers/SignInController";
 import SetupController from "./controllers/SetupController";
 import { OwlbearDatabase } from "./database";
 import { lockDataDirectory } from "./database/directoryLock";
@@ -109,6 +110,7 @@ export async function startServer(options: ServerOptions): Promise<RunningServer
   app.use(setupLock(accounts, frontendAssets));
   app.options("*", (_req, res) => res.sendStatus(204));
   app.use("/api", new SetupController(accounts).setRoutes());
+  app.use("/api", new SignInController(accounts).setRoutes());
   server.loadControllers(controllers);
   server.loadMiddleware([frontendHandler(frontendAssets)]);
 
