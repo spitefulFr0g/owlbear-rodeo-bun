@@ -107,3 +107,16 @@ export async function startTestServer(prepare?: (dataDir: string) => Promise<voi
     },
   };
 }
+
+/** Creates the first administrator through the same setup route a browser uses. */
+export async function setupAdministrator(server: Pick<RunningServer, "address">, username = "Administrator", password = "test-password") {
+  const response = await fetch(`${server.address}/api/setup`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ username, password }),
+  });
+  if (response.status !== 201) throw new Error(`Administrator setup failed: ${await response.text()}`);
+  const { account } = await response.json() as { account: import("../accounts/Accounts").Account };
+  const cookie = response.headers.get("set-cookie")!.split(";")[0];
+  return { account, cookie };
+}

@@ -1,11 +1,14 @@
 import { afterAll, afterEach, beforeAll, describe, expect, test } from "bun:test";
 import { Socket } from "socket.io-client";
-import { startTestServer } from "../testing/serverHelpers";
+import { setupAdministrator, startTestServer } from "../testing/serverHelpers";
 
 let server: Awaited<ReturnType<typeof startTestServer>>;
 const sockets: Socket[] = [];
 
-beforeAll(async () => { server = await startTestServer(); });
+beforeAll(async () => {
+  server = await startTestServer();
+  await setupAdministrator(server);
+});
 
 afterEach(() => {
   for (const socket of sockets.splice(0)) socket.disconnect();

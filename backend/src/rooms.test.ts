@@ -1,5 +1,11 @@
 import { expect, test } from "bun:test";
-import { nextMessage, startTestServer } from "./testing/serverHelpers";
+import { nextMessage, setupAdministrator, startTestServer } from "./testing/serverHelpers";
+
+async function startRoomServer() {
+  const server = await startTestServer();
+  await setupAdministrator(server);
+  return server;
+}
 
 async function change(server: Awaited<ReturnType<typeof startTestServer>>, room = "room") {
   const owner = await server.joinRoom(room);
@@ -17,7 +23,7 @@ async function change(server: Awaited<ReturnType<typeof startTestServer>>, room 
 }
 
 test("a clean stop keeps every room's map, placed state and image list", async () => {
-  const server = await startTestServer();
+  const server = await startRoomServer();
   try {
     const expected = await change(server);
     await change(server, "second-room");
@@ -32,7 +38,7 @@ test("a clean stop keeps every room's map, placed state and image list", async (
 });
 
 test("a room change is saved three seconds after the last change", async () => {
-  const server = await startTestServer();
+  const server = await startRoomServer();
   try {
     const { owner, observer, map } = await change(server);
     await server.clock.advance(2000);
@@ -51,7 +57,7 @@ test("a room change is saved three seconds after the last change", async () => {
 });
 
 test("steady room changes are saved within eight seconds", async () => {
-  const server = await startTestServer();
+  const server = await startRoomServer();
   try {
     const { owner, observer, map } = await change(server);
     for (let second = 1; second <= 7; second++) {
@@ -68,7 +74,7 @@ test("steady room changes are saved within eight seconds", async () => {
 });
 
 test("a room's password still gates new connections after a restart", async () => {
-  const server = await startTestServer();
+  const server = await startRoomServer();
   try {
     await server.joinRoom("protected", "secret");
     await server.restart();
@@ -82,7 +88,7 @@ test("a room's password still gates new connections after a restart", async () =
 });
 
 test("the old display link joins after restart without restoring presence, dice, timers, view or freeze", async () => {
-  const server = await startTestServer();
+  const server = await startRoomServer();
   try {
     const { owner, observer, map } = await change(server);
     const party = nextMessage(observer.socket, "party_state");
@@ -115,7 +121,7 @@ test("the old display link joins after restart without restoring presence, dice,
 });
 
 test("saved image references remain downloadable and incremental edits survive restart", async () => {
-  const server = await startTestServer();
+  const server = await startRoomServer();
   try {
     const { owner, observer } = await change(server);
     const image = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 1, 2, 3, 4]);
@@ -151,7 +157,7 @@ test("saved image references remain downloadable and incremental edits survive r
 });
 
 test("a room that disconnects before its save delay still reaches durable storage", async () => {
-  const server = await startTestServer();
+  const server = await startRoomServer();
   try {
     const { owner, observer, state } = await change(server);
     const left = nextMessage(observer.socket, "player_left");

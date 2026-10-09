@@ -35,6 +35,19 @@ const layout = `
     documentVersion INTEGER NOT NULL,
     document TEXT NOT NULL
   );
+  CREATE TABLE IF NOT EXISTS accounts (
+    id TEXT PRIMARY KEY,
+    username TEXT NOT NULL COLLATE NOCASE UNIQUE,
+    passwordHash TEXT NOT NULL,
+    administrator INTEGER NOT NULL
+  );
+  CREATE TABLE IF NOT EXISTS sign_ins (
+    tokenHash TEXT PRIMARY KEY,
+    accountId TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+    createdAt INTEGER NOT NULL,
+    lastUsedAt INTEGER NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS sign_ins_account ON sign_ins(accountId);
   CREATE TABLE IF NOT EXISTS metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 `;
 
