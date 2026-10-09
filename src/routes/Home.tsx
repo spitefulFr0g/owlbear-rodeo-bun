@@ -10,6 +10,11 @@ import GettingStartedModal from "../modals/GettingStartedModal";
 import HelpIcon from "../icons/HelpIcon";
 
 import { useAuth } from "../contexts/AuthContext";
+import { useServerStatus } from "../contexts/ServerStatusContext";
+
+import { signOut } from "../network/api";
+
+import SignIn from "./SignIn";
 
 import RedditIcon from "../icons/SocialRedditIcon";
 import TwitterIcon from "../icons/SocialTwitterIcon";
@@ -29,6 +34,20 @@ function Home() {
   useEffect(() => {
     setPassword("");
   }, [setPassword]);
+
+  const { account, refresh } = useServerStatus();
+
+  async function handleSignOut() {
+    try {
+      await signOut();
+    } finally {
+      await refresh();
+    }
+  }
+
+  if (!account) {
+    return <SignIn />;
+  }
 
   return (
     <Flex
@@ -73,6 +92,18 @@ function Home() {
         <Text variant="caption" as="p" sx={{ textAlign: "center" }}>
           Legacy v{process.env.REACT_APP_VERSION}
         </Text>
+        <Flex
+          mx={2}
+          mt={3}
+          sx={{ alignItems: "center", justifyContent: "space-between" }}
+        >
+          <Text as="span" variant="body2">
+            Signed in as <strong>{account.username}</strong>
+          </Text>
+          <Button variant="secondary" onClick={handleSignOut}>
+            Sign out
+          </Button>
+        </Flex>
         <Button
           as="a"
           // @ts-ignore
