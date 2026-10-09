@@ -1,11 +1,13 @@
 import { useState, useEffect } from "react";
 import { Flex, Button, Text } from "theme-ui";
+import { useHistory } from "react-router-dom";
+import { useToasts } from "react-toast-notifications";
 
 import SignedInPage from "../components/account/SignedInPage";
-import Link from "../components/Link";
 import RoomList from "../components/rooms/RoomList";
 
 import GettingStartedModal from "../modals/GettingStartedModal";
+import ChangePasswordModal from "../modals/ChangePasswordModal";
 
 import HelpIcon from "../icons/HelpIcon";
 
@@ -40,6 +42,16 @@ function Home() {
     }
   }
 
+  const [isChangePasswordModalOpen, setIsChangePasswordModalOpen] =
+    useState(false);
+  const { addToast } = useToasts();
+  function handlePasswordChanged() {
+    setIsChangePasswordModalOpen(false);
+    addToast("Password changed. Your other browsers have been signed out.");
+  }
+
+  const history = useHistory();
+
   if (!account) {
     if (setup === "open" && !prefersSignIn) {
       return <Setup reopened onSignInInstead={() => setPrefersSignIn(true)} />;
@@ -50,29 +62,28 @@ function Home() {
   return (
     <SignedInPage>
       <RoomList />
-      <Flex
-        mt={4}
-        sx={{
-          width: "100%",
-          alignItems: "center",
-          justifyContent: "space-between",
-        }}
-      >
-        <Text as="span" variant="body2">
-          Signed in as <strong>{account.username}</strong>
-        </Text>
+      <Text as="p" variant="body2" mt={4}>
+        Signed in as <strong>{account.username}</strong>
+      </Text>
+      <Flex sx={{ flexWrap: "wrap", justifyContent: "center" }}>
         {account.administrator && (
-          <Link to="/admin" variant="footer">
+          <Button variant="secondary" onClick={() => history.push("/admin")}>
             Administration
-          </Link>
+          </Button>
         )}
+        <Button
+          variant="secondary"
+          onClick={() => setIsChangePasswordModalOpen(true)}
+        >
+          Change password
+        </Button>
         <Button variant="secondary" onClick={handleSignOut}>
           Sign out
         </Button>
       </Flex>
       <Button
         variant="secondary"
-        mt={3}
+        mt={2}
         onClick={() => setIsGettingStartedModalOpen(true)}
         sx={{
           display: "flex",
@@ -85,6 +96,11 @@ function Home() {
       <Text variant="caption" as="p" sx={{ textAlign: "center" }}>
         Legacy v{process.env.REACT_APP_VERSION}
       </Text>
+      <ChangePasswordModal
+        isOpen={isChangePasswordModalOpen}
+        onRequestClose={() => setIsChangePasswordModalOpen(false)}
+        onChanged={handlePasswordChanged}
+      />
       <GettingStartedModal
         isOpen={isGettingStartedModalOpen}
         onRequestClose={() => setIsGettingStartedModalOpen(false)}

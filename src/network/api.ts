@@ -160,3 +160,33 @@ export function acceptInvite(
     { username, password }
   );
 }
+
+export function createResetLink(accountId: string) {
+  return request<OneUseLink>(
+    "POST",
+    `/admin/accounts/${encodeURIComponent(accountId)}/reset-link`
+  );
+}
+
+/** Answers whose password the link resets, throws `link_invalid` otherwise */
+export function checkReset(token: string) {
+  return request<{ username: string }>(
+    "GET",
+    `/resets/${encodeURIComponent(token)}`
+  );
+}
+
+export function acceptReset(token: string, password: string) {
+  return request<{ account: Account }>(
+    "POST",
+    `/resets/${encodeURIComponent(token)}`,
+    { password }
+  );
+}
+
+export function changePassword(currentPassword: string, newPassword: string) {
+  return request<void>("POST", "/account/password", {
+    currentPassword,
+    newPassword,
+  });
+}

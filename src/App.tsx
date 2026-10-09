@@ -12,6 +12,7 @@ import HowTo from "./routes/HowTo";
 import Setup from "./routes/Setup";
 import Invite from "./routes/Invite";
 import Admin from "./routes/Admin";
+import Reset from "./routes/Reset";
 
 import { AuthProvider } from "./contexts/AuthContext";
 import { SettingsProvider } from "./contexts/SettingsContext";
@@ -68,6 +69,9 @@ function Routes() {
         </Route>
         <Route path="/invite/:token">
           <Invite />
+        </Route>
+        <Route path="/reset/:token">
+          <Reset />
         </Route>
         <Route path="/admin">
           <Admin />

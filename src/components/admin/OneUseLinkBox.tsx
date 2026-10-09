@@ -55,7 +55,7 @@ function OneUseLinkBox({
         <IconButton
           ml={1}
           title="Copy"
-          aria-label={`Copy ${label.toLowerCase()}`}
+          aria-label={`Copy ${label}`}
           onClick={handleCopy}
           sx={{ flexShrink: 0 }}
         >

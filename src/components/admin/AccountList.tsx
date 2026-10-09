@@ -11,6 +11,7 @@ import {
   ApiError,
   OneUseLink,
   createInvite,
+  createResetLink,
   listAccounts,
 } from "../../network/api";
 
@@ -52,6 +53,17 @@ function AccountList({ self }: { self: Account }) {
     setIsInviting(false);
   }
 
+  const [reset, setReset] = useState<{ account: Account; link: OneUseLink }>();
+
+  async function handleReset(account: Account) {
+    setError(undefined);
+    try {
+      setReset({ account, link: await createResetLink(account.id) });
+    } catch (error) {
+      setError(asApiError(error, "Unable to make a reset link."));
+    }
+  }
+
   return (
     <Box sx={{ width: "100%" }}>
       <Flex sx={{ alignItems: "center", justifyContent: "space-between" }}>
@@ -68,6 +80,14 @@ function AccountList({ self }: { self: Account }) {
           link={`${window.location.origin}/invite/${invite.token}`}
           expiresAt={invite.expiresAt}
           recipient="the person you are inviting"
+        />
+      )}
+      {reset && (
+        <OneUseLinkBox
+          label={`Reset link for ${reset.account.username}`}
+          link={`${window.location.origin}/reset/${reset.link.token}`}
+          expiresAt={reset.link.expiresAt}
+          recipient={reset.account.username}
         />
       )}
       {error && (
@@ -92,7 +112,17 @@ function AccountList({ self }: { self: Account }) {
               key={account.id}
               account={account}
               isSelf={account.id === self.id}
-            />
+            >
+              <Button
+                variant="secondary"
+                py={1}
+                sx={{ flexShrink: 0 }}
+                aria-label={`Reset the password of ${account.username}`}
+                onClick={() => handleReset(account)}
+              >
+                Reset password
+              </Button>
+            </AccountRow>
           ))}
         </Box>
       )}
