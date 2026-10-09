@@ -1,4 +1,5 @@
 import { randomBytes } from "crypto";
+import { DisplayView } from "../types/DisplayView";
 import { PlayerState } from "../types/PlayerState";
 import { PartyState } from "../types/PartyState";
 import { MapState } from "../types/MapState";
@@ -6,6 +7,9 @@ import { Manifest } from "../types/Manifest";
 import { Map } from "../types/Map";
 
 export default class Game {
+  displayFrozen = false;
+  latestDisplayView?: DisplayView;
+  shownDisplayView?: DisplayView;
   readonly displayToken = randomBytes(32).toString("base64url");
   gameId: string;
   partyState: PartyState;
