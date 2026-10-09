@@ -36,6 +36,7 @@ function Game() {
 
   const [session] = useState(new Session());
   const [sessionStatus, setSessionStatus] = useState<SessionStatus>();
+  const [authWaitUntil, setAuthWaitUntil] = useState<number>();
 
   const [maintenance, setMaintenance] = useState(
     process.env.REACT_APP_MAINTENANCE === "true"
@@ -44,6 +45,7 @@ function Game() {
   useEffect(() => {
     function handleStatus(status: SessionStatus) {
       setSessionStatus(status);
+      setAuthWaitUntil(session.authWaitUntil);
     }
 
     session.on("status", handleStatus);
@@ -122,6 +124,7 @@ function Game() {
                     />
                     <AuthModal
                       isOpen={sessionStatus === "auth"}
+                      waitUntil={authWaitUntil}
                       onSubmit={handleAuthSubmit}
                     />
                     <GameExpiredModal

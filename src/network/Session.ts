@@ -24,6 +24,12 @@ class Session extends EventEmitter {
    */
   joinToken?: string;
 
+  /**
+   * When the server will take a room password again, in milliseconds since
+   * the epoch. Set while it refuses them after too many wrong ones.
+   */
+  authWaitUntil?: number;
+
   // Store party id and password for reconnect
   _gameId: string = "";
   _password: string = "";
@@ -55,6 +61,7 @@ class Session extends EventEmitter {
       this.socket.on("joined_display", this._handleJoinedDisplay.bind(this));
       this.socket.on("display_error", this._handleDisplayError.bind(this));
       this.socket.on("auth_error", this._handleAuthError.bind(this));
+      this.socket.on("auth_wait", this._handleAuthWait.bind(this));
       this.socket.on("game_expired", this._handleGameExpired.bind(this));
       this.socket.on("disconnect", this._handleSocketDisconnect.bind(this));
       this.socket.io.on("reconnect", this._handleSocketReconnect.bind(this));
@@ -141,6 +148,12 @@ class Session extends EventEmitter {
   }
 
   _handleAuthError() {
+    this.emit("status", "auth");
+  }
+
+  // Too many wrong passwords, even the right one is refused for a while
+  _handleAuthWait(retryAfterSeconds: number) {
+    this.authWaitUntil = Date.now() + retryAfterSeconds * 1000;
     this.emit("status", "auth");
   }
 
