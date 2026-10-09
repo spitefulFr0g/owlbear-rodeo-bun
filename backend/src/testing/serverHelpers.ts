@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from "fs/promises";
+import { cp, mkdtemp, rm } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
 import { io, Socket } from "socket.io-client";
@@ -63,17 +63,35 @@ export async function startTestServer(prepare?: (dataDir: string) => Promise<voi
     throw error;
   }
   const sockets = new Set<Socket>();
+  const connect = () => {
+    const socket = io(server.address, { parser: msgParser, transports: ["websocket"], reconnection: false });
+    sockets.add(socket);
+    return socket;
+  };
   return {
     clock,
+    connect,
     get address() { return server.address; },
     async joinRoom(roomId: string, password = "") {
-      const socket = io(server.address, { parser: msgParser, transports: ["websocket"], reconnection: false });
-      sockets.add(socket);
+      const socket = connect();
+      const map = nextMessage(socket, "map");
+      const mapState = nextMessage(socket, "map_state");
+      const manifest = nextMessage(socket, "manifest");
+      const party = nextMessage(socket, "party_state");
       const joined = nextMessage(socket, "joined_game");
       const frozen = nextMessage(socket, "display_frozen");
       socket.emit("join_game", roomId, password);
-      const [[, token]] = await Promise.all([joined, frozen]);
-      return { socket, token: token as string };
+      const [[, token], [displayFrozen]] = await Promise.all([joined, frozen]);
+      const [[savedMap], [savedState], [savedManifest], [partyState]] = await Promise.all([map, mapState, manifest, party]);
+      return { socket, token: token as string, state: { map: savedMap, mapState: savedState, manifest: savedManifest, partyState }, displayFrozen };
+    },
+    // Capture durable files without invoking the clean-stop flush. The tests
+    // recover this copy through a second whole server, never through SQLite.
+    async durableCopy() {
+      return startTestServer(async (copyDir) => {
+        await cp(join(dataDir, "owlbear.db"), join(copyDir, "owlbear.db"));
+        await cp(join(dataDir, "assets"), join(copyDir, "assets"), { recursive: true });
+      });
     },
     stop: () => server.stop(),
     async restart() {

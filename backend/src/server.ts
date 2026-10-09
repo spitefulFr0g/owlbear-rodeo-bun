@@ -97,7 +97,7 @@ export async function startServer(options: ServerOptions): Promise<RunningServer
   server.loadControllers(controllers);
   server.loadMiddleware([frontendHandler(frontendAssets)]);
 
-  const game = new GameServer(io, joinTokens);
+  const game = new GameServer(io, joinTokens, database, options.clock);
   const httpServer = await new Promise<import("http").Server>((resolve, reject) => {
     const listening = server.run(() => resolve(listening));
     listening.once("error", reject);
@@ -122,7 +122,10 @@ export async function startServer(options: ServerOptions): Promise<RunningServer
       stopping ??= new Promise<void>((resolve, reject) => {
         io.close((error?: Error) => error ? reject(error) : resolve());
         httpServer.closeIdleConnections();
-      }).finally(() => { database.close(); releaseDirectory(); });
+      }).finally(() => {
+        try { game.flush(); }
+        finally { database.close(); releaseDirectory(); }
+      });
       return stopping;
     },
   };

@@ -1,3 +1,5 @@
+import { Clock } from "../clock";
+import { OwlbearDatabase } from "../database";
 /* eslint-disable no-underscore-dangle */
 import { Server as HttpServer } from "http";
 import { Socket, Server as IOServer } from "socket.io";
@@ -18,11 +20,13 @@ export default class GameServer {
   private gameRepo;
   private readonly joinTokens: JoinTokens;
 
-  constructor(io: IOServer, joinTokens: JoinTokens) {
+  constructor(io: IOServer, joinTokens: JoinTokens, database?: OwlbearDatabase, clock?: Clock) {
     this.io = io;
     this.joinTokens = joinTokens;
-    this.gameRepo = new GameRepository();
+    this.gameRepo = new GameRepository(database, clock);
   }
+
+  public flush(): void { this.gameRepo.flush(); }
 
   public initaliseSocketServer(httpServer: HttpServer) {
     this.io.listen(httpServer);
