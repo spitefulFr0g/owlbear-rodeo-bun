@@ -1,3 +1,4 @@
+import AttemptLimiter from "./AttemptLimiter";
 import cors from "cors";
 import RoomController from "./controllers/RoomController";
 import InviteController from "./controllers/InviteController";
@@ -60,6 +61,7 @@ export async function startServer(options: ServerOptions): Promise<RunningServer
   }
 
   const accounts = new Accounts(database, options.clock);
+  const attempts = new AttemptLimiter(options.clock);
   const joinTokens = new JoinTokens();
 
   const app: Application = express();
@@ -112,8 +114,8 @@ export async function startServer(options: ServerOptions): Promise<RunningServer
   app.use(setupLock(accounts, frontendAssets));
   app.options("*", (_req, res) => res.sendStatus(204));
   app.use("/api", new SetupController(accounts).setRoutes());
-  app.use("/api", new SignInController(accounts).setRoutes());
-  const game = new GameServer(io, joinTokens, database, options.clock);
+  app.use("/api", new SignInController(accounts, attempts).setRoutes());
+  const game = new GameServer(io, joinTokens, database, options.clock, attempts);
   app.use("/api", new RoomController(accounts, database, game.gameRepo, (id, name) => io.to(id).emit("room_state", { name })).setRoutes());
   app.use("/api", new InviteController(accounts).setRoutes());
   server.loadControllers(controllers);
