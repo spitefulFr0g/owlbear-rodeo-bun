@@ -72,10 +72,12 @@ Placed 1.0 state (tokens, drawings, fog and notes on a map) is not migrated in s
 | Step | What is built |
 | --- | --- |
 | 8. Scene library | Create, name, open, edit, delete and switch scenes. The one-step importer with map alignment and the fog fill setting. The Scene Controls menu for the grid, with grid opacity, line width and colour. Show to players, and a one-off "bring players here". Fog Fill. Assigning a scene as the welcome screen. The view-only scene. |
-| 9. Libraries and dock | The room library, the account library and the server set ([ADR 0005](adr/0005-assets-belong-to-a-room-or-an-account.md)). A dock along the bottom and one Asset Manager, replacing the token bar and the two pickers. Dropping an image file on the canvas with a type picker. The one-off import of the maintainer's browser library into their account library. |
+| 9. Libraries and dock | The room library, the account library and the server set ([ADR 0005](adr/0005-assets-belong-to-a-room-or-an-account.md)). A dock along the bottom and one Asset Manager, replacing the token bar and the two pickers. Dropping an image file on the canvas with a type picker. The one-off import of a browser library into the account library. Today's Import / Export dialog and the `.owlbear` file are removed. |
 | 10. Small tools | The text tool, with colour and size. Notes and text that start hidden. Adjustable stroke width. Duplicate numbering. Double-click to select a locked item. A check that Space pans mid-shape. |
 
 The asset library stays in the browser until step 9. The reference suggested moving it to the server during the storage work, before the item model. It waits so that the server library is built once, against image types that are layers, and not first against today's separate map and token tables.
+
+The browser library import ships in the release that contains step 9 and is removed in the release after it, with the rest of the browser library code. See [Decide how the existing browser library is imported into the account library](https://github.com/spitefulFr0g/owlbear-rodeo-bun/issues/27).
 
 ### Not scheduled
 
@@ -99,7 +101,6 @@ Decisions that are known to be needed and are not made yet, with the step that n
 | How sign-in sessions work, how they relate to the join token, and what limits apply to sign-in attempts. | Step 4 |
 | What one world unit is (pixels at a fixed cell size, or grid cells) and where a scene's origin sits. | Step 6 |
 | Whether the transport stays on socket.io. | Step 6 |
-| How the existing browser library is read and sent to the account library. See [Decide how the existing browser library is imported into the account library](https://github.com/spitefulFr0g/owlbear-rodeo-bun/issues/27). | Step 9 |
 | Whether extensions written for `@owlbear-rodeo/sdk` should load unchanged. | The extension platform |
 
 ## Verdicts by section
@@ -185,7 +186,7 @@ Decisions: [Decide the access model: server password, local accounts, or both](h
 | Storage manager: usage | In | 4 | Per room on the room list; the server total for the administrator. |
 | Storage manager: quotas | Later | | Today's per-file size cap stays. |
 | Storage manager: backup export and import | In as a copy of the data directory. Later: in-app export and import of one room | 3 | |
-| Converter from 1.0 data | Out for placed state. In: the browser library import | 9 | |
+| Converter from 1.0 data | Out for placed state. In: the browser library import | 9 | Read from the browser's own database by any signed-in account; there is no file route. |
 | Room metadata bag | Later | | With extensions. |
 
 Added by the decisions:
@@ -250,12 +251,12 @@ Decision: [Screen asset manager and image features (sections F and G)](https://g
 | Dock search with fuzzy name match and a tag preview | In: search. Out: tag preview | 9 | |
 | Asset Manager dialog | In | 9 | One dialog replaces the map picker and the token picker. |
 | Sort by created or by name | In | 9 | |
-| Folders | In as today's one-level groups. Later: nesting, colours, "Move to" | 9 | |
+| Folders | In as today's one-level groups. Later: nesting, colours, "Move to" | 9 | One list of folders per library, holding images of any type. |
 | Collections per campaign | In as the room library and the account library | 9 | There is no collection to create or switch. |
 | Tags | Out | | |
 | Drop an image file onto the canvas with a type picker | In | 9 | Placed at the drop point. |
 | Drop an image from another web page | Later | | What works today stays. |
-| Importer defaults | In: type, size mode, label. Later: visible, locked, rotation, text colour, font | 9 | |
+| Importer defaults | In: type, size mode, label, and a saved grid on a map. Later: visible, locked, rotation, text colour, font | 9 | Aligning a map while creating a scene saves the alignment to the asset. The scene still owns its grid. |
 | Image editor with a grid preview | In | 9 | Today's two edit dialogs, merged. |
 | Starter sets | In as the server set. Out: third-party creator sets, tutorial scene | 9 | |
 | Video as image content | Out | | |
