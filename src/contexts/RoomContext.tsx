@@ -2,9 +2,12 @@ import React, { useContext, useEffect, useState } from "react";
 
 import Session from "../network/Session";
 
-import { RoomState } from "../types/Room";
+import { Role, RoomState } from "../types/Room";
 
 const RoomContext = React.createContext<RoomState>({});
+
+// A page that never joined as a person, such as a cast display, changes nothing
+export const RoleContext = React.createContext<Role>("player");
 
 type RoomProviderProps = {
   session: Session;
@@ -22,6 +25,14 @@ export function RoomProvider({ session, children }: RoomProviderProps) {
     };
   }, [session]);
 
+  const [role, setRole] = useState<Role>(session.role);
+  useEffect(() => {
+    session.on("role", setRole);
+    return () => {
+      session.off("role", setRole);
+    };
+  }, [session]);
+
   // Name the browser tab after the room
   useEffect(() => {
     if (!room.name) {
@@ -34,11 +45,20 @@ export function RoomProvider({ session, children }: RoomProviderProps) {
     };
   }, [room.name]);
 
-  return <RoomContext.Provider value={room}>{children}</RoomContext.Provider>;
+  return (
+    <RoomContext.Provider value={room}>
+      <RoleContext.Provider value={role}>{children}</RoleContext.Provider>
+    </RoomContext.Provider>
+  );
 }
 
 export function useRoom() {
   return useContext(RoomContext);
+}
+
+/** The role the server gave this connection in the room */
+export function useRole() {
+  return useContext(RoleContext);
 }
 
 export default RoomContext;

@@ -4,6 +4,8 @@ import Konva from "konva";
 import { useSpring, animated } from "@react-spring/konva";
 
 import { useUserId } from "../../contexts/UserIdContext";
+import { useRole } from "../../contexts/RoomContext";
+import { getRoleControls } from "../../helpers/roomControls";
 import {
   useSetPreventMapInteraction,
   useMapWidth,
@@ -57,6 +59,7 @@ function Note({
   selected,
 }: NoteProps) {
   const userId = useUserId();
+  const roleControls = getRoleControls(useRole());
 
   const mapWidth = useMapWidth();
   const mapHeight = useMapHeight();
@@ -121,7 +124,7 @@ function Note({
     if (draggable) {
       setPreventMapInteraction(true);
     }
-    if (note.locked && map?.owner === userId) {
+    if (note.locked && roleControls.hidden) {
       notePointerDownTimeRef.current = event.evt.timeStamp;
     }
   }
@@ -135,7 +138,7 @@ function Note({
     }
     // Check note click when locked and we are the map owner
     // We can't use onClick because that doesn't check pointer distance
-    if (note.locked && map?.owner === userId) {
+    if (note.locked && roleControls.hidden) {
       // If down and up time is small trigger a click
       const delta = event.evt.timeStamp - notePointerDownTimeRef.current;
       if (delta < 300) {
@@ -229,7 +232,7 @@ function Note({
   });
 
   // When a note is hidden if you aren't the map owner hide it completely
-  if (map && !note.visible && map.owner !== userId) {
+  if (map && !note.visible && !roleControls.hidden) {
     return null;
   }
 

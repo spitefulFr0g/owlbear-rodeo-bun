@@ -14,7 +14,8 @@ import HideIcon from "../../icons/TokenHideIcon";
 import CopyIcon from "../../icons/CopyIcon";
 import PasteIcon from "../../icons/PasteIcon";
 
-import { useUserId } from "../../contexts/UserIdContext";
+import { useRole } from "../../contexts/RoomContext";
+import { getRoleControls } from "../../helpers/roomControls";
 
 import {
   SelectionItemsChangeEventHandler,
@@ -63,7 +64,7 @@ function SelectionMenu({
 }: SelectionMenuProps) {
   const { addToast } = useToasts();
 
-  const userId = useUserId();
+  const roleControls = getRoleControls(useRole());
 
   const wasOpen = usePrevious(isOpen);
 
@@ -392,7 +393,7 @@ function SelectionMenu({
           {selection ? (
             <>
               {/* Only show hide and lock token actions to map owners */}
-              {map && map.owner === userId && (
+              {map && roleControls.hidden && (
                 <>
                   <IconButton
                     onClick={handleVisibleChange}

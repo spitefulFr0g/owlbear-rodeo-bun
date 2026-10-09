@@ -17,7 +17,8 @@ import HideIcon from "../../icons/TokenHideIcon";
 import NoteIcon from "../../icons/NoteToolIcon";
 import TextIcon from "../../icons/NoteTextIcon";
 
-import { useUserId } from "../../contexts/UserIdContext";
+import { useRole } from "../../contexts/RoomContext";
+import { getRoleControls } from "../../helpers/roomControls";
 
 import {
   NoteChangeEventHandler,
@@ -45,7 +46,7 @@ function NoteMenu({
   onNoteChange,
   map,
 }: NoteMenuProps) {
-  const userId = useUserId();
+  const roleControls = getRoleControls(useRole());
 
   const wasOpen = usePrevious(isOpen);
 
@@ -191,7 +192,7 @@ function NoteMenu({
             ))}
         </Box>
         {/* Only show hide and lock token actions to map owners */}
-        {map && map.owner === userId && (
+        {map && roleControls.hidden && (
           <Flex sx={{ alignItems: "center", justifyContent: "space-around" }}>
             <IconButton
               onClick={handleVisibleChange}

@@ -16,6 +16,8 @@ import DisplayControls from "../display/DisplayControls";
 
 import { useSettings } from "../../contexts/SettingsContext";
 import { useUserId } from "../../contexts/UserIdContext";
+import { useRole } from "../../contexts/RoomContext";
+import { getRoleControls } from "../../helpers/roomControls";
 
 import Action from "../../actions/Action";
 import {
@@ -99,6 +101,7 @@ function Map({
   const { addToast } = useToasts();
 
   const userId = useUserId();
+  const roleControls = getRoleControls(useRole());
 
   const [selectedToolId, setSelectedToolId] = useState<MapToolId>("move");
   const { settings, setSettings } = useSettings();
@@ -229,7 +232,7 @@ function Map({
           active={selectedToolId === "fog"}
           toolSettings={settings.fog}
           editable={
-            !!(map?.owner === userId || mapState?.editFlags.includes("fog")) &&
+            !!(roleControls.hidden || mapState?.editFlags.includes("fog")) &&
             !settings.fog.preview
           }
         />

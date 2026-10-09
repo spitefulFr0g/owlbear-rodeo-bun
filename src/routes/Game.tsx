@@ -110,6 +110,15 @@ function Game() {
     );
   }
 
+  if (sessionStatus === "signed_out") {
+    return (
+      <RoomNotice title="You were signed out">
+        Your sign-in ended, so you have left the room. Sign in again from the
+        home page to run it.
+      </RoomNotice>
+    );
+  }
+
   return (
     <RoomProvider session={session}>
       <AssetsProvider>

@@ -21,6 +21,8 @@ import { KonvaEventObject } from "konva/lib/Node";
 import TokenMenu from "../components/token/TokenMenu";
 import TokenDragOverlay from "../components/token/TokenDragOverlay";
 import { useUserId } from "../contexts/UserIdContext";
+import { useRole } from "../contexts/RoomContext";
+import { getRoleControls } from "../helpers/roomControls";
 import { useBlur, useKeyboard } from "../contexts/KeyboardContext";
 import shortcuts from "../shortcuts";
 
@@ -33,9 +35,10 @@ function useMapTokens(
   selectedToolId: MapToolId
 ) {
   const userId = useUserId();
+  const roleControls = getRoleControls(useRole());
   const disabledTokens: Record<string, boolean> = {};
   if (mapState && map) {
-    if (!mapState.editFlags.includes("tokens") && map.owner !== userId) {
+    if (!mapState.editFlags.includes("tokens") && !roleControls.hidden) {
       for (let token of Object.values(mapState.tokens)) {
         if (token.owner !== userId) {
           disabledTokens[token.id] = true;
@@ -158,7 +161,7 @@ function useMapTokens(
           selectable={
             selectedToolId === "move" &&
             ((!(tokenState.id in disabledTokens) && !tokenState.locked) ||
-              map.owner === userId)
+              roleControls.hidden)
           }
           fadeOnHover={
             tokenState.category !== "prop" && selectedToolId === "drawing"

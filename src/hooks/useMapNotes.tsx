@@ -9,7 +9,8 @@ import NoteDragOverlay from "../components/note/NoteDragOverlay";
 import NoteMenu from "../components/note/NoteMenu";
 import NoteTool from "../components/tools/NoteTool";
 import { useBlur, useKeyboard } from "../contexts/KeyboardContext";
-import { useUserId } from "../contexts/UserIdContext";
+import { useRole } from "../contexts/RoomContext";
+import { getRoleControls } from "../helpers/roomControls";
 import shortcuts from "../shortcuts";
 import {
   NoteChangeEventHandler,
@@ -32,9 +33,9 @@ function useMapNotes(
   onNoteRemove: NoteRemoveEventHander,
   selectedToolId: MapToolId
 ) {
-  const userId = useUserId();
+  const roleControls = getRoleControls(useRole());
   const allowNoteEditing = !!(
-    map?.owner === userId || mapState?.editFlags.includes("notes")
+    roleControls.hidden || mapState?.editFlags.includes("notes")
   );
 
   const [isNoteMenuOpen, setIsNoteMenuOpen] = useState<boolean>(false);
