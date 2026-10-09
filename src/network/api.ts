@@ -5,6 +5,15 @@ export type Account = {
   administrator: boolean;
 };
 
+/** A room as its GM sees it in their room list */
+export type Room = {
+  id: string;
+  name: string;
+  hasPassword: boolean;
+  /** How much the room keeps on the server, missing on servers that don't count it */
+  sizeBytes?: number;
+};
+
 /**
  * Where the server stands:
  * `required` no administrator exists yet, nothing else can be used
@@ -94,4 +103,24 @@ export function signIn(username: string, password: string) {
 
 export function signOut() {
   return request<void>("POST", "/sign-out");
+}
+
+export async function listRooms() {
+  const { rooms } = await request<{ rooms: Room[] }>("GET", "/rooms");
+  return rooms;
+}
+
+export async function createRoom(name: string, password: string) {
+  const { room } = await request<{ room: Room }>("POST", "/rooms", {
+    name,
+    password,
+  });
+  return room;
+}
+
+export async function renameRoom(id: string, name: string) {
+  const { room } = await request<{ room: Room }>("PATCH", `/rooms/${id}`, {
+    name,
+  });
+  return room;
 }

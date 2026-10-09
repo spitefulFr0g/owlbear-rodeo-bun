@@ -13,31 +13,14 @@ import { useUserId } from "../../contexts/UserIdContext";
 
 import Session from "../../network/Session";
 
+import { copyText } from "../../helpers/clipboard";
+
 import { Map } from "../../types/Map";
 
 type DisplayControlsProps = {
   map: Map | null;
   session: Session;
 };
-
-async function copyText(text: string) {
-  // The clipboard api is missing on a page loaded over http from another machine
-  if (navigator.clipboard) {
-    await navigator.clipboard.writeText(text);
-    return;
-  }
-  const input = document.createElement("textarea");
-  input.value = text;
-  input.style.position = "fixed";
-  input.style.opacity = "0";
-  document.body.appendChild(input);
-  input.select();
-  const copied = document.execCommand("copy");
-  document.body.removeChild(input);
-  if (!copied) {
-    throw new Error("Unable to copy");
-  }
-}
 
 /** The cast display controls, seen only by the player that cast displays follow */
 function DisplayControls({ map, session }: DisplayControlsProps) {

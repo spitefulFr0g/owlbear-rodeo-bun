@@ -1,10 +1,9 @@
 import { useState, useEffect } from "react";
-import { Flex, Button, Image, Text, IconButton, Link } from "theme-ui";
+import { Flex, Button, Image, Text } from "theme-ui";
 
 import Footer from "../components/Footer";
+import RoomList from "../components/rooms/RoomList";
 
-import StartModal from "../modals/StartModal";
-import JoinModal from "../modals/JoinModal";
 import GettingStartedModal from "../modals/GettingStartedModal";
 
 import HelpIcon from "../icons/HelpIcon";
@@ -16,16 +15,9 @@ import { signOut } from "../network/api";
 
 import SignIn from "./SignIn";
 
-import RedditIcon from "../icons/SocialRedditIcon";
-import TwitterIcon from "../icons/SocialTwitterIcon";
-import YouTubeIcon from "../icons/SocialYouTubeIcon";
-import SocialPatreonIcon from "../icons/SocialPatreonIcon";
-
 import owlington from "../images/Owlington.png";
 
 function Home() {
-  const [isStartModalOpen, setIsStartModalOpen] = useState(false);
-  const [isJoinModalOpen, setIsJoinModalOpen] = useState(false);
   const [isGettingStartedModalOpen, setIsGettingStartedModalOpen] =
     useState(false);
 
@@ -61,41 +53,27 @@ function Home() {
       <Flex
         sx={{
           flexDirection: "column",
-          justifyContent: "center",
-          maxWidth: "300px",
+          alignItems: "center",
+          width: "100%",
+          maxWidth: "480px",
           flexGrow: 1,
         }}
-        mb={2}
+        p={3}
       >
-        <Text variant="display" as="h1" sx={{ textAlign: "center" }}>
-          Owlbear Rodeo
-        </Text>
-        <Image src={owlington} m={2} />
-        <Button
-          variant="secondary"
-          m={2}
-          onClick={() => setIsGettingStartedModalOpen(true)}
-          sx={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          Getting Started <HelpIcon />
-        </Button>
-        <Button m={2} onClick={() => setIsStartModalOpen(true)}>
-          Start Game
-        </Button>
-        <Button m={2} onClick={() => setIsJoinModalOpen(true)}>
-          Join Game
-        </Button>
-        <Text variant="caption" as="p" sx={{ textAlign: "center" }}>
-          Legacy v{process.env.REACT_APP_VERSION}
-        </Text>
+        <Flex sx={{ alignItems: "center" }} mb={3}>
+          <Image src={owlington} alt="" sx={{ width: "72px" }} mr={2} />
+          <Text variant="display" as="h1" sx={{ fontSize: 5 }}>
+            Owlbear Rodeo
+          </Text>
+        </Flex>
+        <RoomList />
         <Flex
-          mx={2}
-          mt={3}
-          sx={{ alignItems: "center", justifyContent: "space-between" }}
+          mt={4}
+          sx={{
+            width: "100%",
+            alignItems: "center",
+            justifyContent: "space-between",
+          }}
         >
           <Text as="span" variant="body2">
             Signed in as <strong>{account.username}</strong>
@@ -105,50 +83,20 @@ function Home() {
           </Button>
         </Flex>
         <Button
-          as="a"
-          // @ts-ignore
-          href="https://owlbear.rodeo/"
-          mt={4}
-          mx={2}
-          mb={2}
+          variant="secondary"
+          mt={3}
+          onClick={() => setIsGettingStartedModalOpen(true)}
           sx={{
             display: "flex",
-            alignItems: "flex-end",
+            alignItems: "center",
             justifyContent: "center",
           }}
         >
-          Owlbear Rodeo 2.0
+          Getting Started <HelpIcon />
         </Button>
-        <Flex mb={4} mt={0} sx={{ justifyContent: "center" }}>
-          <Link href="https://www.reddit.com/r/OwlbearRodeo/">
-            <IconButton title="Reddit" aria-label="Reddit">
-              <RedditIcon />
-            </IconButton>
-          </Link>
-          <Link href="https://twitter.com/OwlbearRodeo">
-            <IconButton title="Twitter" aria-label="Twitter">
-              <TwitterIcon />
-            </IconButton>
-          </Link>
-          <Link href="https://www.youtube.com/channel/UCePe1wJC53_7fbBbSECG7YQ">
-            <IconButton title="YouTube" aria-label="YouTube">
-              <YouTubeIcon />
-            </IconButton>
-          </Link>
-          <Link href="https://patreon.com/owlbearrodeo">
-            <IconButton title="Patreon" aria-label="Patreon">
-              <SocialPatreonIcon />
-            </IconButton>
-          </Link>
-        </Flex>
-        <JoinModal
-          isOpen={isJoinModalOpen}
-          onRequestClose={() => setIsJoinModalOpen(false)}
-        />
-        <StartModal
-          isOpen={isStartModalOpen}
-          onRequestClose={() => setIsStartModalOpen(false)}
-        />
+        <Text variant="caption" as="p" sx={{ textAlign: "center" }}>
+          Legacy v{process.env.REACT_APP_VERSION}
+        </Text>
         <GettingStartedModal
           isOpen={isGettingStartedModalOpen}
           onRequestClose={() => setIsGettingStartedModalOpen(false)}
