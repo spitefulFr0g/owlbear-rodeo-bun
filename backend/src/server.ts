@@ -1,5 +1,6 @@
 import cors from "cors";
 import RoomController from "./controllers/RoomController";
+import InviteController from "./controllers/InviteController";
 import Accounts from "./accounts/Accounts";
 import { setupLock } from "./accounts/setupLock";
 import { apiOrigin } from "./accounts/apiOrigin";
@@ -114,6 +115,7 @@ export async function startServer(options: ServerOptions): Promise<RunningServer
   app.use("/api", new SignInController(accounts).setRoutes());
   const game = new GameServer(io, joinTokens, database, options.clock);
   app.use("/api", new RoomController(accounts, database, game.gameRepo, (id, name) => io.to(id).emit("room_state", { name })).setRoutes());
+  app.use("/api", new InviteController(accounts).setRoutes());
   server.loadControllers(controllers);
   server.loadMiddleware([frontendHandler(frontendAssets)]);
 
