@@ -1,4 +1,5 @@
 import cors from "cors";
+import { OwlbearDatabase } from "./database";
 import express, { Application, RequestHandler } from "express";
 import helmet from "helmet";
 import { networkInterfaces } from "os";
@@ -37,10 +38,12 @@ export async function startServer(options: ServerOptions): Promise<RunningServer
   const MAX_ASSET_BYTES = 64 * 1024 * 1024;
 
   const dataDir = resolve(options.dataDir);
-  const assetStore = new FsAssetStore(join(dataDir, "assets"), MAX_ASSET_BYTES, options.clock);
+  const database = new OwlbearDatabase(join(dataDir, "owlbear.db"));
+  const assetStore = new FsAssetStore(join(dataDir, "assets"), MAX_ASSET_BYTES, options.clock, database);
   try {
     await assetStore.init();
   } catch (error: any) {
+    database.close();
     throw new Error(`Unable to use the data directory ${dataDir}: ${error.message}\nChoose another with --data-dir.`);
   }
 
@@ -95,6 +98,10 @@ export async function startServer(options: ServerOptions): Promise<RunningServer
     listening.once("error", reject);
     game.initaliseSocketServer(listening);
     game.run();
+  }).catch((error) => {
+    io.close();
+    database.close();
+    throw error;
   });
   const boundPort = (httpServer.address() as AddressInfo).port;
   const urls = [`http://localhost:${boundPort}`, ...lanUrls(boundPort, networkInterfaces())];
@@ -110,7 +117,7 @@ export async function startServer(options: ServerOptions): Promise<RunningServer
       stopping ??= new Promise<void>((resolve, reject) => {
         io.close((error?: Error) => error ? reject(error) : resolve());
         httpServer.closeIdleConnections();
-      });
+      }).finally(() => database.close());
       return stopping;
     },
   };

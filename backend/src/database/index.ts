@@ -1,0 +1,81 @@
+import { Database } from "bun:sqlite";
+import { mkdirSync } from "fs";
+import { dirname } from "path";
+import type { AssetRecord } from "../entities/AssetStore";
+
+export const LAYOUT_VERSION = 1;
+
+// All v0.2.0 tables belong here, in the same layout version. Nothing in
+// this release has shipped yet, so later tickets extend this declaration.
+const layout = `
+  CREATE TABLE IF NOT EXISTS assets (
+    id TEXT PRIMARY KEY,
+    hash TEXT NOT NULL,
+    size INTEGER NOT NULL,
+    mime TEXT NOT NULL,
+    width INTEGER NOT NULL,
+    height INTEGER NOT NULL,
+    owner TEXT NOT NULL,
+    createdAt TEXT NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS assets_hash ON assets(hash);
+  CREATE TABLE IF NOT EXISTS metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+`;
+
+export class OwlbearDatabase {
+  readonly connection: Database;
+
+  constructor(path: string) {
+    mkdirSync(dirname(path), { recursive: true });
+    this.connection = new Database(path, { create: true, strict: true });
+    try {
+      this.transaction(() => {
+        this.connection.exec(layout);
+        if (this.connection.query<{ user_version: number }, []>("PRAGMA user_version").get()?.user_version === 0) {
+          this.connection.exec(`PRAGMA user_version = ${LAYOUT_VERSION}`);
+        }
+      });
+    } catch (error) {
+      this.close();
+      throw error;
+    }
+  }
+
+  /** SQLite transactions are synchronous: never await inside this callback. */
+  transaction<T>(change: () => T extends PromiseLike<unknown> ? never : T): T {
+    return this.connection.transaction(() => {
+      const result = change();
+      if (result && typeof (result as any).then === "function") {
+        throw new Error("Database transactions must be synchronous");
+      }
+      return result;
+    })();
+  }
+
+  asset(id: string): AssetRecord | undefined {
+    return this.connection.query<AssetRecord, [string]>("SELECT * FROM assets WHERE id = ?").get(id) ?? undefined;
+  }
+
+  insertAsset(record: AssetRecord): void {
+    this.connection.query(`INSERT INTO assets (id, hash, size, mime, width, height, owner, createdAt)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`).run(record.id, record.hash, record.size, record.mime, record.width, record.height, record.owner, record.createdAt);
+  }
+
+  deleteAsset(id: string): void {
+    this.connection.query("DELETE FROM assets WHERE id = ?").run(id);
+  }
+
+  hasHash(hash: string): boolean {
+    return !!this.connection.query("SELECT 1 FROM assets WHERE hash = ? LIMIT 1").get(hash);
+  }
+
+  legacyAssetsImported(): boolean {
+    return !!this.connection.query("SELECT 1 FROM metadata WHERE key = 'legacy_assets_imported'").get();
+  }
+
+  markLegacyAssetsImported(): void {
+    this.connection.query("INSERT INTO metadata VALUES ('legacy_assets_imported', '1')").run();
+  }
+
+  close(): void { this.connection.close(); }
+}

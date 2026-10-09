@@ -1,7 +1,8 @@
+import { OwlbearDatabase } from "../database";
 import { Clock, realClock } from "../clock";
 import { createHash, randomUUID } from "crypto";
-import { createReadStream, createWriteStream } from "fs";
-import { mkdir, readFile, readdir, rename, rm, stat, writeFile } from "fs/promises";
+import { readFileSync, readdirSync, createReadStream, createWriteStream } from "fs";
+import { mkdir, rename, rm, stat } from "fs/promises";
 import { dirname, join } from "path";
 import { Readable } from "stream";
 import { pipeline } from "stream/promises";
@@ -71,24 +72,22 @@ export function isAssetId(id: unknown): id is string {
   return typeof id === "string" && /^[a-z0-9-]{1,64}$/.test(id);
 }
 
-/**
- * Stores assets in a directory:
- *
- *   blobs/ab/abcdef...     the bytes, named by their SHA-256
- *   refs/12/1234-....json  an AssetRecord per asset id, pointing at a blob
- *   tmp/                   uploads in progress
- */
+/** Keeps bytes in blobs/ and temporary uploads in tmp/; records live in SQLite. */
 export class FsAssetStore implements AssetStore {
   private readonly blobsDir: string;
   private readonly refsDir: string;
+  private readonly database: OwlbearDatabase;
   private readonly tmpDir: string;
   private readonly maxBytes: number;
   /** Ids with an upload in progress */
   private readonly writing = new Set<string>();
-  /** Tail of the queue that changes to refs and blobs wait in */
+  /** Tail of the queue that changes to records and blobs wait in */
   private queue: Promise<unknown> = Promise.resolve();
 
-  constructor(dir: string, maxBytes: number, private readonly clock: Clock = realClock) {
+  constructor(dir: string, maxBytes: number, private readonly clock: Clock = realClock, database?: OwlbearDatabase) {
+    // Standalone stores keep their database beside the byte directory. The
+    // server supplies its single data-directory database.
+    this.database = database ?? new OwlbearDatabase(`${dir}.db`);
     this.blobsDir = join(dir, "blobs");
     this.refsDir = join(dir, "refs");
     this.tmpDir = join(dir, "tmp");
@@ -99,7 +98,9 @@ export class FsAssetStore implements AssetStore {
   async init(): Promise<void> {
     await rm(this.tmpDir, { recursive: true, force: true });
     await mkdir(this.blobsDir, { recursive: true });
-    await mkdir(this.refsDir, { recursive: true });
+    this.importLegacyRecords();
+    // Only remove old files after their records and completion marker commit.
+    await rm(this.refsDir, { recursive: true, force: true });
     await mkdir(this.tmpDir, { recursive: true });
   }
 
@@ -108,14 +109,14 @@ export class FsAssetStore implements AssetStore {
     info: AssetInfo,
     body: AsyncIterable<Uint8Array>
   ): Promise<AssetRecord> {
-    const refPath = this.refPath(id);
+    this.validateId(id);
     if (this.writing.has(id)) {
       throw new AssetExistsError(id);
     }
     this.writing.add(id);
     const tmpPath = join(this.tmpDir, randomUUID());
     try {
-      if (await exists(refPath)) {
+      if (this.database.asset(id)) {
         throw new AssetExistsError(id);
       }
 
@@ -153,12 +154,7 @@ export class FsAssetStore implements AssetStore {
           await mkdir(dirname(blobPath), { recursive: true });
           await rename(tmpPath, blobPath);
         }
-        // Written in full before it is moved into place, so a crash cannot
-        // leave half a record behind
-        const tmpRefPath = `${tmpPath}.json`;
-        await writeFile(tmpRefPath, JSON.stringify(record));
-        await mkdir(dirname(refPath), { recursive: true });
-        await rename(tmpRefPath, refPath);
+        this.database.insertAsset(record);
       });
       return record;
     } finally {
@@ -168,7 +164,8 @@ export class FsAssetStore implements AssetStore {
   }
 
   async get(id: string): Promise<StoredAsset | undefined> {
-    const record = await readRecord(this.refPath(id));
+    this.validateId(id);
+    const record = this.database.asset(id);
     if (!record) {
       return undefined;
     }
@@ -177,38 +174,46 @@ export class FsAssetStore implements AssetStore {
   }
 
   async has(id: string): Promise<boolean> {
-    return exists(this.refPath(id));
+    this.validateId(id);
+    return !!this.database.asset(id);
   }
 
   async delete(id: string): Promise<boolean> {
-    const refPath = this.refPath(id);
+    this.validateId(id);
     return this.exclusive(async () => {
-      const record = await readRecord(refPath);
+      const record = this.database.asset(id);
       if (!record) {
         return false;
       }
-      await rm(refPath);
-      if (!(await this.isReferenced(record.hash))) {
+      this.database.deleteAsset(id);
+      if (!this.database.hasHash(record.hash)) {
         await rm(this.blobPath(record.hash), { force: true });
       }
       return true;
     });
   }
 
-  private async isReferenced(hash: string): Promise<boolean> {
-    const files = await readdir(this.refsDir, { recursive: true });
-    for (const file of files) {
-      if (file.endsWith(".json")) {
-        const record = await readRecord(join(this.refsDir, file));
-        if (record?.hash === hash) {
-          return true;
-        }
+  private importLegacyRecords(): void {
+    if (this.database.legacyAssetsImported()) return;
+    this.database.transaction(() => {
+      let files: string[];
+      try { files = readdirSync(this.refsDir, { recursive: true }) as string[]; }
+      catch (error: any) {
+        if (error.code !== "ENOENT") throw error;
+        files = [];
       }
-    }
-    return false;
+      for (const file of files.sort()) {
+        if (!file.endsWith(".json")) continue;
+        const record: AssetRecord = JSON.parse(readFileSync(join(this.refsDir, file), "utf8"));
+        this.validateId(record.id);
+        if (!/^[a-f0-9]{64}$/.test(record.hash)) throw new Error(`Invalid asset hash in ${file}`);
+        this.database.insertAsset(record);
+      }
+      this.database.markLegacyAssetsImported();
+    });
   }
 
-  /** Runs tasks that change refs or blobs one at a time */
+  /** Runs tasks that change records or blobs one at a time */
   private exclusive<T>(task: () => Promise<T>): Promise<T> {
     const run = this.queue.then(task, task);
     this.queue = run.catch(() => {
@@ -217,11 +222,8 @@ export class FsAssetStore implements AssetStore {
     return run;
   }
 
-  private refPath(id: string): string {
-    if (!isAssetId(id)) {
-      throw new Error(`Invalid asset id "${id}"`);
-    }
-    return join(this.refsDir, id.slice(0, 2), `${id}.json`);
+  private validateId(id: string): void {
+    if (!isAssetId(id)) throw new Error(`Invalid asset id "${id}"`);
   }
 
   private blobPath(hash: string): string {
@@ -236,17 +238,6 @@ async function exists(path: string): Promise<boolean> {
   } catch (error: any) {
     if (error.code === "ENOENT") {
       return false;
-    }
-    throw error;
-  }
-}
-
-async function readRecord(path: string): Promise<AssetRecord | undefined> {
-  try {
-    return JSON.parse(await readFile(path, "utf8"));
-  } catch (error: any) {
-    if (error.code === "ENOENT") {
-      return undefined;
     }
     throw error;
   }

@@ -49,13 +49,19 @@ export function nextMessage(socket: Socket, event: string): Promise<any[]> {
 }
 
 /** Owns a temporary directory across restarts; dispose it in a finally block. */
-export async function startTestServer() {
-  const dataDir = await mkdtemp(join(tmpdir(), "owlbear-server-"));
+export async function startTestServer(prepare?: (dataDir: string) => Promise<void>, preparedDataDir?: string) {
+  const dataDir = preparedDataDir ?? await mkdtemp(join(tmpdir(), "owlbear-server-"));
   const clock = new TestClock();
   const options = { dataDir, clock, port: 0, allowOrigin: null };
   let server: RunningServer;
-  try { server = await startServer(options); }
-  catch (error) { await rm(dataDir, { recursive: true, force: true }); throw error; }
+  try {
+    await prepare?.(dataDir);
+    server = await startServer(options);
+  }
+  catch (error) {
+    if (!preparedDataDir) await rm(dataDir, { recursive: true, force: true });
+    throw error;
+  }
   const sockets = new Set<Socket>();
   return {
     clock,
