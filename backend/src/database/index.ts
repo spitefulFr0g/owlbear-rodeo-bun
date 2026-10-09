@@ -48,6 +48,10 @@ const layout = `
     lastUsedAt INTEGER NOT NULL
   );
   CREATE INDEX IF NOT EXISTS sign_ins_account ON sign_ins(accountId);
+  CREATE TABLE IF NOT EXISTS invites (
+    tokenHash TEXT PRIMARY KEY,
+    expiresAt INTEGER NOT NULL
+  );
   CREATE TABLE IF NOT EXISTS metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 `;
 

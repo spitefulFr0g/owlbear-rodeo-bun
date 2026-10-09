@@ -1,4 +1,5 @@
 import cors from "cors";
+import InviteController from "./controllers/InviteController";
 import Accounts from "./accounts/Accounts";
 import { setupLock } from "./accounts/setupLock";
 import { apiOrigin } from "./accounts/apiOrigin";
@@ -111,6 +112,7 @@ export async function startServer(options: ServerOptions): Promise<RunningServer
   app.options("*", (_req, res) => res.sendStatus(204));
   app.use("/api", new SetupController(accounts).setRoutes());
   app.use("/api", new SignInController(accounts).setRoutes());
+  app.use("/api", new InviteController(accounts).setRoutes());
   server.loadControllers(controllers);
   server.loadMiddleware([frontendHandler(frontendAssets)]);
 

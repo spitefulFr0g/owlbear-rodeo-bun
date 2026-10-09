@@ -133,3 +133,19 @@ export async function signIn(server: Pick<RunningServer, "address">, username: s
   const cookie = response.headers.get("set-cookie")!.split(";")[0];
   return { account, cookie };
 }
+
+/** Creates an ordinary account through an administrator's invite link. */
+export async function inviteAccount(server: Pick<RunningServer, "address">, administratorCookie: string, username: string, password: string) {
+  const invite = await fetch(`${server.address}/api/admin/invites`, {
+    method: "POST", headers: { Cookie: administratorCookie },
+  });
+  if (invite.status !== 201) throw new Error(`Invite creation failed: ${await invite.text()}`);
+  const { token } = await invite.json() as { token: string };
+  const response = await fetch(`${server.address}/api/invites/${token}`, {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ username, password }),
+  });
+  if (response.status !== 201) throw new Error(`Invite acceptance failed: ${await response.text()}`);
+  const { account } = await response.json() as { account: import("../accounts/Accounts").Account };
+  const cookie = response.headers.get("set-cookie")!.split(";")[0];
+  return { account, cookie };
+}

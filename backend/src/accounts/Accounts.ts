@@ -76,6 +76,40 @@ export default class Accounts {
     return createHash("sha256").update(token).digest("hex");
   }
 
+  list(): Account[] {
+    return this.database.connection.query<{ id: string; username: string; administrator: number }, []>("SELECT id, username, administrator FROM accounts ORDER BY username").all()
+      .map(row => ({ ...row, administrator: !!row.administrator }));
+  }
+
+  createInvite(): { token: string; expiresAt: number } {
+    const token = randomBytes(32).toString("hex");
+    const expiresAt = this.clock.now() + 7 * 24 * 60 * 60 * 1000;
+    this.database.connection.query("INSERT INTO invites (tokenHash, expiresAt) VALUES (?, ?)").run(this.tokenHash(token), expiresAt);
+    return { token, expiresAt };
+  }
+
+  inviteUsable(token: string): boolean {
+    return !!this.database.connection.query("SELECT 1 FROM invites WHERE tokenHash = ? AND expiresAt > ?").get(this.tokenHash(token), this.clock.now());
+  }
+
+  async acceptInvite(token: string, username: unknown, password: unknown) {
+    if (!this.inviteUsable(token)) return { error: "link_invalid" } as const;
+    if (typeof username !== "string" || username.length < 3 || username.length > 32) return { error: "username_length" } as const;
+    if (!/^[A-Za-z0-9._-]+$/.test(username)) return { error: "username_characters" } as const;
+    if (typeof password !== "string" || password.length < 8) return { error: "password_too_short" } as const;
+    const passwordHash = await new Auth().createPasswordHash(password);
+    return this.database.transaction(() => {
+      if (!this.inviteUsable(token)) return { error: "link_invalid" } as const;
+      if (this.database.connection.query("SELECT 1 FROM accounts WHERE username = ? COLLATE NOCASE").get(username)) return { error: "username_taken" } as const;
+      const account = { id: randomUUID(), username, administrator: false };
+      this.database.connection.query("INSERT INTO accounts (id, username, passwordHash, administrator) VALUES (?, ?, ?, 0)").run(account.id, username, passwordHash);
+      this.database.connection.query("DELETE FROM invites WHERE tokenHash = ?").run(this.tokenHash(token));
+      const signInToken = randomBytes(32).toString("hex");
+      this.database.connection.query("INSERT INTO sign_ins (tokenHash, accountId, createdAt, lastUsedAt) VALUES (?, ?, ?, ?)").run(this.tokenHash(signInToken), account.id, this.clock.now(), this.clock.now());
+      return { account, token: signInToken };
+    });
+  }
+
   hasAdministrator(): boolean {
     return !!this.database.connection.query("SELECT 1 FROM accounts WHERE administrator = 1 LIMIT 1").get();
   }
