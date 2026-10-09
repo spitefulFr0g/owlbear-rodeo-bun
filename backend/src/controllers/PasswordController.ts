@@ -29,7 +29,7 @@ export default class PasswordController extends Controller {
   }
 
   private async change(req: Request, res: Response): Promise<void> {
-    this.accounts.resolveAccount(req, token => res.cookie("owlbear_sign_in", token, lastingSignInCookieOptions));
+    this.accounts.resolveAccount(req, token => res.cookie("owlbear_sign_in", token, lastingSignInCookieOptions(req)));
     const result = await this.accounts.changePassword(req, req.body?.currentPassword, req.body?.newPassword);
     if (result.error !== undefined) this.error(res, result.error);
     else res.status(204).end();
@@ -41,7 +41,7 @@ export default class PasswordController extends Controller {
       this.error(res, result.error);
       return;
     }
-    res.cookie("owlbear_sign_in", result.token, lastingSignInCookieOptions);
+    res.cookie("owlbear_sign_in", result.token, lastingSignInCookieOptions(req));
     res.json({ account: result.account });
   }
 
