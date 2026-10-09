@@ -124,3 +124,39 @@ export async function renameRoom(id: string, name: string) {
   });
   return room;
 }
+
+/** A link that works once, for an invite or a password reset */
+export type OneUseLink = {
+  token: string;
+  /** When it stops working, in milliseconds since the epoch */
+  expiresAt: number;
+};
+
+export async function listAccounts() {
+  const { accounts } = await request<{ accounts: Account[] }>(
+    "GET",
+    "/admin/accounts"
+  );
+  return accounts;
+}
+
+export function createInvite() {
+  return request<OneUseLink>("POST", "/admin/invites");
+}
+
+/** Throws `link_invalid` when the invite can't be used */
+export function checkInvite(token: string) {
+  return request<{}>("GET", `/invites/${encodeURIComponent(token)}`);
+}
+
+export function acceptInvite(
+  token: string,
+  username: string,
+  password: string
+) {
+  return request<{ account: Account }>(
+    "POST",
+    `/invites/${encodeURIComponent(token)}`,
+    { username, password }
+  );
+}
