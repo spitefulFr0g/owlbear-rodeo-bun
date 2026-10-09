@@ -5,7 +5,7 @@ import { mkdtemp, rm } from "fs/promises";
 import { join } from "path";
 import { tmpdir } from "os";
 import { startServer } from "./server";
-import { nextMessage, TestClock, startTestServer } from "./testing/serverHelpers";
+import { createRoom, nextMessage, TestClock, startTestServer } from "./testing/serverHelpers";
 
 test("a new server reports that setup is required without an account", async () => {
   const server = await startTestServer();
@@ -114,9 +114,11 @@ test("the locked server refuses room and cast display joins without joining", as
       await refused;
       expect(joined).toBe(false);
     }
-    await setup(server.address);
+    const response = await setup(server.address);
+    const cookie = response.headers.get("set-cookie")!.split(";")[0];
+    const room = await createRoom(server, cookie, "Room");
     const accepted = nextMessage(socket, "joined_game");
-    socket.emit("join_game", "room", "");
+    socket.emit("join_game", room.id, "");
     await accepted;
     expect(joined).toBe(true);
   } finally { socket.disconnect(); await server.dispose(); }

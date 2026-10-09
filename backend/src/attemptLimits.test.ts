@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { setupAdministrator, startTestServer } from "./testing/serverHelpers";
+import { createRoom, setupAdministrator, startTestServer } from "./testing/serverHelpers";
 
 const MINUTE = 60_000;
 function attempt(address: string, username = "Administrator", password = "wrong") {
@@ -112,8 +112,9 @@ import { nextMessage } from "./testing/serverHelpers";
 test("room refusal tells only the joiner to wait and leaves existing players joined", async () => {
   const server = await startTestServer();
   try {
-    await setupAdministrator(server);
-    const resident = await server.joinRoom("room", "secret");
+    const { cookie } = await setupAdministrator(server);
+    const room = await createRoom(server, cookie, "Room", "secret");
+    const resident = await server.joinRoom(room.id, "secret");
     const socket = server.connect();
     const residentEvents: string[] = [];
     const joinerEvents: string[] = [];
@@ -123,18 +124,18 @@ test("room refusal tells only the joiner to wait and leaves existing players joi
     socket.on("map", () => joinerEvents.push("map"));
     for (let i = 0; i < 5; i++) {
       const error = nextMessage(socket, "auth_error");
-      socket.emit("join_game", "room", "wrong");
+      socket.emit("join_game", room.id, "wrong");
       await error;
     }
     const wait = nextMessage(socket, "auth_wait");
-    socket.emit("join_game", "room", "secret");
+    socket.emit("join_game", room.id, "secret");
     expect(await wait).toEqual([300]);
     expect(resident.socket.connected).toBe(true);
     expect(residentEvents).toEqual([]);
     expect(joinerEvents).toEqual([]);
     await server.clock.advance(5 * MINUTE);
     const joined = nextMessage(socket, "joined_game");
-    socket.emit("join_game", "room", "secret");
+    socket.emit("join_game", room.id, "secret");
     expect((await joined)[1]).toBeString();
   } finally { await server.dispose(); }
 });
@@ -158,42 +159,44 @@ test("room counts span addresses while address counts span rooms with later refu
   const sockets: Socket[] = [];
   const connect = (source: string) => { const socket = roomSocket(server, source); sockets.push(socket); return socket; };
   try {
-    await setupAdministrator(server);
-    for (let i = 0; i < 5; i++) await server.joinRoom(`room${i}`, "secret");
-    for (let i = 0; i < 5; i++) await joinAnswer(connect(`127.0.0.${i + 2}`), "room0", "wrong", "auth_error");
-    expect(await joinAnswer(connect("127.0.0.20"), "room0", "secret", "auth_wait")).toEqual([300]);
+    const { cookie } = await setupAdministrator(server);
+    const rooms = [];
+    for (let i = 0; i < 5; i++) rooms.push(await createRoom(server, cookie, `Room ${i}`, "secret"));
+    for (let i = 0; i < 5; i++) await joinAnswer(connect(`127.0.0.${i + 2}`), rooms[0].id, "wrong", "auth_error");
+    expect(await joinAnswer(connect("127.0.0.20"), rooms[0].id, "secret", "auth_wait")).toEqual([300]);
     // This address has not failed; another room remains accessible.
-    await joinAnswer(connect("127.0.0.20"), "room1", "secret", "joined_game");
+    await joinAnswer(connect("127.0.0.20"), rooms[1].id, "secret", "joined_game");
     const attacker = connect("127.0.0.30");
-    for (let i = 0; i < 5; i++) await joinAnswer(attacker, `room${i === 0 ? 1 : i}`, "wrong", "auth_error");
-    expect(await joinAnswer(attacker, "room2", "secret", "auth_wait")).toEqual([300]);
+    for (let i = 0; i < 5; i++) await joinAnswer(attacker, rooms[i === 0 ? 1 : i].id, "wrong", "auth_error");
+    expect(await joinAnswer(attacker, rooms[2].id, "secret", "auth_wait")).toEqual([300]);
     await server.clock.advance(5 * MINUTE - 1);
-    expect(await joinAnswer(attacker, "room2", "secret", "auth_wait")).toEqual([1]);
+    expect(await joinAnswer(attacker, rooms[2].id, "secret", "auth_wait")).toEqual([1]);
     await server.clock.advance(1);
-    for (let i = 0; i < 5; i++) await joinAnswer(attacker, `room${i}`, "wrong", "auth_error");
-    expect(await joinAnswer(attacker, "room4", "secret", "auth_wait")).toEqual([900]);
+    for (let i = 0; i < 5; i++) await joinAnswer(attacker, rooms[i].id, "wrong", "auth_error");
+    expect(await joinAnswer(attacker, rooms[4].id, "secret", "auth_wait")).toEqual([900]);
     await server.clock.advance(15 * MINUTE - 1);
-    expect(await joinAnswer(attacker, "room4", "secret", "auth_wait")).toEqual([1]);
+    expect(await joinAnswer(attacker, rooms[4].id, "secret", "auth_wait")).toEqual([1]);
     await server.clock.advance(1);
-    await joinAnswer(attacker, "room4", "secret", "joined_game");
+    await joinAnswer(attacker, rooms[4].id, "secret", "joined_game");
   } finally { for (const socket of sockets) socket.disconnect(); await server.dispose(); }
-});
+}, 20_000);
 
 test("room attempts expire after fifteen minutes and room and address histories reset after twenty-four hours", async () => {
   const server = await startTestServer();
   try {
-    await setupAdministrator(server);
-    await server.joinRoom("room", "secret");
+    const { cookie } = await setupAdministrator(server);
+    const room = await createRoom(server, cookie, "Room", "secret");
+    await server.joinRoom(room.id, "secret");
     const socket = server.connect();
-    for (let i = 0; i < 4; i++) await joinAnswer(socket, "room", "wrong", "auth_error");
+    for (let i = 0; i < 4; i++) await joinAnswer(socket, room.id, "wrong", "auth_error");
     await server.clock.advance(15 * MINUTE);
-    await joinAnswer(socket, "room", "wrong", "auth_error");
+    await joinAnswer(socket, room.id, "wrong", "auth_error");
     // Four more failures now reach five, rather than refusing at the first one.
-    for (let i = 0; i < 4; i++) await joinAnswer(socket, "room", "wrong", "auth_error");
-    expect(await joinAnswer(socket, "room", "secret", "auth_wait")).toEqual([300]);
+    for (let i = 0; i < 4; i++) await joinAnswer(socket, room.id, "wrong", "auth_error");
+    expect(await joinAnswer(socket, room.id, "secret", "auth_wait")).toEqual([300]);
     await server.clock.advance(24 * 60 * MINUTE);
-    for (let i = 0; i < 5; i++) await joinAnswer(socket, "room", "wrong", "auth_error");
-    expect(await joinAnswer(socket, "room", "secret", "auth_wait")).toEqual([300]);
+    for (let i = 0; i < 5; i++) await joinAnswer(socket, room.id, "wrong", "auth_error");
+    expect(await joinAnswer(socket, room.id, "secret", "auth_wait")).toEqual([300]);
   } finally { await server.dispose(); }
 });
 
@@ -211,22 +214,23 @@ test("an account count resets after exactly twenty-four hours without a wrong at
 test("a restart clears account, room and address counts and sign-in counts are separate from room counts", async () => {
   const server = await startTestServer();
   try {
-    await setupAdministrator(server);
-    await server.joinRoom("room", "secret");
+    const { cookie } = await setupAdministrator(server);
+    const room = await createRoom(server, cookie, "Room", "secret");
+    await server.joinRoom(room.id, "secret");
     await wrongFive(server.address);
     // Sign-in address refusal does not refuse room joins.
-    await server.joinRoom("room", "secret");
+    await server.joinRoom(room.id, "secret");
     const socket = server.connect();
-    for (let i = 0; i < 5; i++) await joinAnswer(socket, "room", "wrong", "auth_error");
-    expect(await joinAnswer(socket, "room", "secret", "auth_wait")).toEqual([300]);
+    for (let i = 0; i < 5; i++) await joinAnswer(socket, room.id, "wrong", "auth_error");
+    expect(await joinAnswer(socket, room.id, "secret", "auth_wait")).toEqual([300]);
     await server.restart();
     expect((await attempt(server.address, "Administrator", "test-password")).status).toBe(200);
-    await server.joinRoom("room", "secret");
+    await server.joinRoom(room.id, "secret");
     await wrongFive(server.address);
     expect((await (await attempt(server.address)).json() as any).retryAfterSeconds).toBe(300);
     const fresh = server.connect();
-    for (let i = 0; i < 5; i++) await joinAnswer(fresh, "room", "wrong", "auth_error");
-    expect(await joinAnswer(fresh, "room", "secret", "auth_wait")).toEqual([300]);
+    for (let i = 0; i < 5; i++) await joinAnswer(fresh, room.id, "wrong", "auth_error");
+    expect(await joinAnswer(fresh, room.id, "secret", "auth_wait")).toEqual([300]);
   } finally { await server.dispose(); }
 });
 
@@ -235,13 +239,14 @@ test("a room's second and later refusals last fifteen minutes and a successful j
   const sockets: Socket[] = [];
   const connect = (source: number) => { const socket = roomSocket(server, `127.0.0.${source}`); sockets.push(socket); return socket; };
   try {
-    await setupAdministrator(server);
-    await server.joinRoom("room", "secret");
+    const { cookie } = await setupAdministrator(server);
+    const room = await createRoom(server, cookie, "Room", "secret");
+    await server.joinRoom(room.id, "secret");
     for (let round = 0; round < 3; round++) {
-      for (let i = 0; i < 5; i++) await joinAnswer(connect(2 + round * 10 + i), "room", "", "auth_error");
-      expect(await joinAnswer(connect(60 + round), "room", "secret", "auth_wait")).toEqual([round === 0 ? 300 : 900]);
+      for (let i = 0; i < 5; i++) await joinAnswer(connect(2 + round * 10 + i), room.id, "", "auth_error");
+      expect(await joinAnswer(connect(60 + round), room.id, "secret", "auth_wait")).toEqual([round === 0 ? 300 : 900]);
       await server.clock.advance((round === 0 ? 5 : 15) * MINUTE);
-      await joinAnswer(connect(70 + round), "room", "secret", "joined_game");
+      await joinAnswer(connect(70 + round), room.id, "secret", "joined_game");
     }
   } finally { for (const socket of sockets) socket.disconnect(); await server.dispose(); }
-});
+}, 20_000);

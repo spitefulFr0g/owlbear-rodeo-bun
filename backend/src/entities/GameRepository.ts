@@ -13,7 +13,7 @@ export default class GameRepository {
   private readonly pending = new globalThis.Map<string, { since: number; cancel: () => void }>();
 
   constructor(private readonly database?: OwlbearDatabase, private readonly clock?: Clock) {
-    this.games = {};
+    this.games = Object.create(null);
   }
 
   setGameCreation(gameId: string, hash: string): void {

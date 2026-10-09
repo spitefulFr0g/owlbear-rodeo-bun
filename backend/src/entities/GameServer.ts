@@ -127,30 +127,23 @@ export default class GameServer {
             return;
           }
 
+          if (!this.gameRepo.isGameCreated(gameId)) {
+            socket.emit("room_not_found");
+            return;
+          }
           const keys = [`room:id:${gameId}`, `room:address:${socket.handshake.address}`];
           const retryAfterSeconds = this.attempts.retryAfterSeconds(keys);
           if (retryAfterSeconds) {
             socket.emit("auth_wait", retryAfterSeconds);
             return;
           }
-          const created = this.gameRepo.isGameCreated(gameId);
-          if (!created) {
-            // Create a game and join
-            const hash = await auth.createPasswordHash(password);
-            this.gameRepo.setGameCreation(gameId, hash);
-            await gameState.joinGame(gameId);
-          } else {
-            // Join existing game
-            const hash = this.gameRepo.getGamePasswordHash(gameId);
-            const res = await auth.checkPassword(password, hash);
-            if (res) {
-              await gameState.joinGame(gameId);
-            } else {
-              this.attempts.wrong(keys);
-              socket.emit("auth_error");
-              return;
-            }
+          const hash = this.gameRepo.getGamePasswordHash(gameId);
+          if (!await auth.checkPassword(password, hash)) {
+            this.attempts.wrong(keys);
+            socket.emit("auth_error");
+            return;
           }
+          await gameState.joinGame(gameId);
           _gameId = gameId;
           // Only the player who joined gets the token for the asset routes
           const token = this.joinTokens.issue(socket.id, gameId);
