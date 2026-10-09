@@ -1,24 +1,16 @@
 import { afterAll, afterEach, beforeAll, describe, expect, test } from "bun:test";
-import { createServer, Server as HttpServer } from "http";
-import { AddressInfo } from "net";
-import { Server } from "socket.io";
 import { io as connect, Socket } from "socket.io-client";
 import msgParser from "socket.io-msgpack-parser";
-import GameServer from "./GameServer";
-import JoinTokens from "./JoinTokens";
+import { setupAdministrator, startTestServer } from "../testing/serverHelpers";
 
-let httpServer: HttpServer;
-let io: Server;
+let server: Awaited<ReturnType<typeof startTestServer>>;
 let url: string;
-const joinTokens = new JoinTokens();
 const sockets: Socket[] = [];
 
 beforeAll(async () => {
-  httpServer = createServer();
-  io = new Server(httpServer, { parser: msgParser });
-  new GameServer(io, joinTokens).run();
-  await new Promise<void>((resolve) => httpServer.listen(0, resolve));
-  url = `http://localhost:${(httpServer.address() as AddressInfo).port}`;
+  server = await startTestServer();
+  await setupAdministrator(server);
+  url = server.address;
 });
 
 afterEach(() => {
@@ -27,8 +19,8 @@ afterEach(() => {
   }
 });
 
-afterAll(() => {
-  io.close();
+afterAll(async () => {
+  await server.dispose();
 });
 
 function client(): Socket {
@@ -50,8 +42,10 @@ async function join(socket: Socket, gameId: string, password = "") {
   return result;
 }
 
-async function until(condition: () => boolean) {
-  while (!condition()) {
+async function until(condition: () => Promise<boolean>) {
+  const deadline = Date.now() + 2000;
+  while (!await condition()) {
+    if (Date.now() > deadline) throw new Error("Token was not revoked");
     await new Promise((resolve) => setTimeout(resolve, 5));
   }
 }
@@ -61,7 +55,7 @@ describe("joining a game", () => {
     const socket = client();
     const [socketId, token] = await join(socket, "game-token");
     expect(socketId).toBe(socket.id);
-    expect(joinTokens.verify(token)).toBe("game-token");
+    expect(await tokenStatus(token)).toBe(404);
   });
 
   test("does not show a player's token to the rest of the game", async () => {
@@ -71,7 +65,7 @@ describe("joining a game", () => {
     const second = client();
     const [, token] = await join(second, "game-private");
     expect(await seenByFirst).toEqual([second.id]);
-    expect(joinTokens.verify(token)).toBe("game-private");
+    expect(await tokenStatus(token)).toBe(404);
   });
 
   test("gives no token for a wrong password", async () => {
@@ -92,8 +86,8 @@ describe("joining a game", () => {
     const socket = client();
     const [, token] = await join(socket, "game-leave");
     socket.disconnect();
-    await until(() => joinTokens.verify(token) === undefined);
-    expect(joinTokens.verify(token)).toBeUndefined();
+    await until(async () => await tokenStatus(token) === 401);
+    expect(await tokenStatus(token)).toBe(401);
   });
 });
 
@@ -155,8 +149,8 @@ test("a cast display receives initial and live state without player presence", a
   const events = record(display);
   const [id, joinToken] = await joinDisplay(display, "display-live", token);
   expect(id).toBe(display.id);
-  expect(joinTokens.verify(joinToken)).toBe("display-live");
-  expect(joinTokens.canUpload(joinToken)).toBe(false);
+  expect(await tokenStatus(joinToken)).toBe(404);
+  expect(await tokenStatus(joinToken, "PUT")).toBe(403);
   expect(events.map(([event]) => event)).toEqual([
     "party_state", "map_state", "map", "manifest", "joined_display", "display_frozen",
   ]);
@@ -178,7 +172,7 @@ test("a cast display receives initial and live state without player presence", a
   player.emit("player_state", { userId: "gm", nickname: "Changed" });
   expect(Object.keys((await party)[0])).toEqual([player.id!]);
   display.disconnect();
-  await until(() => joinTokens.verify(joinToken) === undefined);
+  await until(async () => await tokenStatus(joinToken) === 401);
   await pause();
   expect(playerEvents).toEqual([]);
 });
@@ -198,7 +192,7 @@ for (const [label, room, token] of [
     player.emit("map", { id: "not-for-display", owner: "gm" });
     await pause();
     expect(events.map(([event]) => event)).toEqual(["display_error"]);
-    expect(io.sockets.sockets.get(display.id!)?.rooms.size).toBe(1);
+    expect(await displayToken(display)).toBeNull();
   });
 }
 
@@ -249,9 +243,11 @@ test("a cast display cannot rejoin as a player or join a second room", async () 
   display.emit("join_display", "display-second-room", secondToken);
   await refused;
   expect(events.map(([event]) => event)).toEqual(["display_error"]);
-  expect([...io.sockets.sockets.get(display.id!)!.rooms]).toEqual([
-    display.id!, "display-single-room",
-  ]);
+  const secondRoom = await owner("display-second-room");
+  secondRoom.socket.emit("map", { id: "other-room-map", owner: "gm" });
+  await displayToken(secondRoom.socket);
+  await pause();
+  expect(events.map(([event]) => event)).toEqual(["display_error"]);
 });
 
 test("a pending player join cannot also join as a cast display", async () => {
@@ -266,9 +262,9 @@ test("a pending player join cannot also join as a cast display", async () => {
   await pause();
   expect(events.some(([event]) => event === "joined_display")).toBe(false);
   expect(events.some(([event]) => event === "display_error")).toBe(true);
-  expect([...io.sockets.sockets.get(socket.id!)!.rooms]).toEqual([
-    socket.id!, "display-pending-player",
-  ]);
+  socket.emit("player_state", { userId: "pending-gm" });
+  socket.emit("map", { id: "pending-map", owner: "pending-gm" });
+  expect(await displayToken(socket)).toEqual(expect.any(String));
 });
 
 const view = { mapId: "map-1", x: -0.2, y: 0.3, width: 0.5, height: 0.4 };
@@ -418,4 +414,10 @@ for (const replacement of [null, { id: "map-2", owner: "gm" }]) {
     await pause();
     expect(lateEvents.filter(([event]) => event === "display_view")).toEqual([["display_view", view]]);
   });
+}
+
+async function tokenStatus(token: string, method = "GET") {
+  const response = await fetch(`${url}/assets/not-present`, { method, headers: { Authorization: `Bearer ${token}` } });
+  await response.text();
+  return response.status;
 }

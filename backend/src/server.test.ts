@@ -3,13 +3,14 @@ import { createHash } from "crypto";
 import { mkdir, mkdtemp, rm, writeFile, stat } from "fs/promises";
 import { join } from "path";
 import { expect, test } from "bun:test";
-import { startTestServer } from "./testing/serverHelpers";
+import { setupAdministrator, startTestServer } from "./testing/serverHelpers";
 
 const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 1, 2, 3, 4]);
 
 test("an image uploaded with a room connection survives a server restart", async () => {
   const server = await startTestServer();
   try {
+    await setupAdministrator(server);
     const { token } = await server.joinRoom("room");
     const uploaded = await fetch(`${server.address}/assets/image`, {
       method: "PUT", body: png,
@@ -32,6 +33,8 @@ test("two servers keep room passwords, join tokens and images separate", async (
   const first = await startTestServer();
   const second = await startTestServer();
   try {
+    await setupAdministrator(first);
+    await setupAdministrator(second);
     expect(first.address).not.toBe(second.address);
     const a = await first.joinRoom("same-room", "first-password");
     const b = await second.joinRoom("same-room", "second-password");
@@ -58,6 +61,7 @@ test("two servers keep room passwords, join tokens and images separate", async (
 test("stopping the server disconnects room clients and releases its listener", async () => {
   const server = await startTestServer();
   try {
+    await setupAdministrator(server);
     const { socket } = await server.joinRoom("room");
     const disconnected = new Promise<string>((resolve) => socket.once("disconnect", resolve));
     await server.stop();
@@ -96,6 +100,7 @@ test("every v0.1.0 image remains downloadable and old records are never read aga
     await legacyAsset(dir, "old-b", new Uint8Array([5, 6, 7]));
   });
   try {
+    await setupAdministrator(server);
     const check = async () => {
       const { token } = await server.joinRoom("another-room");
       for (const [id, body] of [["old-a", png], ["old-b", new Uint8Array([5, 6, 7])]] as const) {
@@ -132,6 +137,7 @@ test("a failed legacy read-in is retried in full on the next start", async () =>
     await legacyAsset(dir, "zz-last");
     const server = await startTestServer(undefined, dir);
     try {
+      await setupAdministrator(server);
       const { token } = await server.joinRoom("room");
       for (const [id, body] of [["aa-first", new Uint8Array([9, 8])], ["zz-last", png]] as const) {
         const response = await fetch(`${server.address}/assets/${id}`, { headers: { Authorization: `Bearer ${token}` } });

@@ -1,5 +1,5 @@
 // Bun.password rejects empty strings, but games without a password join with
-// "". Hashes only live in memory, so prefixing every password is safe.
+// "". Prefix every password consistently before hashing and checking it.
 const PREFIX = "owlbear:";
 
 export default class Auth implements Auth {
