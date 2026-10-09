@@ -146,7 +146,8 @@ export default class GameServer {
             if (res) {
               await gameState.joinGame(gameId);
             } else {
-              this.attempts.wrong(keys);
+              // Opening a room's link sends no password; only a guess is counted
+              if (password !== "") this.attempts.wrong(keys);
               socket.emit("auth_error");
               return;
             }
