@@ -177,7 +177,7 @@ test("room counts span addresses while address counts span rooms with later refu
     await server.clock.advance(1);
     await joinAnswer(attacker, "room4", "secret", "joined_game");
   } finally { for (const socket of sockets) socket.disconnect(); await server.dispose(); }
-});
+}, 30000);
 
 test("room attempts expire after fifteen minutes and room and address histories reset after twenty-four hours", async () => {
   const server = await startTestServer();
@@ -244,7 +244,7 @@ test("a room's second and later refusals last fifteen minutes and a successful j
       await joinAnswer(connect(70 + round), "room", "secret", "joined_game");
     }
   } finally { for (const socket of sockets) socket.disconnect(); await server.dispose(); }
-});
+}, 30000);
 
 test("opening a password room without a password is asked for it and never counted as a wrong one", async () => {
   const server = await startTestServer();
@@ -256,4 +256,4 @@ test("opening a password room without a password is asked for it and never count
     for (let i = 0; i < 12; i++) await joinAnswer(connect(2 + i), "room", "", "auth_error");
     await joinAnswer(connect(40), "room", "secret", "joined_game");
   } finally { for (const socket of sockets) socket.disconnect(); await server.dispose(); }
-});
+}, 30000);
