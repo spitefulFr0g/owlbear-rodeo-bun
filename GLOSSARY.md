@@ -7,19 +7,19 @@ A self-hosted virtual tabletop: one server that a table's players connect to wit
 ### Access
 
 **Room**:
-The persistent place on a server that players join to share a tabletop.
-_Avoid_: Campaign, game, session, party
+The persistent place on a server that players join to share a tabletop. It has a name its GM can change, and it is kept until its GM deletes it.
+_Avoid_: Campaign, game, party
 
 **Account**:
 An identity on one server that a person signs in to. Only an account can create a room.
 _Avoid_: User, login, profile
 
 **Administrator**:
-An account that manages the other accounts on a server. The first account, made at setup, is an administrator.
+An account that manages the other accounts on a server, and can see and delete any room on it. The first account, made at setup, is an administrator.
 _Avoid_: Admin user, owner, superuser
 
 **GM**:
-The person running a room. The account that creates a room is its GM.
+The person running a room. A room has one GM: the account that created it, or the administrator it passed to when that account was removed.
 _Avoid_: DM, host, map owner
 
 **Player**:
@@ -27,8 +27,12 @@ Anyone in a room who is not its GM. A GM who joins their own room without signin
 _Avoid_: User, participant, member
 
 **Trusted player**:
-A player the GM has marked to receive the room's wider set of permissions.
+A player the GM has marked in one room as able to use every tool, whatever the room's switches say. A trusted player still cannot change the Map layer, the scene's settings or the room's settings.
 _Avoid_: Co-GM, moderator, assistant
+
+**Room switch**:
+A setting the GM turns on or off for a whole room to say what its players may do: tokens, drawing, notes and text, fog, Owner Only and uploads.
+_Avoid_: Edit flag, permission, layer permission
 
 **Anonymous player**:
 A person in a room who has not signed in to an account.
@@ -36,7 +40,7 @@ _Avoid_: Guest, visitor
 
 **Presence**:
 One person's live connection to a room: their name, colour, role and the scene they are viewing, plus their shared dice rolls and timer. It exists only while they are connected.
-_Avoid_: Party member, peer, session
+_Avoid_: Party member, peer
 
 **Dice roll**:
 The dice a person has thrown in their dice tray and the result. A shared roll is part of that person's presence, seen by everyone in the room whatever scene they are viewing, and is never saved.
@@ -46,6 +50,14 @@ _Avoid_: Roll history, roll log
 A countdown one person starts, shown to everyone in the room. It is part of that person's presence and ends when they disconnect.
 _Avoid_: Clock, stopwatch, turn timer
 
+**Session**:
+The stretch of play in a room between its GM starting it and ending it. Players see the open scene only during a session. A session also ends by itself once the GM has been disconnected for a while.
+_Avoid_: Game, meeting, live mode
+
+**Welcome screen**:
+What players see in a room outside a session. By default it shows the room's name and who is waiting. The GM can assign a scene to be shown in its place.
+_Avoid_: Lockout screen, splash screen, lobby, waiting room
+
 ### Canvas
 
 **Scene**:
@@ -53,8 +65,12 @@ An unbounded canvas in a room, holding items and one grid. A room holds any numb
 _Avoid_: Map, board, level
 
 **Open scene**:
-The one scene in a room that the players see. The GM may be viewing a different scene, and moves the players by showing it to them.
+The one scene in a room that the players see during a session. The GM may be viewing a different scene, and moves the players by showing it to them.
 _Avoid_: Active scene, current scene, live scene
+
+**View-only scene**:
+A scene the GM has marked so that players can look at it but not change it.
+_Avoid_: Locked scene, read-only scene, presentation scene
 
 **Map**:
 An image item on the Map layer. It is a picture only; the grid and everything placed on top belong to the scene.
@@ -63,6 +79,18 @@ _Avoid_: Background, battlemap
 **Item**:
 One thing placed on the canvas, such as an image, a shape or a piece of text. Every item has a position, a layer and an owner.
 _Avoid_: Object, element, node, entity
+
+**Owner**:
+The one person an item belongs to. It starts as whoever created the item, and the GM can give it to someone else.
+_Avoid_: Creator, author
+
+**Owner Only**:
+A room switch that limits each player to moving the tokens they own. Off in a new room.
+_Avoid_: Token lock, restricted movement
+
+**Locked item**:
+An item the GM has pinned so that no player can change it, trusted or not.
+_Avoid_: Frozen item, pinned item
 
 **Layer**:
 The fixed band an item is drawn in, which decides what covers what.
@@ -81,7 +109,7 @@ A short piece of plain text on a coloured square, placed on the Note layer.
 _Avoid_: Sticky, memo, comment
 
 **Hidden item**:
-An item that only its creator and the GM can see. New notes and text start hidden, and only the GM or a trusted player can show theirs to everyone.
+An item that only its owner and the GM can see. New notes and text start hidden, and only the GM or a trusted player can show theirs to everyone.
 _Avoid_: Private item, invisible item, secret item
 
 **Cast display**:
