@@ -9,8 +9,10 @@ import usePreventOverscroll from "../../hooks/usePreventOverscroll";
 import useStageInteraction from "../../hooks/useStageInteraction";
 import useImageCenter from "../../hooks/useImageCenter";
 import usePreventContextMenu from "../../hooks/usePreventContextMenu";
+import useFollowMapRect from "../../hooks/useFollowMapRect";
 
 import { getGridMaxZoom } from "../../helpers/grid";
+import { MapRect } from "../../helpers/displayView";
 import KonvaBridge from "../../helpers/KonvaBridge";
 
 import {
@@ -34,6 +36,8 @@ type MapInteractionProps = {
   controls: React.ReactNode;
   selectedToolId: MapToolId;
   onSelectedToolChange: SelectedToolChangeEventHanlder;
+  // Keep this part of the map fitted to the window and ignore all input
+  followRect?: MapRect;
 };
 
 function MapInteraction({
@@ -43,6 +47,7 @@ function MapInteraction({
   controls,
   selectedToolId,
   onSelectedToolChange,
+  followRect,
 }: MapInteractionProps) {
   const [mapImage, mapImageStatus] = useMapImage(map);
 
@@ -88,6 +93,17 @@ function MapInteraction({
     containerRef
   );
 
+  const isFollowing = followRect !== undefined;
+  useFollowMapRect(
+    followRect,
+    map?.id,
+    mapStageRef,
+    mapLayerRef,
+    { stageWidth, stageHeight, mapWidth, mapHeight },
+    stageTranslateRef,
+    setStageScale
+  );
+
   const previousSelectedToolRef = useRef(selectedToolId);
   const [currentMouseButtons, setCurentMouseButtons] = useState(0);
 
@@ -101,7 +117,7 @@ function MapInteraction({
     mapLayerRef,
     getGridMaxZoom(map?.grid),
     selectedToolId,
-    preventMapInteraction,
+    preventMapInteraction || isFollowing,
     {
       onPinchStart: () => {
         // Change to move tool when pinching and zooming
@@ -193,7 +209,8 @@ function MapInteraction({
         <Box
           sx={{
             position: "relative",
-            cursor: getCursorForTool(selectedToolId),
+            cursor: isFollowing ? "inherit" : getCursorForTool(selectedToolId),
+            pointerEvents: isFollowing ? "none" : undefined,
             touchAction: "none",
             outline: "none",
             width: "100%",

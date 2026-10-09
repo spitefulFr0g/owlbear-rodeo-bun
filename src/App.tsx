@@ -4,6 +4,7 @@ import { BrowserRouter as Router, Switch, Route } from "react-router-dom";
 import theme from "./theme";
 import Home from "./routes/Home";
 import Game from "./routes/Game";
+import Display from "./routes/Display";
 import About from "./routes/About";
 import FAQ from "./routes/FAQ";
 import ReleaseNotes from "./routes/ReleaseNotes";
@@ -43,6 +44,11 @@ function App() {
                       <UserIdProvider>
                         <Game />
                       </UserIdProvider>
+                    </DatabaseProvider>
+                  </Route>
+                  <Route path="/display/:id">
+                    <DatabaseProvider>
+                      <Display />
                     </DatabaseProvider>
                   </Route>
                   <Route path="/">
