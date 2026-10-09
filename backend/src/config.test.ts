@@ -2,11 +2,10 @@ import { describe, expect, test } from "bun:test";
 import { defaultDataDir, parseConfig } from "./config";
 
 describe("parseConfig", () => {
-  test("defaults to port 9000, same-origin and the bundled ICE servers", () => {
+  test("defaults to port 9000, same-origin", () => {
     const config = parseConfig([], {});
     expect(config.port).toBe(9000);
     expect(config.allowOrigin).toBeNull();
-    expect(config.iceServersFile).toBeUndefined();
     expect(config.dataDir).toBeUndefined();
     expect(config.help).toBe(false);
   });
@@ -15,12 +14,10 @@ describe("parseConfig", () => {
     const config = parseConfig([], {
       PORT: "8080",
       ALLOW_ORIGIN: "^https://example\\.com$",
-      ICE_SERVERS_FILE: "/etc/ice.json",
       DATA_DIR: "/var/lib/owlbear",
     });
     expect(config.port).toBe(8080);
     expect(config.allowOrigin?.test("https://example.com")).toBe(true);
-    expect(config.iceServersFile).toBe("/etc/ice.json");
     expect(config.dataDir).toBe("/var/lib/owlbear");
   });
 
@@ -31,21 +28,17 @@ describe("parseConfig", () => {
         "3000",
         "--allow-origin",
         ".*",
-        "--ice-servers",
-        "ice.json",
         "--data-dir",
         "assets",
       ],
       {
         PORT: "8080",
         ALLOW_ORIGIN: "nope",
-        ICE_SERVERS_FILE: "other.json",
         DATA_DIR: "elsewhere",
       }
     );
     expect(config.port).toBe(3000);
     expect(config.allowOrigin?.source).toBe(".*");
-    expect(config.iceServersFile).toBe("ice.json");
     expect(config.dataDir).toBe("assets");
   });
 

@@ -32,15 +32,6 @@ export default class GameServer {
       const gameState = new GameState(this.io, socket, this.gameRepo);
       let _gameId: string;
 
-      socket.on("signal", (data: string) => {
-        try {
-          const { to, signal } = JSON.parse(data);
-          this.io.to(to).emit("signal", { from: socket.id, signal });
-        } catch (error) {
-          console.error("SIGNAL_ERROR", error);
-        }
-      });
-
       socket.on("disconnecting", async () => {
         this.joinTokens.revoke(socket.id);
         try {

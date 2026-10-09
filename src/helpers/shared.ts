@@ -22,12 +22,6 @@ export function fromEntries(iterable: Iterable<[string | number, any]>) {
   );
 }
 
-// Check to see if all tracks are muted
-export function isStreamStopped(stream: MediaStream): boolean {
-  // TODO: Check what this thing actually does
-  return stream.getTracks().reduce((a, b) => a && b, { muted: true }).muted;
-}
-
 export function roundTo(x: number, to: number): number {
   return Math.round(x / to) * to;
 }

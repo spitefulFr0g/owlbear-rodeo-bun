@@ -16,7 +16,6 @@ import customTokens from "./CustomTokens.mp4";
 import tokenEditor from "./TokenEditor.mp4";
 import addPartyMember from "./AddPartyMember.mp4";
 import changeNickname from "./ChangeNickname.mp4";
-import sharingAudio from "./SharingAudio.mp4";
 import startGame from "./StartGame.mp4";
 import diceSharing from "./DiceSharing.mp4";
 import usingTimer from "./UsingTimer.mp4";
@@ -47,7 +46,6 @@ const assets = {
   tokenEditor,
   addPartyMember,
   changeNickname,
-  sharingAudio,
   startGame,
   diceSharing,
   usingTimer,
