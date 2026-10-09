@@ -8,7 +8,6 @@ import assets from "../docs/assets";
 
 const database = raw("../docs/faq/database.md");
 const maps = raw("../docs/faq/maps.md");
-const audioSharing = raw("../docs/faq/audio-sharing.md");
 const general = raw("../docs/faq/general.md");
 const connection = raw("../docs/faq/connection.md");
 
@@ -38,9 +37,6 @@ function FAQ() {
         </Box>
         <Box my={1} id="maps">
           <Markdown source={maps} assets={assets} />
-        </Box>
-        <Box my={1} id="audio-sharing">
-          <Markdown source={audioSharing} assets={assets} />
         </Box>
         <Box my={1} id="database">
           <Markdown source={database} assets={assets} />

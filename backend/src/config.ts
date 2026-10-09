@@ -5,8 +5,6 @@ export interface Config {
   port: number;
   /** Extra origins allowed to connect. Same-origin is always allowed. */
   allowOrigin: RegExp | null;
-  /** JSON file replacing the bundled ICE server list. */
-  iceServersFile?: string;
   /** Directory that uploaded assets are kept in. */
   dataDir?: string;
   help: boolean;
@@ -18,9 +16,6 @@ Options:
   -p, --port <port>          Port to listen on (env PORT, default 9000)
       --allow-origin <regex> Also accept connections from origins matching
                              this pattern (env ALLOW_ORIGIN)
-      --ice-servers <file>   JSON file with {"iceServers": [...]} to use
-                             instead of the default STUN server
-                             (env ICE_SERVERS_FILE)
       --data-dir <dir>       Directory to keep uploaded maps and tokens in
                              (env DATA_DIR, default "data" beside the
                              executable)
@@ -35,7 +30,6 @@ export function parseConfig(
     options: {
       port: { type: "string", short: "p" },
       "allow-origin": { type: "string" },
-      "ice-servers": { type: "string" },
       "data-dir": { type: "string" },
       help: { type: "boolean", short: "h" },
     },
@@ -45,7 +39,6 @@ export function parseConfig(
   return {
     port: parsePort(values.port ?? env.PORT ?? "9000"),
     allowOrigin: parseOrigin(values["allow-origin"] ?? env.ALLOW_ORIGIN),
-    iceServersFile: values["ice-servers"] ?? env.ICE_SERVERS_FILE,
     dataDir: values["data-dir"] || env.DATA_DIR || undefined,
     help: values.help ?? false,
   };

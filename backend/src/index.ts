@@ -12,8 +12,6 @@ import { FsAssetStore } from "./entities/AssetStore";
 import Controller from "./controllers/Controller";
 import GameServer from "./entities/GameServer";
 import HealthcheckController from "./controllers/HealthcheckController";
-import IceServer from "./entities/IceServer";
-import IceServerController from "./controllers/IceServerController";
 import JoinTokens from "./entities/JoinTokens";
 import { defaultDataDir, parseConfig, USAGE } from "./config";
 import { frontendHandler } from "./frontend";
@@ -33,16 +31,6 @@ if (config.help) {
   process.exit(0);
 }
 const { allowOrigin } = config;
-
-const iceServer = new IceServer(config.iceServersFile);
-try {
-  await iceServer.getIceServers();
-} catch (error: any) {
-  console.error(
-    `Unable to load ICE servers from ${config.iceServersFile}: ${error.message}`
-  );
-  process.exit(1);
-}
 
 // The app tells players maps can be up to 50 MB. This leaves some headroom.
 const MAX_ASSET_BYTES = 64 * 1024 * 1024;
@@ -98,7 +86,6 @@ const globalMiddleware: Array<RequestHandler> = [
 
 const controllers: Array<Controller> = [
   new HealthcheckController(),
-  new IceServerController(iceServer),
   new AssetController(assetStore, joinTokens, MAX_ASSET_BYTES),
 ];
 
