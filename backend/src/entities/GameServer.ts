@@ -1,3 +1,4 @@
+import { clientAddress } from "../clientRequest";
 import AttemptLimiter from "../AttemptLimiter";
 import { realClock, Clock } from "../clock";
 import { OwlbearDatabase } from "../database";
@@ -22,7 +23,7 @@ export default class GameServer {
   private readonly attempts: AttemptLimiter;
   private readonly joinTokens: JoinTokens;
 
-  constructor(io: IOServer, joinTokens: JoinTokens, database?: OwlbearDatabase, clock?: Clock, attempts?: AttemptLimiter) {
+  constructor(io: IOServer, joinTokens: JoinTokens, database?: OwlbearDatabase, clock?: Clock, attempts?: AttemptLimiter, private readonly behindProxy = false) {
     this.attempts = attempts ?? new AttemptLimiter(clock ?? realClock);
     this.io = io;
     this.joinTokens = joinTokens;
@@ -127,7 +128,7 @@ export default class GameServer {
             return;
           }
 
-          const keys = [`room:id:${gameId}`, `room:address:${socket.handshake.address}`];
+          const keys = [`room:id:${gameId}`, `room:address:${clientAddress(socket.request, this.behindProxy)}`];
           const retryAfterSeconds = this.attempts.retryAfterSeconds(keys);
           if (retryAfterSeconds) {
             socket.emit("auth_wait", retryAfterSeconds);

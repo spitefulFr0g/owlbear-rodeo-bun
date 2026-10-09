@@ -94,7 +94,7 @@ export async function startTestServer(prepare?: (dataDir: string) => Promise<voi
       });
     },
     stop: () => server.stop(),
-    async restart(overrides: { reopenSetup?: boolean } = {}) {
+    async restart(overrides: { reopenSetup?: boolean; behindProxy?: boolean } = {}) {
       await server.stop();
       for (const socket of sockets) socket.disconnect();
       sockets.clear();
