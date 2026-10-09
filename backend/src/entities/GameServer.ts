@@ -17,7 +17,7 @@ import { Pointer } from "../types/Pointer";
 
 export default class GameServer {
   private readonly io: IOServer;
-  private gameRepo;
+  readonly gameRepo;
   private readonly joinTokens: JoinTokens;
 
   constructor(io: IOServer, joinTokens: JoinTokens, database?: OwlbearDatabase, clock?: Clock) {
@@ -77,7 +77,7 @@ export default class GameServer {
         _gameId = gameId;
         await gameState.joinGame(gameId, true);
         const token = this.joinTokens.issue(socket.id, gameId, "display");
-        socket.emit("joined_display", socket.id, token);
+        socket.emit("joined_display", socket.id, token, { room: { name: this.gameRepo.games[gameId].name } });
         const game = this.gameRepo.games[gameId];
         socket.emit("display_frozen", game.displayFrozen);
         if (game.shownDisplayView) socket.emit("display_view", game.shownDisplayView);
@@ -144,7 +144,7 @@ export default class GameServer {
           _gameId = gameId;
           // Only the player who joined gets the token for the asset routes
           const token = this.joinTokens.issue(socket.id, gameId);
-          socket.emit("joined_game", socket.id, token);
+          socket.emit("joined_game", socket.id, token, { room: { name: this.gameRepo.games[gameId].name } });
           socket.emit("display_frozen", this.gameRepo.games[gameId].displayFrozen);
           socket.to(gameId).emit("joined_game", socket.id);
         } catch (error) {

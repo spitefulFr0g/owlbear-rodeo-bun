@@ -1,4 +1,5 @@
 import cors from "cors";
+import RoomController from "./controllers/RoomController";
 import Accounts from "./accounts/Accounts";
 import { setupLock } from "./accounts/setupLock";
 import { apiOrigin } from "./accounts/apiOrigin";
@@ -111,6 +112,8 @@ export async function startServer(options: ServerOptions): Promise<RunningServer
   app.options("*", (_req, res) => res.sendStatus(204));
   app.use("/api", new SetupController(accounts).setRoutes());
   app.use("/api", new SignInController(accounts).setRoutes());
+  const game = new GameServer(io, joinTokens, database, options.clock);
+  app.use("/api", new RoomController(accounts, database, game.gameRepo, (id, name) => io.to(id).emit("room_state", { name })).setRoutes());
   server.loadControllers(controllers);
   server.loadMiddleware([frontendHandler(frontendAssets)]);
 
@@ -123,7 +126,6 @@ export async function startServer(options: ServerOptions): Promise<RunningServer
       next();
     });
   });
-  const game = new GameServer(io, joinTokens, database, options.clock);
   const httpServer = await new Promise<import("http").Server>((resolve, reject) => {
     const listening = server.run(() => resolve(listening));
     listening.once("error", reject);

@@ -7,6 +7,9 @@ import { Manifest } from "../types/Manifest";
 import { Map } from "../types/Map";
 
 export default class Game {
+  name = "";
+  gmAccountId: string | null = null;
+  hasPassword = false;
   displayFrozen = false;
   latestDisplayView?: DisplayView;
   shownDisplayView?: DisplayView;

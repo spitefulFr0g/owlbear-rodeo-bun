@@ -133,3 +133,13 @@ export async function signIn(server: Pick<RunningServer, "address">, username: s
   const cookie = response.headers.get("set-cookie")!.split(";")[0];
   return { account, cookie };
 }
+
+/** Creates a room through the signed-in HTTP route. */
+export async function createRoom(server: Pick<RunningServer, "address">, cookie: string, name: string, password?: string) {
+  const response = await fetch(`${server.address}/api/rooms`, {
+    method: "POST", headers: { Cookie: cookie, "Content-Type": "application/json" },
+    body: JSON.stringify({ name, password }),
+  });
+  if (response.status !== 201) throw new Error(`Room creation failed: ${await response.text()}`);
+  return (await response.json() as { room: import("../controllers/RoomController").Room }).room;
+}
