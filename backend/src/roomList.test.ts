@@ -88,6 +88,8 @@ test("password rooms refuse missing and wrong passwords while empty passwords ne
     }
     await server.joinRoom(protectedRoom.id, "room-password");
     await server.joinRoom(openRoom.id);
+    // A browser sends the password it last used for another room
+    await server.joinRoom(openRoom.id, "room-password");
     expect(await (await request(server, "GET", undefined, cookie)).json()).toEqual({ rooms: [openRoom, protectedRoom] });
   } finally { await server.dispose(); }
 });
