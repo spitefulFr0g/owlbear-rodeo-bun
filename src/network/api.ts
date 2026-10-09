@@ -84,3 +84,14 @@ export function setup(username: string, password: string) {
     password,
   });
 }
+
+export function signIn(username: string, password: string) {
+  return request<{ account: Account }>("POST", "/sign-in", {
+    username,
+    password,
+  });
+}
+
+export function signOut() {
+  return request<void>("POST", "/sign-out");
+}
