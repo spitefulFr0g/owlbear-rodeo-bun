@@ -1,3 +1,4 @@
+import { Clock, realClock } from "../clock";
 import { createHash, randomUUID } from "crypto";
 import { createReadStream, createWriteStream } from "fs";
 import { mkdir, readFile, readdir, rename, rm, stat, writeFile } from "fs/promises";
@@ -87,7 +88,7 @@ export class FsAssetStore implements AssetStore {
   /** Tail of the queue that changes to refs and blobs wait in */
   private queue: Promise<unknown> = Promise.resolve();
 
-  constructor(dir: string, maxBytes: number) {
+  constructor(dir: string, maxBytes: number, private readonly clock: Clock = realClock) {
     this.blobsDir = join(dir, "blobs");
     this.refsDir = join(dir, "refs");
     this.tmpDir = join(dir, "tmp");
@@ -144,7 +145,7 @@ export class FsAssetStore implements AssetStore {
         width: info.width,
         height: info.height,
         owner: info.owner,
-        createdAt: new Date().toISOString(),
+        createdAt: new Date(this.clock.now()).toISOString(),
       };
       await this.exclusive(async () => {
         const blobPath = this.blobPath(record.hash);

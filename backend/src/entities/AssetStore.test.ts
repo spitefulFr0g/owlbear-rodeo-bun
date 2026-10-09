@@ -1,3 +1,4 @@
+import { TestClock } from "../testing/serverHelpers";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdtemp, readdir, rm, writeFile } from "fs/promises";
 import { tmpdir } from "os";
@@ -43,6 +44,16 @@ describe("FsAssetStore", () => {
 
   afterEach(async () => {
     await rm(dir, { recursive: true, force: true });
+  });
+
+  test("dates asset records with the supplied clock", async () => {
+    const clock = new TestClock();
+    const timedStore = new FsAssetStore(dir, 16, clock);
+    const first = await timedStore.put("first-date", info, bytes("first"));
+    expect(first.createdAt).toBe("2026-01-01T00:00:00.000Z");
+    await clock.advance(3000);
+    const second = await timedStore.put("second-date", info, bytes("second"));
+    expect(second.createdAt).toBe("2026-01-01T00:00:03.000Z");
   });
 
   test("returns what was put", async () => {
