@@ -238,10 +238,22 @@ test("a room's second and later refusals last fifteen minutes and a successful j
     await setupAdministrator(server);
     await server.joinRoom("room", "secret");
     for (let round = 0; round < 3; round++) {
-      for (let i = 0; i < 5; i++) await joinAnswer(connect(2 + round * 10 + i), "room", "", "auth_error");
+      for (let i = 0; i < 5; i++) await joinAnswer(connect(2 + round * 10 + i), "room", "wrong", "auth_error");
       expect(await joinAnswer(connect(60 + round), "room", "secret", "auth_wait")).toEqual([round === 0 ? 300 : 900]);
       await server.clock.advance((round === 0 ? 5 : 15) * MINUTE);
       await joinAnswer(connect(70 + round), "room", "secret", "joined_game");
     }
+  } finally { for (const socket of sockets) socket.disconnect(); await server.dispose(); }
+});
+
+test("opening a password room without a password is asked for it and never counted as a wrong one", async () => {
+  const server = await startTestServer();
+  const sockets: Socket[] = [];
+  const connect = (source: number) => { const socket = roomSocket(server, `127.0.0.${source}`); sockets.push(socket); return socket; };
+  try {
+    await setupAdministrator(server);
+    await server.joinRoom("room", "secret");
+    for (let i = 0; i < 12; i++) await joinAnswer(connect(2 + i), "room", "", "auth_error");
+    await joinAnswer(connect(40), "room", "secret", "joined_game");
   } finally { for (const socket of sockets) socket.disconnect(); await server.dispose(); }
 });
