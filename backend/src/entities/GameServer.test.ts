@@ -42,9 +42,12 @@ function next(socket: Socket, event: string): Promise<any[]> {
 }
 
 async function join(socket: Socket, gameId: string, password = "") {
+  const frozen = next(socket, "display_frozen");
   const joined = next(socket, "joined_game");
   socket.emit("join_game", gameId, password);
-  return joined;
+  const result = await joined;
+  await frozen;
+  return result;
 }
 
 async function until(condition: () => boolean) {
@@ -125,9 +128,13 @@ describe("cast displays", () => {
 });
 
 async function joinDisplay(socket: Socket, gameId: string, token: string | null) {
+  const frozen = next(socket, "display_frozen");
   const joined = next(socket, "joined_display");
   socket.emit("join_display", gameId, token);
-  return joined;
+  const result = await joined;
+  await frozen;
+  await displayToken(socket);
+  return result;
 }
 
 function record(socket: Socket) {
@@ -151,7 +158,7 @@ test("a cast display receives initial and live state without player presence", a
   expect(joinTokens.verify(joinToken)).toBe("display-live");
   expect(joinTokens.canUpload(joinToken)).toBe(false);
   expect(events.map(([event]) => event)).toEqual([
-    "party_state", "map_state", "map", "manifest", "joined_display",
+    "party_state", "map_state", "map", "manifest", "joined_display", "display_frozen",
   ]);
   expect(events[0][1]).toEqual({ [player.id!]: { userId: "gm", nickname: "GM" } });
   expect(events[1][1]).toEqual({ mapId: "map-1", notes: {} });
@@ -173,7 +180,7 @@ test("a cast display receives initial and live state without player presence", a
   display.disconnect();
   await until(() => joinTokens.verify(joinToken) === undefined);
   await pause();
-  expect(playerEvents).toEqual([]);
+  expect(playerEvents).toEqual([["display_frozen", false]]);
 });
 
 for (const [label, room, token] of [
@@ -226,6 +233,8 @@ for (const [event, payload] of [
     expect(snapshot[1][1]).toEqual({ mapId: "map-1", notes: {} });
     expect(snapshot[2][1]).toEqual({ id: "map-1", owner: "gm" });
     expect(snapshot[3][1]).toEqual({ mapId: "map-1", assets: [] });
+    expect(snapshot.filter(([name]) => name === "display_frozen")).toEqual([["display_frozen", false]]);
+    expect(snapshot.filter(([name]) => name === "display_view")).toEqual([]);
   });
 }
 
@@ -261,3 +270,122 @@ test("a pending player join cannot also join as a cast display", async () => {
     socket.id!, "display-pending-player",
   ]);
 });
+
+const view = { mapId: "map-1", x: -0.2, y: 0.3, width: 0.5, height: 0.4 };
+
+test("only a followed player's valid current-map views reach cast displays", async () => {
+  const { socket: player, token } = await owner("display-follow");
+  const other = client();
+  await join(other, "display-follow", "secret");
+  other.emit("player_state", { userId: "other" });
+  const display = client();
+  await joinDisplay(display, "display-follow", token);
+  const displayEvents = record(display);
+  const playerEvents = record(player);
+  const otherEvents = record(other);
+  other.emit("display_view", view);
+  player.emit("display_view", { ...view, mapId: "old-map" });
+  for (const invalid of [
+    null, [], "view", { ...view, mapId: 1 },
+    ...["x", "y", "width", "height"].flatMap((key) =>
+      [NaN, Infinity, -Infinity, "1", null, undefined].map((value) => ({ ...view, [key]: value }))),
+    { ...view, width: 0 }, { ...view, width: -1 },
+    { ...view, height: 0 }, { ...view, height: -1 },
+  ]) player.emit("display_view", invalid);
+  await displayToken(player);
+  await pause();
+  expect(displayEvents).toEqual([]);
+  player.emit("display_view", view);
+  await pause();
+  expect(displayEvents).toEqual([["display_view", view]]);
+  expect(playerEvents).toEqual([]);
+  expect(otherEvents.filter(([event]) => event === "display_view")).toEqual([]);
+});
+
+test("freeze holds the shown view for joining displays and unfreeze sends the latest view", async () => {
+  const { socket: player, token } = await owner("display-freeze");
+  const display = client();
+  await joinDisplay(display, "display-freeze", token);
+  const other = client();
+  const joinEvents = record(other);
+  await join(other, "display-freeze", "secret");
+  expect(joinEvents.find(([event]) => event === "display_frozen")).toEqual(["display_frozen", false]);
+  other.emit("player_state", { userId: "other" });
+  await displayToken(other);
+  await pause();
+  const events = record(display);
+  const playerEvents = record(player);
+  other.emit("display_freeze", true);
+  player.emit("display_freeze", "true");
+  await displayToken(player);
+  await pause();
+  expect(events).toEqual([]);
+  player.emit("display_view", view);
+  player.emit("display_freeze", true);
+  player.emit("display_freeze", true);
+  const latest = { ...view, x: 0.8 };
+  player.emit("display_view", latest);
+  await displayToken(player);
+  await pause();
+  expect(events).toEqual([["display_view", view], ["display_frozen", true]]);
+  expect(playerEvents).toEqual([["display_frozen", true]]);
+  expect(joinEvents.filter(([event]) => event === "display_frozen")).toEqual([
+    ["display_frozen", false], ["display_frozen", true],
+  ]);
+  const lateDisplay = client();
+  const lateEvents = record(lateDisplay);
+  await joinDisplay(lateDisplay, "display-freeze", token);
+  expect(lateEvents).toEqual([
+    ["party_state", expect.any(Object)], ["map_state", undefined],
+    ["map", { id: "map-1", owner: "gm" }], ["manifest", undefined],
+    ["joined_display", lateDisplay.id, expect.any(String)],
+    ["display_frozen", true], ["display_view", view],
+  ]);
+  player.emit("display_freeze", false);
+  await displayToken(player);
+  await pause();
+  expect(events.slice(-2)).toEqual([["display_frozen", false], ["display_view", latest]]);
+  expect(lateEvents.slice(-2)).toEqual([["display_frozen", false], ["display_view", latest]]);
+});
+
+for (const replacement of [null, { id: "map-2", owner: "gm" }]) {
+  test(`changing the map to ${replacement?.id || "none"} forgets views and resets freeze`, async () => {
+    const gameId = `display-reset-${replacement?.id || "none"}`;
+    const { socket: player, token } = await owner(gameId);
+    const display = client();
+    await joinDisplay(display, gameId, token);
+    player.emit("display_view", view);
+    player.emit("display_freeze", true);
+    player.emit("display_view", { ...view, x: 0.9 });
+    await displayToken(player);
+    await pause();
+    const events = record(display);
+    const playerEvents = record(player);
+    player.emit("map", { id: "map-1", owner: "gm", name: "renamed" });
+    await displayToken(player);
+    await pause();
+    expect(events.filter(([event]) => event === "display_frozen")).toEqual([]);
+    player.emit("map", replacement);
+    await displayToken(player);
+    await pause();
+    expect(events.filter(([event]) => event === "display_frozen")).toEqual([["display_frozen", false]]);
+    expect(playerEvents).toEqual([["display_frozen", false]]);
+    // The frontend clears the map before selecting another, including the same id.
+    player.emit("map", null);
+    player.emit("map", { id: "map-1", owner: "gm" });
+    await displayToken(player);
+    const late = client();
+    const lateEvents = record(late);
+    await joinDisplay(late, gameId, token);
+    expect(lateEvents.filter(([event]) => event === "display_frozen")).toEqual([["display_frozen", false]]);
+    expect(lateEvents.filter(([event]) => event === "display_view")).toEqual([]);
+    player.emit("display_freeze", false);
+    await displayToken(player);
+    await pause();
+    expect(lateEvents.filter(([event]) => event === "display_view")).toEqual([]);
+    player.emit("display_view", view);
+    await displayToken(player);
+    await pause();
+    expect(lateEvents.filter(([event]) => event === "display_view")).toEqual([["display_view", view]]);
+  });
+}
