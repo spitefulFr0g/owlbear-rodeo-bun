@@ -161,7 +161,7 @@ test("a cast display receives initial and live state without player presence", a
   expect(events.map(([event]) => event)).toEqual([
     "party_state", "map_state", "map", "manifest", "joined_display", "display_frozen",
   ]);
-  expect(events[0][1]).toEqual({ [player.id!]: { userId: "gm", nickname: "GM", role: "gm" } });
+  expect(events[0][1]).toEqual({ [player.id!]: { userId: "gm", nickname: "GM", role: "gm", color: "blue" } });
   expect(events[1][1]).toEqual({ mapId: "map-1", notes: {} });
   expect(events[2][1]).toEqual({ id: "map-1", owner: "gm" });
   expect(events[3][1]).toEqual({ mapId: "map-1", assets: [] });
@@ -230,7 +230,7 @@ for (const [event, payload] of [
     const observer = client();
     const snapshot = record(observer);
     await joinDisplay(observer, gameId, token);
-    expect(snapshot[0][1]).toEqual({ [player.id!]: { userId: "gm", nickname: "GM", role: "gm" } });
+    expect(snapshot[0][1]).toEqual({ [player.id!]: { userId: "gm", nickname: "GM", role: "gm", color: "blue" } });
     expect(snapshot[1][1]).toEqual({ mapId: "map-1", notes: {} });
     expect(snapshot[2][1]).toEqual({ id: "map-1", owner: "gm" });
     expect(snapshot[3][1]).toEqual({ mapId: "map-1", assets: [] });
