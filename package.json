@@ -59,7 +59,7 @@
     "shortid": "^2.2.15",
     "simplebar-react": "^2.3.6",
     "simplify-js": "^1.2.4",
-    "socket.io-client": "^4.5.4",
+    "socket.io-client": "^4.8.4",
     "socket.io-msgpack-parser": "^3.0.2",
     "source-map-explorer": "^2.5.3",
     "theme-ui": "^0.10.0",
