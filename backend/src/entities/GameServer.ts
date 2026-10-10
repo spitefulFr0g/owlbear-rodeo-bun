@@ -74,13 +74,7 @@ export default class GameServer {
           answer(null);
           return;
         }
-        const player = this.gameRepo.getPartyState(gameId)[socket.id];
-        const map = this.gameRepo.getState(gameId, "map") as Map | undefined;
-        answer(
-          player?.userId && map && player.userId === map.owner
-            ? this.gameRepo.games[gameId].displayToken
-            : null
-        );
+        answer(socket.data.role === "gm" ? this.gameRepo.games[gameId].displayToken : null);
       });
 
       socket.on("join_display", async (gameId: string, displayToken: string) => {
@@ -190,11 +184,8 @@ export default class GameServer {
 
       const followedGame = () => {
         const gameId = gameState.getGameId();
-        if (!gameId || socket.data.castDisplay) return;
-        const game = this.gameRepo.games[gameId];
-        const player = game.getPartyState()[socket.id];
-        const map = game.getState("map") as Map | undefined;
-        if (player?.userId && map && player.userId === map.owner) return game;
+        if (!gameId || socket.data.castDisplay || socket.data.role !== "gm") return;
+        return this.gameRepo.games[gameId];
       };
 
       const forwardView = (gameId: string, view: DisplayView) => {
@@ -208,7 +199,7 @@ export default class GameServer {
         const game = followedGame();
         if (
           !game || !view || typeof view.mapId !== "string" ||
-          view.mapId !== (game.getState("map") as Map).id ||
+          view.mapId !== (game.getState("map") as Map | undefined)?.id ||
           ![view.x, view.y, view.width, view.height].every(
             (value) => typeof value === "number" && Number.isFinite(value)
           ) || view.width <= 0 || view.height <= 0

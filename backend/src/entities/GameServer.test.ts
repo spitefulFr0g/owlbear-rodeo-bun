@@ -107,7 +107,7 @@ async function owner(gameId: string) {
 }
 
 describe("cast displays", () => {
-  test("only the current map owner can obtain the room's display token", async () => {
+  test("only GM connections can obtain the display token, even without a map", async () => {
     const { socket, token } = await owner("display-token");
     expect(token).toMatch(/^[A-Za-z0-9_-]{43}$/);
     expect(await displayToken(socket)).toBe(token);
@@ -117,10 +117,14 @@ describe("cast displays", () => {
     other.emit("player_state", { userId: "other" });
     expect(await displayToken(other)).toBeNull();
     socket.emit("map", { id: "map-2", owner: "other" });
-    expect(await displayToken(socket)).toBeNull();
-    expect(await displayToken(other)).toBe(token);
-    socket.emit("map", null);
+    expect(await displayToken(socket)).toBe(token);
     expect(await displayToken(other)).toBeNull();
+    socket.emit("map", null);
+    expect(await displayToken(socket)).toBe(token);
+    expect(await displayToken(other)).toBeNull();
+    const secondGM = client(true);
+    await join(secondGM, "display-token");
+    expect(await displayToken(secondGM)).toBe(token);
   });
 });
 
@@ -275,7 +279,7 @@ test("a pending player join cannot also join as a cast display", async () => {
 
 const view = { mapId: "map-1", x: -0.2, y: 0.3, width: 0.5, height: 0.4 };
 
-test("only a followed player's valid current-map views reach cast displays", async () => {
+test("only a GM connection's valid current-map views reach cast displays", async () => {
   const { socket: player, token } = await owner("display-follow");
   const other = client();
   await join(other, "display-follow", "secret");
@@ -421,3 +425,43 @@ for (const replacement of [null, { id: "map-2", owner: "gm" }]) {
     expect(lateEvents.filter(([event]) => event === "display_view")).toEqual([["display_view", view]]);
   });
 }
+
+test("the last GM device's view wins even when a player owns the map", async () => {
+  const gameId = "display-gm-devices";
+  const { socket: gm, token } = await owner(gameId);
+  const player = client();
+  await join(player, gameId, "secret");
+  player.emit("player_state", { userId: "map-owner" });
+  gm.emit("map", { id: "map-1", owner: "map-owner" });
+  await displayToken(gm);
+  const secondGM = client(true);
+  await join(secondGM, gameId);
+  const display = client();
+  await joinDisplay(display, gameId, token);
+  const events = record(display);
+  const secondView = { ...view, x: 0.7 };
+  for (const [sender, sent] of [[gm, view], [secondGM, secondView], [gm, view]] as const) {
+    const received = next(display, "display_view");
+    sender.emit("display_view", sent);
+    expect(await received).toEqual([sent]);
+  }
+  player.emit("display_view", { ...view, x: 0.9 });
+  player.emit("display_freeze", true);
+  await displayToken(player);
+  await pause();
+  expect(events).toEqual([["display_view", view], ["display_view", secondView], ["display_view", view]]);
+  secondGM.emit("display_freeze", true);
+  secondGM.emit("display_view", secondView);
+  await displayToken(secondGM);
+  player.emit("display_freeze", false);
+  await displayToken(player);
+  await pause();
+  expect(events.slice(-1)).toEqual([["display_frozen", true]]);
+  const unfrozen = next(display, "display_view");
+  gm.emit("display_freeze", false);
+  expect(await unfrozen).toEqual([secondView]);
+  const late = client();
+  const lateEvents = record(late);
+  await joinDisplay(late, gameId, token);
+  expect(lateEvents.filter(([event]) => event === "display_view")).toEqual([["display_view", secondView]]);
+});
