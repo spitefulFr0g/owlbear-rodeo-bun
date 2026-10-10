@@ -57,6 +57,12 @@ export default class GameRepository {
     this.pending.delete(gameId);
   }
 
+  forgetRoom(roomId: string): void {
+    this.pending.get(roomId)?.cancel();
+    this.pending.delete(roomId);
+    delete this.games[roomId];
+  }
+
   flush(): void {
     for (const gameId of this.pending.keys()) this.save(gameId);
   }

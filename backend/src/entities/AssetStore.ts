@@ -193,6 +193,16 @@ export class FsAssetStore implements AssetStore {
     });
   }
 
+  async deleteRoom(roomId: string, deleted: () => void): Promise<void> {
+    await this.exclusive(async () => {
+      const removed = this.database.deleteRoom(roomId);
+      deleted();
+      for (const hash of new Set(removed.map(asset => asset.hash))) {
+        if (!this.database.hasHash(hash)) await rm(this.blobPath(hash), { force: true });
+      }
+    });
+  }
+
   private importLegacyRecords(): void {
     if (this.database.legacyAssetsImported()) return;
     this.database.transaction(() => {
