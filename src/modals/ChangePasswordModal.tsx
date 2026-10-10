@@ -60,6 +60,7 @@ function ChangePasswordModal({
 
   return (
     <Modal
+      contentLabel="Change password"
       isOpen={isOpen}
       onRequestClose={onRequestClose}
       style={{ content: { maxWidth: "300px", width: "100%" } }}

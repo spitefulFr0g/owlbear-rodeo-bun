@@ -53,7 +53,7 @@ function AuthModal({ isOpen, onSubmit, waitUntil }: AuthModalProps) {
   }
 
   return (
-    <Modal isOpen={isOpen} allowClose={false} onAfterOpen={focusInput}>
+    <Modal contentLabel="Room password" isOpen={isOpen} allowClose={false} onAfterOpen={focusInput}>
       <Box as="form" onSubmit={handleSubmit}>
         <Label py={2} htmlFor="password">
           Enter password

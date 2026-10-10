@@ -102,6 +102,7 @@ function Party({ gameId, roomSettings, onTrustChange }: PartyProps) {
       bg="background"
       sx={{
         position: "relative",
+        flexShrink: 0,
       }}
     >
       <Box
