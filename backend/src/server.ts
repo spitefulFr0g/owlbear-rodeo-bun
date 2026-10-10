@@ -1,6 +1,9 @@
+import { roomDeletion } from "./rooms/deleteRoom";
+import AdministratorController from "./controllers/AdministratorController";
 import AttemptLimiter from "./AttemptLimiter";
 import cors from "cors";
 import RoomController from "./controllers/RoomController";
+import PasswordController from "./controllers/PasswordController";
 import InviteController from "./controllers/InviteController";
 import Accounts from "./accounts/Accounts";
 import { setupLock } from "./accounts/setupLock";
@@ -36,6 +39,7 @@ export interface ServerOptions {
   allowOrigin: RegExp | null;
   clock: Clock;
   reopenSetup?: boolean;
+  behindProxy?: boolean;
   databaseUpgrades?: readonly UpgradeStep[];
 }
 
@@ -66,6 +70,7 @@ export async function startServer(options: ServerOptions): Promise<RunningServer
   const joinTokens = new JoinTokens();
 
   const app: Application = express();
+  app.set("behindProxy", options.behindProxy ?? false);
   const server = new AppServer(app, port);
 
   const io = new Server({
@@ -101,7 +106,7 @@ export async function startServer(options: ServerOptions): Promise<RunningServer
 
   const controllers: Array<Controller> = [
     new HealthcheckController(),
-    new AssetController(assetStore, joinTokens, MAX_ASSET_BYTES),
+    new AssetController(assetStore, joinTokens, MAX_ASSET_BYTES, database),
   ];
 
   server.loadMiddleware(globalMiddleware);
@@ -116,9 +121,11 @@ export async function startServer(options: ServerOptions): Promise<RunningServer
   app.options("*", (_req, res) => res.sendStatus(204));
   app.use("/api", new SetupController(accounts).setRoutes());
   app.use("/api", new SignInController(accounts, attempts).setRoutes());
-  const game = new GameServer(io, joinTokens, database, options.clock, attempts);
-  app.use("/api", new RoomController(accounts, database, game.gameRepo, (id, name) => io.to(id).emit("room_state", { name })).setRoutes());
+  const game = new GameServer(io, joinTokens, database, options.clock, attempts, options.behindProxy, accounts);
+  app.use("/api", new RoomController(accounts, database, game.gameRepo, (id, name) => io.to(id).emit("room_state", { name }), roomDeletion(assetStore, game.gameRepo, io), async () => await assetStore.diskSizeBytes() + database.diskSizeBytes()).setRoutes());
   app.use("/api", new InviteController(accounts).setRoutes());
+  app.use("/api", new PasswordController(accounts).setRoutes());
+  app.use("/api", new AdministratorController(accounts, game.gameRepo).setRoutes());
   server.loadControllers(controllers);
   server.loadMiddleware([frontendHandler(frontendAssets)]);
 

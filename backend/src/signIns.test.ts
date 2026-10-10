@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { signIn, setupAdministrator, startTestServer } from "./testing/serverHelpers";
+import { createRoom, signIn, setupAdministrator, startTestServer } from "./testing/serverHelpers";
 
 function signInRequest(address: string, username: unknown, password: unknown) {
   return fetch(`${address}/api/sign-in`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ username, password }) });
@@ -139,6 +139,7 @@ test("sign-in and sign-out keep the setup lock and origin check", async () => {
       expect((await refused.json() as { error: string }).error).toBe("origin_not_allowed");
     }
     expect(await (await status(server.address, cookie)).json()).toEqual({ setup: "closed", account });
-    await server.joinRoom("anonymous-room");
+    const room = await createRoom(server, cookie, "Anonymous room");
+    await server.joinRoom(room.id);
   } finally { await server.dispose(); }
 });

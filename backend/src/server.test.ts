@@ -3,15 +3,16 @@ import { createHash } from "crypto";
 import { mkdir, mkdtemp, rm, writeFile, stat } from "fs/promises";
 import { join } from "path";
 import { expect, test } from "bun:test";
-import { setupAdministrator, startTestServer } from "./testing/serverHelpers";
+import { createRoom, setupAdministrator, startTestServer } from "./testing/serverHelpers";
 
 const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 1, 2, 3, 4]);
 
 test("an image uploaded with a room connection survives a server restart", async () => {
   const server = await startTestServer();
   try {
-    await setupAdministrator(server);
-    const { token } = await server.joinRoom("room");
+    const { cookie } = await setupAdministrator(server);
+    const room = await createRoom(server, cookie, "Room");
+    const { token } = await server.joinRoom(room.id);
     const uploaded = await fetch(`${server.address}/assets/image`, {
       method: "PUT", body: png,
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "image/png",
@@ -20,7 +21,7 @@ test("an image uploaded with a room connection survives a server restart", async
     expect(uploaded.status).toBe(201);
     await uploaded.text();
     await server.restart();
-    const rejoined = await server.joinRoom("room");
+    const rejoined = await server.joinRoom(room.id);
     const downloaded = await fetch(`${server.address}/assets/image`, {
       headers: { Authorization: `Bearer ${rejoined.token}` },
     });
@@ -33,11 +34,13 @@ test("two servers keep room passwords, join tokens and images separate", async (
   const first = await startTestServer();
   const second = await startTestServer();
   try {
-    await setupAdministrator(first);
-    await setupAdministrator(second);
+    const firstAccount = await setupAdministrator(first);
+    const firstRoom = await createRoom(first, firstAccount.cookie, "Same room", "first-password");
+    const secondAccount = await setupAdministrator(second);
+    const secondRoom = await createRoom(second, secondAccount.cookie, "Same room", "second-password");
     expect(first.address).not.toBe(second.address);
-    const a = await first.joinRoom("same-room", "first-password");
-    const b = await second.joinRoom("same-room", "second-password");
+    const a = await first.joinRoom(firstRoom.id, "first-password");
+    const b = await second.joinRoom(secondRoom.id, "second-password");
     const response = await fetch(`${first.address}/assets/separate`, {
       method: "PUT", body: png,
       headers: { Authorization: `Bearer ${a.token}`, "Content-Type": "image/png",
@@ -61,8 +64,9 @@ test("two servers keep room passwords, join tokens and images separate", async (
 test("stopping the server disconnects room clients and releases its listener", async () => {
   const server = await startTestServer();
   try {
-    await setupAdministrator(server);
-    const { socket } = await server.joinRoom("room");
+    const { cookie } = await setupAdministrator(server);
+    const room = await createRoom(server, cookie, "Room");
+    const { socket } = await server.joinRoom(room.id);
     const disconnected = new Promise<string>((resolve) => socket.once("disconnect", resolve));
     await server.stop();
     await disconnected;
@@ -100,9 +104,10 @@ test("every v0.1.0 image remains downloadable and old records are never read aga
     await legacyAsset(dir, "old-b", new Uint8Array([5, 6, 7]));
   });
   try {
-    await setupAdministrator(server);
+    const { cookie } = await setupAdministrator(server);
+    const room = await createRoom(server, cookie, "Room");
     const check = async () => {
-      const { token } = await server.joinRoom("another-room");
+      const { token } = await server.joinRoom(room.id);
       for (const [id, body] of [["old-a", png], ["old-b", new Uint8Array([5, 6, 7])]] as const) {
         const response = await fetch(`${server.address}/assets/${id}`, { headers: { Authorization: `Bearer ${token}` } });
         expect(response.status).toBe(200);
@@ -117,7 +122,7 @@ test("every v0.1.0 image remains downloadable and old records are never read aga
     await legacyAsset(dir, "late-record");
     await server.restart();
     await check();
-    const { token } = await server.joinRoom("third-room");
+    const { token } = await server.joinRoom((await createRoom(server, cookie, "Third room")).id);
     const late = await fetch(`${server.address}/assets/late-record`, { headers: { Authorization: `Bearer ${token}` } });
     expect(late.status).toBe(404);
     await late.text();
@@ -137,8 +142,9 @@ test("a failed legacy read-in is retried in full on the next start", async () =>
     await legacyAsset(dir, "zz-last");
     const server = await startTestServer(undefined, dir);
     try {
-      await setupAdministrator(server);
-      const { token } = await server.joinRoom("room");
+      const { cookie } = await setupAdministrator(server);
+      const room = await createRoom(server, cookie, "Room");
+      const { token } = await server.joinRoom(room.id);
       for (const [id, body] of [["aa-first", new Uint8Array([9, 8])], ["zz-last", png]] as const) {
         const response = await fetch(`${server.address}/assets/${id}`, { headers: { Authorization: `Bearer ${token}` } });
         expect(response.status).toBe(200);

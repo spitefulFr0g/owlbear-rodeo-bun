@@ -15,6 +15,8 @@ export interface Account {
 const UNKNOWN_PASSWORD_HASH = "$2b$10$Y0Lpwb.O8hQl95PBTsjx6u4vkMkcws1/I4A4eB51H6UqIXfFoZh4S";
 
 export default class Accounts {
+  private readonly signInWatchers = new Map<string, Set<() => void>>();
+
   constructor(private readonly database: OwlbearDatabase, private readonly clock: Clock, private reopenSetup = false) {}
 
   setupState(): "required" | "open" | "closed" {
@@ -61,18 +63,63 @@ export default class Accounts {
     if (!row) return null;
     if (this.clock.now() - row.lastUsedAt >= SIGN_IN_LIFETIME_MS) {
       this.database.connection.query("DELETE FROM sign_ins WHERE tokenHash = ?").run(hash);
+      this.notifySignIn(hash);
       return null;
     }
     if (this.clock.now() - row.lastUsedAt >= 60 * 60 * 1000) {
       this.database.connection.query("UPDATE sign_ins SET lastUsedAt = ? WHERE tokenHash = ?").run(this.clock.now(), hash);
       refreshCookie?.(token);
+      this.notifySignIn(hash);
     }
     return { id: row.id, username: row.username, administrator: !!row.administrator };
   }
 
   signOut(request: Pick<IncomingMessage, "headers">): void {
     const token = this.signInToken(request);
-    if (token) this.database.connection.query("DELETE FROM sign_ins WHERE tokenHash = ?").run(this.tokenHash(token));
+    if (token) {
+      const hash = this.tokenHash(token);
+      this.database.connection.query("DELETE FROM sign_ins WHERE tokenHash = ?").run(hash);
+      this.notifySignIn(hash);
+    }
+  }
+
+  // Watch the original handshake sign-in without extending its lifetime.
+  watchSignIn(request: Pick<IncomingMessage, "headers">, ended: () => void): () => void {
+    const token = this.signInToken(request);
+    if (!token) return () => {};
+    const hash = this.tokenHash(token);
+    let cancel = () => {};
+    const check = () => {
+      cancel();
+      const row = this.database.connection.query<{ lastUsedAt: number }, [string]>("SELECT lastUsedAt FROM sign_ins WHERE tokenHash = ?").get(hash);
+      if (!row || this.clock.now() - row.lastUsedAt >= SIGN_IN_LIFETIME_MS) {
+        this.database.connection.query("DELETE FROM sign_ins WHERE tokenHash = ?").run(hash);
+        ended();
+        return;
+      }
+      cancel = this.clock.after(row.lastUsedAt + SIGN_IN_LIFETIME_MS - this.clock.now(), check);
+    };
+    const watchers = this.signInWatchers.get(hash) ?? new Set<() => void>();
+    watchers.add(check);
+    this.signInWatchers.set(hash, watchers);
+    check();
+    return () => {
+      cancel();
+      watchers.delete(check);
+      if (!watchers.size) this.signInWatchers.delete(hash);
+    };
+  }
+
+  private endSignIns(accountId: string, exceptHash?: string): void {
+    const rows = this.database.connection.query<{ tokenHash: string }, [string, string]>(
+      "SELECT tokenHash FROM sign_ins WHERE accountId = ? AND tokenHash != ?"
+    ).all(accountId, exceptHash ?? "");
+    this.database.connection.query("DELETE FROM sign_ins WHERE accountId = ? AND tokenHash != ?").run(accountId, exceptHash ?? "");
+    for (const row of rows) this.notifySignIn(row.tokenHash);
+  }
+
+  private notifySignIn(hash: string): void {
+    for (const check of [...this.signInWatchers.get(hash) ?? []]) check();
   }
 
   private signInToken(request: Pick<IncomingMessage, "headers">): string | undefined {
@@ -115,6 +162,77 @@ export default class Accounts {
       const signInToken = randomBytes(32).toString("hex");
       this.database.connection.query("INSERT INTO sign_ins (tokenHash, accountId, createdAt, lastUsedAt) VALUES (?, ?, ?, ?)").run(this.tokenHash(signInToken), account.id, this.clock.now(), this.clock.now());
       return { account, token: signInToken };
+    });
+  }
+
+  createResetLink(accountId: string): { token: string; expiresAt: number } | null {
+    if (!this.database.connection.query("SELECT 1 FROM accounts WHERE id = ?").get(accountId)) return null;
+    const token = randomBytes(32).toString("hex");
+    const expiresAt = this.clock.now() + 7 * 24 * 60 * 60 * 1000;
+    this.database.connection.query("INSERT INTO resets (tokenHash, accountId, expiresAt) VALUES (?, ?, ?)").run(this.tokenHash(token), accountId, expiresAt);
+    return { token, expiresAt };
+  }
+
+  resetAccount(token: string): Account | null {
+    const row = this.database.connection.query<{ id: string; username: string; administrator: number }, [string, number]>(
+      "SELECT accounts.id, username, administrator FROM resets JOIN accounts ON accounts.id = resets.accountId WHERE tokenHash = ? AND expiresAt > ?"
+    ).get(this.tokenHash(token), this.clock.now());
+    return row ? { ...row, administrator: !!row.administrator } : null;
+  }
+
+  async acceptReset(token: string, password: unknown) {
+    if (!this.resetAccount(token)) return { error: "link_invalid" } as const;
+    if (typeof password !== "string" || password.length < 8) return { error: "password_too_short" } as const;
+    const passwordHash = await new Auth().createPasswordHash(password);
+    return this.database.transaction(() => {
+      const account = this.resetAccount(token);
+      if (!account) return { error: "link_invalid" } as const;
+      this.database.connection.query("UPDATE accounts SET passwordHash = ? WHERE id = ?").run(passwordHash, account.id);
+      this.database.connection.query("DELETE FROM resets WHERE tokenHash = ?").run(this.tokenHash(token));
+      this.endSignIns(account.id);
+      const signInToken = randomBytes(32).toString("hex");
+      this.database.connection.query("INSERT INTO sign_ins (tokenHash, accountId, createdAt, lastUsedAt) VALUES (?, ?, ?, ?)").run(this.tokenHash(signInToken), account.id, this.clock.now(), this.clock.now());
+      return { account, token: signInToken };
+    });
+  }
+
+  async changePassword(request: Pick<IncomingMessage, "headers">, currentPassword: unknown, newPassword: unknown) {
+    const account = this.resolveAccount(request);
+    if (!account) return { error: "not_signed_in" } as const;
+    const row = this.database.connection.query<{ passwordHash: string }, [string]>("SELECT passwordHash FROM accounts WHERE id = ?").get(account.id);
+    if (!row || typeof currentPassword !== "string" || !await new Auth().checkPassword(currentPassword, row.passwordHash)) return { error: "wrong_password" } as const;
+    if (typeof newPassword !== "string" || newPassword.length < 8) return { error: "password_too_short" } as const;
+    const passwordHash = await new Auth().createPasswordHash(newPassword);
+    return this.database.transaction(() => {
+      // Password hashing yields: a reset or another change may have ended this sign-in meanwhile.
+      if (!this.resolveAccount(request)) return { error: "not_signed_in" } as const;
+      const changed = this.database.connection.query("UPDATE accounts SET passwordHash = ? WHERE id = ? AND passwordHash = ?").run(passwordHash, account.id, row.passwordHash);
+      if (!changed.changes) return { error: "wrong_password" } as const;
+      this.endSignIns(account.id, this.tokenHash(this.signInToken(request)!));
+      return {};
+    });
+  }
+
+  setAdministrator(id: string, administrator: boolean) {
+    return this.database.transaction(() => {
+      const account = this.list().find(account => account.id === id);
+      if (!account) return { error: "account_not_found" } as const;
+      if (account.administrator && !administrator && this.list().filter(account => account.administrator).length === 1) return { error: "last_administrator" } as const;
+      this.database.connection.query("UPDATE accounts SET administrator = ? WHERE id = ?").run(Number(administrator), id);
+      return { account: { ...account, administrator } };
+    });
+  }
+
+  removeAccount(id: string, callerId: string) {
+    return this.database.transaction(() => {
+      const account = this.list().find(account => account.id === id);
+      if (!account) return { error: "account_not_found" } as const;
+      if (id === callerId) return { error: "cannot_remove_self" } as const;
+      if (account.administrator && this.list().filter(account => account.administrator).length === 1) return { error: "last_administrator" } as const;
+      this.database.connection.query("UPDATE rooms SET gmAccountId = ? WHERE gmAccountId = ?").run(callerId, id);
+      this.endSignIns(id);
+      this.database.connection.query("DELETE FROM accounts WHERE id = ?").run(id);
+      return { removed: true } as const;
     });
   }
 

@@ -13,7 +13,7 @@ export default class GameRepository {
   private readonly pending = new globalThis.Map<string, { since: number; cancel: () => void }>();
 
   constructor(private readonly database?: OwlbearDatabase, private readonly clock?: Clock) {
-    this.games = {};
+    this.games = Object.create(null);
   }
 
   setGameCreation(gameId: string, hash: string): void {
@@ -55,6 +55,12 @@ export default class GameRepository {
       displayToken: game.displayToken, documentVersion: 1, document: JSON.stringify(game.state) });
     this.pending.get(gameId)?.cancel();
     this.pending.delete(gameId);
+  }
+
+  forgetRoom(roomId: string): void {
+    this.pending.get(roomId)?.cancel();
+    this.pending.delete(roomId);
+    delete this.games[roomId];
   }
 
   flush(): void {

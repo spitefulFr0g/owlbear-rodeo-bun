@@ -63,28 +63,32 @@ export async function startTestServer(prepare?: (dataDir: string) => Promise<voi
     throw error;
   }
   const sockets = new Set<Socket>();
-  const connect = () => {
-    const socket = io(server.address, { parser: msgParser, transports: ["websocket"], reconnection: false });
+  const connect = (cookie?: string) => {
+    const socket = io(server.address, { parser: msgParser, transports: ["websocket"], reconnection: false, extraHeaders: cookie ? { Cookie: cookie } : undefined });
     sockets.add(socket);
     return socket;
+  };
+  // Both helpers join rooms already created through POST /api/rooms.
+  const joinConnection = async (roomId: string, credential: string, event: "join_game" | "join_display", cookie?: string) => {
+    const socket = connect(cookie);
+    const map = nextMessage(socket, "map");
+    const mapState = nextMessage(socket, "map_state");
+    const manifest = nextMessage(socket, "manifest");
+    const party = nextMessage(socket, "party_state");
+    const joined = nextMessage(socket, event === "join_game" ? "joined_game" : "joined_display");
+    const frozen = nextMessage(socket, "display_frozen");
+    socket.emit(event, roomId, credential);
+    const [[, token, info], [displayFrozen]] = await Promise.all([joined, frozen]);
+    const [[savedMap], [savedState], [savedManifest], [partyState]] = await Promise.all([map, mapState, manifest, party]);
+    return { socket, info, token: token as string, state: { map: savedMap, mapState: savedState, manifest: savedManifest, partyState }, displayFrozen };
   };
   return {
     clock,
     connect,
     get address() { return server.address; },
-    async joinRoom(roomId: string, password = "") {
-      const socket = connect();
-      const map = nextMessage(socket, "map");
-      const mapState = nextMessage(socket, "map_state");
-      const manifest = nextMessage(socket, "manifest");
-      const party = nextMessage(socket, "party_state");
-      const joined = nextMessage(socket, "joined_game");
-      const frozen = nextMessage(socket, "display_frozen");
-      socket.emit("join_game", roomId, password);
-      const [[, token], [displayFrozen]] = await Promise.all([joined, frozen]);
-      const [[savedMap], [savedState], [savedManifest], [partyState]] = await Promise.all([map, mapState, manifest, party]);
-      return { socket, token: token as string, state: { map: savedMap, mapState: savedState, manifest: savedManifest, partyState }, displayFrozen };
-    },
+    joinRoom: (roomId: string, password = "") => joinConnection(roomId, password, "join_game"),
+    joinRoomAsGM: (roomId: string, cookie: string) => joinConnection(roomId, "", "join_game", cookie),
+    joinDisplay: (roomId: string, displayToken: string) => joinConnection(roomId, displayToken, "join_display"),
     // Capture durable files without invoking the clean-stop flush. The tests
     // recover this copy through a second whole server, never through SQLite.
     async durableCopy() {
@@ -94,7 +98,7 @@ export async function startTestServer(prepare?: (dataDir: string) => Promise<voi
       });
     },
     stop: () => server.stop(),
-    async restart(overrides: { reopenSetup?: boolean } = {}) {
+    async restart(overrides: { reopenSetup?: boolean; behindProxy?: boolean } = {}) {
       await server.stop();
       for (const socket of sockets) socket.disconnect();
       sockets.clear();

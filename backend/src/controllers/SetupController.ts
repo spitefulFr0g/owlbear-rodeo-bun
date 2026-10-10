@@ -22,7 +22,7 @@ export default class SetupController extends Controller {
   ];
 
   private status(req: Request, res: Response): void {
-    res.json({ setup: this.accounts.setupState(), account: this.accounts.resolveAccount(req, token => res.cookie("owlbear_sign_in", token, lastingSignInCookieOptions)) });
+    res.json({ setup: this.accounts.setupState(), account: this.accounts.resolveAccount(req, token => res.cookie("owlbear_sign_in", token, lastingSignInCookieOptions(req))) });
   }
 
   private async setup(req: Request, res: Response): Promise<void> {
@@ -53,7 +53,7 @@ export default class SetupController extends Controller {
       return;
     }
     console.log(`Administrator created: ${result.account.username}`);
-    res.cookie("owlbear_sign_in", result.token, lastingSignInCookieOptions);
+    res.cookie("owlbear_sign_in", result.token, lastingSignInCookieOptions(req));
     res.status(201).json({ account: result.account });
   }
 }

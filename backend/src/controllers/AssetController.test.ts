@@ -1,7 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { io } from "socket.io-client";
-import msgParser from "socket.io-msgpack-parser";
-import { nextMessage, setupAdministrator, startTestServer } from "../testing/serverHelpers";
+import { createRoom, setupAdministrator, startTestServer } from "../testing/serverHelpers";
 
 const MAX_BYTES = 64 * 1024 * 1024;
 const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 1, 2, 3, 4]);
@@ -9,12 +7,16 @@ const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 1, 2, 3, 4]);
 let server: Awaited<ReturnType<typeof startTestServer>>;
 let baseUrl: string;
 let token: string;
+let gmCookie: string;
+let roomId: string;
 
 beforeAll(async () => {
   server = await startTestServer();
-  await setupAdministrator(server);
+  const { cookie } = await setupAdministrator(server);
+  gmCookie = cookie;
+  roomId = (await createRoom(server, cookie, "Assets")).id;
   baseUrl = server.address;
-  token = (await server.joinRoom("game-1")).token;
+  token = (await server.joinRoom(roomId)).token;
 });
 
 afterAll(async () => {
@@ -87,14 +89,11 @@ describe("asset routes", () => {
   describe("auth", () => {
     test("cast display tokens allow downloads but refuse uploads", async () => {
       await upload("display-download");
-      const owner = await server.joinRoom("game-1");
+      const owner = await server.joinRoomAsGM(roomId, gmCookie);
       owner.socket.emit("player_state", { userId: "gm" });
       owner.socket.emit("map", { id: "map", owner: "gm" });
       const link = await new Promise<string>(resolve => owner.socket.emit("get_display_token", resolve));
-      const display = io(baseUrl, { parser: msgParser, transports: ["websocket"], reconnection: false });
-      const joined = nextMessage(display, "joined_display");
-      display.emit("join_display", "game-1", link);
-      const [, displayToken] = await joined;
+      const { socket: display, token: displayToken } = await server.joinDisplay(roomId, link);
       const authorization = `Bearer ${displayToken}`;
       const response = await download("display-download", "GET", authorization);
       expect(response.status).toBe(200);
@@ -134,7 +133,7 @@ describe("asset routes", () => {
 
     test("reject a token after its socket has left", async () => {
       await upload("revoked");
-      const connection = await server.joinRoom("game-1");
+      const connection = await server.joinRoom(roomId);
       const leaving = connection.token;
       expect((await download("revoked", "GET", `Bearer ${leaving}`)).status).toBe(200);
       connection.socket.disconnect();

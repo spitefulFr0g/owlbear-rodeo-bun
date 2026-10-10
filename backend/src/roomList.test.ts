@@ -12,7 +12,7 @@ test("an account creates named rooms with server links and lists them by name", 
     const response = await request(server, "POST", undefined, cookie, { name: "  Zebra  " });
     expect(response.status).toBe(201);
     const { room } = await response.json() as any;
-    expect(room).toEqual({ id: expect.stringMatching(/^[A-Za-z0-9]{16}$/), name: "Zebra", hasPassword: false });
+    expect(room).toEqual({ id: expect.stringMatching(/^[A-Za-z0-9]{16}$/), name: "Zebra", hasPassword: false, sizeBytes: 2 });
     const second = await request(server, "POST", undefined, cookie, { name: "Alpha", password: "secret" });
     const { room: alpha } = await second.json() as any;
     expect(alpha.id).not.toBe(room.id);
@@ -46,10 +46,10 @@ test("joining carries the name and renaming reaches players and cast displays wi
   try {
     const { cookie } = await setupAdministrator(server);
     const room = await createRoom(server, cookie, "Before");
-    const player = server.connect();
+    const player = server.connect(cookie);
     const joined = nextMessage(player, "joined_game");
     player.emit("join_game", room.id, "");
-    expect((await joined)[2]).toEqual({ room: { name: "Before" } });
+    expect((await joined)[2]).toEqual({ role: "gm", room: { name: "Before" } });
     const peer = await server.joinRoom(room.id);
     const party = nextMessage(peer.socket, "party_state");
     player.emit("player_state", { userId: "gm" });
@@ -65,9 +65,9 @@ test("joining carries the name and renaming reaches players and cast displays wi
     const notifications = [player, peer.socket, display].map(socket => nextMessage(socket, "room_state"));
     const response = await request(server, "PATCH", `/api/rooms/${room.id}`, cookie, { name: "  After  " });
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ room: { ...room, name: "After" } });
+    expect(await response.json()).toEqual({ room: { ...room, name: "After", sizeBytes: 33 } });
     for (const notification of notifications) expect(await notification).toEqual([{ name: "After" }]);
-    expect(await (await request(server, "GET", undefined, cookie)).json()).toEqual({ rooms: [{ ...room, name: "After" }] });
+    expect(await (await request(server, "GET", undefined, cookie)).json()).toEqual({ rooms: [{ ...room, name: "After", sizeBytes: 33 }] });
     await server.joinRoom(room.id);
   } finally { await server.dispose(); }
 });
@@ -99,35 +99,35 @@ test("renamed rooms keep their GM, name, document and link across restart and im
   try {
     const { cookie } = await setupAdministrator(server);
     const room = await createRoom(server, cookie, "Before");
-    const player = await server.joinRoom(room.id);
+    const player = await server.joinRoomAsGM(room.id, cookie);
     player.socket.emit("map", { id: "saved", owner: "gm" });
     const peer = await server.joinRoom(room.id);
     expect(peer.state.map).toEqual({ id: "saved", owner: "gm" });
     expect((await request(server, "PATCH", `/api/rooms/${room.id}`, cookie, { name: "After" })).status).toBe(200);
     const copy = await server.durableCopy();
     try {
-      expect(await (await request(copy, "GET", undefined, cookie)).json()).toEqual({ rooms: [{ ...room, name: "After" }] });
+      expect(await (await request(copy, "GET", undefined, cookie)).json()).toEqual({ rooms: [{ ...room, name: "After", sizeBytes: 35 }] });
       expect((await copy.joinRoom(room.id)).state.map).toEqual({ id: "saved", owner: "gm" });
     } finally { await copy.dispose(); }
     await server.restart();
-    expect(await (await request(server, "GET", undefined, cookie)).json()).toEqual({ rooms: [{ ...room, name: "After" }] });
+    expect(await (await request(server, "GET", undefined, cookie)).json()).toEqual({ rooms: [{ ...room, name: "After", sizeBytes: 35 }] });
     expect((await request(server, "PATCH", `/api/rooms/${room.id}`, cookie, { name: "Again" })).status).toBe(200);
     expect((await server.joinRoom(room.id)).state.map).toEqual({ id: "saved", owner: "gm" });
   } finally { await server.dispose(); }
 });
 
-test("unknown joined rooms have no GM or list entry and invalid renames change nothing", async () => {
+test("unknown rooms cannot be joined or renamed and invalid renames change nothing", async () => {
   const server = await startTestServer();
   try {
     const { cookie } = await setupAdministrator(server);
     const socket = server.connect();
-    const joined = nextMessage(socket, "joined_game");
+    const refused = nextMessage(socket, "room_not_found");
     socket.emit("join_game", "legacy-room", "");
-    expect((await joined)[2]).toEqual({ room: { name: "" } });
+    expect(await refused).toEqual([]);
     expect(await (await request(server, "GET", undefined, cookie)).json()).toEqual({ rooms: [] });
     const forbidden = await request(server, "PATCH", "/api/rooms/legacy-room", cookie, { name: "Stolen" });
-    expect(forbidden.status).toBe(403);
-    expect(await forbidden.json()).toMatchObject({ error: "not_room_gm" });
+    expect(forbidden.status).toBe(404);
+    expect(await forbidden.json()).toMatchObject({ error: "room_not_found" });
     const missing = await request(server, "PATCH", "/api/rooms/unknown", cookie, { name: "Missing" });
     expect(missing.status).toBe(404);
     expect(await missing.json()).toMatchObject({ error: "room_not_found" });
@@ -140,9 +140,9 @@ test("unknown joined rooms have no GM or list entry and invalid renames change n
     expect(await (await request(server, "GET", undefined, cookie)).json()).toEqual({ rooms: [room] });
     await server.restart();
     const rejoined = server.connect();
-    const info = nextMessage(rejoined, "joined_game");
+    const info = nextMessage(rejoined, "room_not_found");
     rejoined.emit("join_game", "legacy-room", "");
-    expect((await info)[2]).toEqual({ room: { name: "" } });
+    expect(await info).toEqual([]);
   } finally { await server.dispose(); }
 });
 
