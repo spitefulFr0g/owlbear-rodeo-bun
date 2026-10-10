@@ -16,7 +16,7 @@ beforeAll(async () => {
   gmCookie = cookie;
   roomId = (await createRoom(server, cookie, "Assets")).id;
   baseUrl = server.address;
-  token = (await server.joinRoom(roomId)).token;
+  token = (await server.joinRoomAsGM(roomId, cookie)).token;
 });
 
 afterAll(async () => {

@@ -32,7 +32,7 @@ test("administrators see every room and actual database and image bytes includin
     const other = await inviteAccount(server, administrator.cookie, "Other", "test-password");
     const first = await createRoom(server, other.cookie, "Alpha");
     const second = await createRoom(server, administrator.cookie, "Beta");
-    const uploader = await server.joinRoom(first.id);
+    const uploader = await server.joinRoomAsGM(first.id, other.cookie);
     const reader = await server.joinRoom(second.id);
     for (const id of ["shared", "same-bytes"]) {
       const response = await fetch(`${server.address}/assets/${id}`, { method: "PUT", headers: imageHeaders(uploader.token), body: "12345678" });
@@ -71,7 +71,7 @@ test("an administrator deletes another GM's room with notifications, disconnecti
     const other = await inviteAccount(server, administrator.cookie, "Other", "test-password");
     const room = await createRoom(server, other.cookie, "Other room");
     const survivor = await createRoom(server, other.cookie, "Survivor");
-    const writer = await server.joinRoom(room.id);
+    const writer = await server.joinRoomAsGM(room.id, other.cookie);
     const reader = await server.joinRoom(survivor.id);
     for (const id of ["exclusive", "shared"]) {
       const uploaded = await fetch(`${server.address}/assets/${id}`, { method: "PUT", headers: imageHeaders(writer.token), body: id });

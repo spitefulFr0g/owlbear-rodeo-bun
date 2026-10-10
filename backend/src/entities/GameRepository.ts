@@ -29,7 +29,7 @@ export default class GameRepository {
       if (!record) return false;
       const game = new Game(gameId, record.passwordHash, record.displayToken);
       game.name = record.name;
-      if (record.switches) game.switches = JSON.parse(record.switches);
+      if (record.switches) game.switches = { ...game.switches, ...JSON.parse(record.switches) };
       game.gmAccountId = record.gmAccountId;
       game.hasPassword = !!record.hasPassword;
       if (record.documentVersion === 1) game.state = JSON.parse(record.document);

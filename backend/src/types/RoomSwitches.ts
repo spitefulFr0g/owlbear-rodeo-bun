@@ -3,4 +3,5 @@ export type RoomSwitches = {
   drawing: boolean;
   notes: boolean;
   fog: boolean;
+  uploads: boolean;
 };

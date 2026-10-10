@@ -29,8 +29,8 @@ for (const method of ["PUT", "HEAD", "GET"] as const) {
       const { cookie } = await setupAdministrator(server);
       const first = await createRoom(server, cookie, "First");
       const second = await createRoom(server, cookie, "Second");
-      const uploader = await server.joinRoom(first.id);
-      const reader = await server.joinRoom(second.id);
+      const uploader = await server.joinRoomAsGM(first.id, cookie);
+      const reader = await server.joinRoomAsGM(second.id, cookie);
       const upload = await fetch(`${server.address}/assets/image`, { method: "PUT", headers: imageHeaders(uploader.token), body: "12345678" });
       expect(upload.status).toBe(201);
       await upload.text();

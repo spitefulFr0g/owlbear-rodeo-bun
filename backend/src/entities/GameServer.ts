@@ -12,7 +12,7 @@ import { DisplayView } from "../types/DisplayView";
 import GameRepository from "./GameRepository";
 import GameState from "./GameState";
 import JoinTokens from "./JoinTokens";
-import { Update } from "../helpers/diff";
+import { applyChanges, Update } from "../helpers/diff";
 import { Map } from "../types/Map";
 import { MapState } from "../types/MapState";
 import { PlayerState } from "../types/PlayerState";
@@ -30,6 +30,20 @@ export default class GameServer {
     this.io = io;
     this.joinTokens = joinTokens;
     this.gameRepo = new GameRepository(database, clock);
+    joinTokens.uploadAllowed = (gameId, socketId) => {
+      const socket = io.sockets.sockets.get(socketId);
+      const game = this.gameRepo.games[gameId];
+      return !!socket && !!game && !socket.data.castDisplay &&
+        (socket.data.role === "gm" || (socket.data.role === "player" && game.switches.uploads));
+    };
+  }
+
+  private allowsManifest(socket: Socket, gameId: string, manifest: Manifest): boolean {
+    if (socket.data.role === "gm" || this.gameRepo.games[gameId].switches.uploads) return true;
+    const current = this.gameRepo.getState(gameId, "manifest") as Manifest | undefined;
+    // Built-in images do not enter the manifest; compare stored image ids, not aliases.
+    const used = new Set(Object.values(current?.assets ?? {}).map(asset => asset.id));
+    return Object.values(manifest?.assets ?? {}).every(asset => used.has(asset.id));
   }
 
   public flush(): void { this.gameRepo.flush(); }
@@ -369,6 +383,10 @@ export default class GameServer {
             }
           }
 
+          if (!this.allowsManifest(socket, gameId, manifest)) {
+            socket.emit("manifest", this.gameRepo.getState(gameId, "manifest"));
+            return;
+          }
           this.gameRepo.setState(gameId, "manifest", manifest);
           const state = this.gameRepo.getState(gameId, "manifest");
           socket.broadcast.to(gameId).emit("manifest", state);
@@ -392,6 +410,15 @@ export default class GameServer {
             }
           }
 
+          const current = this.gameRepo.getState(gameId, "manifest") as Manifest;
+          if (current && update.id === current.mapId) {
+            const proposed = structuredClone(current);
+            applyChanges(proposed, update.changes);
+            if (!this.allowsManifest(socket, gameId, proposed)) {
+              socket.emit("manifest", current);
+              return;
+            }
+          }
           if (await gameState.updateState(gameId, "manifest", update)) {
             socket.to(gameId).emit("manifest_update", update);
           }

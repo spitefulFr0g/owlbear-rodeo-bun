@@ -9,7 +9,7 @@ import { Map } from "../types/Map";
 
 export default class Game {
   name = "";
-  switches: RoomSwitches = { tokens: true, drawing: true, notes: true, fog: false };
+  switches: RoomSwitches = { tokens: true, drawing: true, notes: true, fog: false, uploads: false };
   gmAccountId: string | null = null;
   hasPassword = false;
   displayFrozen = false;
