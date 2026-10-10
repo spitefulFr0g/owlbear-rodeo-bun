@@ -2,7 +2,7 @@ import { OwlbearDatabase } from "../database";
 import { Clock, realClock } from "../clock";
 import { createHash, randomUUID } from "crypto";
 import { readFileSync, readdirSync, createReadStream, createWriteStream } from "fs";
-import { mkdir, rename, rm, stat } from "fs/promises";
+import { mkdir, readdir, rename, rm, stat } from "fs/promises";
 import { dirname, join } from "path";
 import { Readable } from "stream";
 import { pipeline } from "stream/promises";
@@ -201,6 +201,16 @@ export class FsAssetStore implements AssetStore {
         if (!this.database.hasHash(hash)) await rm(this.blobPath(hash), { force: true });
       }
     });
+  }
+
+  async diskSizeBytes(): Promise<number> {
+    const measure = async (path: string): Promise<number> => {
+      const info = await stat(path);
+      if (info.isFile()) return info.size;
+      const sizes = await Promise.all((await readdir(path)).map(name => measure(join(path, name))));
+      return sizes.reduce((total, size) => total + size, 0);
+    };
+    return this.exclusive(() => measure(this.blobsDir));
   }
 
   private importLegacyRecords(): void {

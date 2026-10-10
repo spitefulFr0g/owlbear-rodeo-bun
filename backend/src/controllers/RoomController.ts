@@ -4,6 +4,7 @@ import Accounts from "../accounts/Accounts";
 import { lastingSignInCookieOptions } from "../accounts/signInCookie";
 import { OwlbearDatabase } from "../database";
 import GameRepository from "../entities/GameRepository";
+import { requireAdministrator } from "../accounts/requireAdministrator";
 import Auth from "../entities/Auth";
 
 const roomName: RequestHandler = (req, res, next) => {
@@ -21,10 +22,20 @@ const roomName: RequestHandler = (req, res, next) => {
 export interface Room { id: string; name: string; hasPassword: boolean; sizeBytes: number }
 
 export default class RoomController {
-  constructor(private readonly accounts: Accounts, private readonly database: OwlbearDatabase, private readonly rooms: GameRepository, private readonly renamed: (id: string, name: string) => void, private readonly deleteRoom: (id: string) => Promise<void>) {}
+  constructor(private readonly accounts: Accounts, private readonly database: OwlbearDatabase, private readonly rooms: GameRepository, private readonly renamed: (id: string, name: string) => void, private readonly deleteRoom: (id: string) => Promise<void>, private readonly totalBytes: () => Promise<number>) {}
 
   setRoutes(): Router {
     const router = Router();
+    router.get("/admin/rooms", requireAdministrator(this.accounts), async (_req, res, next) => {
+      try {
+        const rooms = this.database.administratorRooms().map(room => ({
+          id: room.id, name: room.name, hasPassword: !!room.hasPassword,
+          sizeBytes: this.database.roomSizeBytes(room.id),
+          gm: { id: room.gmAccountId, username: room.gmUsername },
+        }));
+        res.json({ rooms, totalBytes: await this.totalBytes() });
+      } catch (error) { next(error); }
+    });
     router.use("/rooms", (req, res, next) => {
       const account = this.accounts.resolveAccount(req, token => res.cookie("owlbear_sign_in", token, lastingSignInCookieOptions(req)));
       if (!account) {
@@ -75,8 +86,8 @@ export default class RoomController {
         res.status(404).json({ error: "room_not_found", message: "That room does not exist." });
         return;
       }
-      if (this.rooms.games[req.params.id].gmAccountId !== res.locals.account.id) {
-        res.status(403).json({ error: "not_room_gm", message: "Only the room's GM can delete it." });
+      if (this.rooms.games[req.params.id].gmAccountId !== res.locals.account.id && !res.locals.account.administrator) {
+        res.status(403).json({ error: "not_room_gm", message: "Only the room's GM or an administrator can delete it." });
         return;
       }
       try {
