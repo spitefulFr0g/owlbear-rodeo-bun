@@ -32,6 +32,8 @@ class Session extends EventEmitter {
    * the epoch. Set while it refuses them after too many wrong ones.
    */
   authWaitUntil?: number;
+  /** The server checked the last password sent and refused it */
+  passwordRefused = false;
 
   /**
    * What the server last said about the room we have joined
@@ -193,12 +195,14 @@ class Session extends EventEmitter {
   }
 
   _handleAuthError() {
+    this.passwordRefused = true;
     this.emit("status", "auth");
   }
 
   // Too many wrong passwords, even the right one is refused for a while
   _handleAuthWait(retryAfterSeconds: number) {
     this.authWaitUntil = Date.now() + retryAfterSeconds * 1000;
+    this.passwordRefused = false;
     this.emit("status", "auth");
   }
 

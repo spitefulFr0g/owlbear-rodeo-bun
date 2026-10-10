@@ -27,13 +27,13 @@ test("room switches default, reject players and malformed changes, broadcast and
     const messages = [gm, player, display].map(peer => nextMessage(peer.socket, "room_state"));
     expect(await change(gm.socket, { tokens: false, fog: true, uploads: true })).toEqual({ ok: true });
     const switches = { ...defaults, tokens: false, fog: true, uploads: true };
-    for (const message of await Promise.all(messages)) expect(message[0]).toEqual({ name: "Table", switches, session: true });
+    for (const message of await Promise.all(messages)) expect(message[0]).toEqual({ name: "Table", switches, session: true, hasPassword: false });
     const renamed = nextMessage(player.socket, "room_state");
     await fetch(`${server.address}/api/rooms/${room.id}`, { method: "PATCH", headers: { Cookie: cookie, "Content-Type": "application/json" }, body: JSON.stringify({ name: "Renamed" }) });
-    expect((await renamed)[0]).toEqual({ name: "Renamed", switches, session: true });
+    expect((await renamed)[0]).toEqual({ name: "Renamed", switches, session: true, hasPassword: false });
     await server.clock.advance(3000);
     await server.restart();
-    expect((await server.joinRoom(room.id)).info.room).toEqual({ name: "Renamed", switches, session: false });
+    expect((await server.joinRoom(room.id)).info.room).toEqual({ name: "Renamed", switches, session: false, hasPassword: false });
   } finally { await server.dispose(); }
 }, 15000);
 

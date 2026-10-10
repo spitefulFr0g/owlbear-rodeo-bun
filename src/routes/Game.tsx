@@ -43,6 +43,7 @@ function Game() {
   const [session] = useState(new Session());
   const [sessionStatus, setSessionStatus] = useState<SessionStatus>();
   const [authWaitUntil, setAuthWaitUntil] = useState<number>();
+  const [passwordRefused, setPasswordRefused] = useState(false);
 
   useEffect(() => {
     if (sessionStatus === "signed_out") {
@@ -58,6 +59,7 @@ function Game() {
     function handleStatus(status: SessionStatus) {
       setSessionStatus(status);
       setAuthWaitUntil(session.authWaitUntil);
+      setPasswordRefused(session.passwordRefused);
     }
 
     session.on("status", handleStatus);
@@ -165,6 +167,7 @@ function Game() {
                       <AuthModal
                         isOpen={sessionStatus === "auth"}
                         waitUntil={authWaitUntil}
+                        refused={passwordRefused}
                         onSubmit={handleAuthSubmit}
                       />
                       <GameExpiredModal

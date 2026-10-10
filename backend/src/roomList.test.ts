@@ -49,7 +49,7 @@ test("joining carries the name and renaming reaches players and cast displays wi
     const player = server.connect(cookie);
     const joined = nextMessage(player, "joined_game");
     player.emit("join_game", room.id, "");
-    expect((await joined)[2]).toEqual({ role: "gm", color: "blue", room: { name: "Before", session: false, switches: { tokens: true, drawing: true, notes: true, fog: false, uploads: false } } });
+    expect((await joined)[2]).toEqual({ role: "gm", color: "blue", room: { name: "Before", session: false, hasPassword: false, switches: { tokens: true, drawing: true, notes: true, fog: false, uploads: false } } });
     await new Promise(resolve => player.emit("session", true, resolve));
     const peer = await server.joinRoom(room.id);
     const party = nextMessage(peer.socket, "party_state");
@@ -62,12 +62,12 @@ test("joining carries the name and renaming reaches players and cast displays wi
     const display = server.connect();
     const displayJoined = nextMessage(display, "joined_display");
     display.emit("join_display", room.id, displayToken);
-    expect((await displayJoined)[2]).toEqual({ room: { name: "Before", session: true, switches: { tokens: true, drawing: true, notes: true, fog: false, uploads: false } } });
+    expect((await displayJoined)[2]).toEqual({ room: { name: "Before", session: true, hasPassword: false, switches: { tokens: true, drawing: true, notes: true, fog: false, uploads: false } } });
     const notifications = [player, peer.socket, display].map(socket => nextMessage(socket, "room_state"));
     const response = await request(server, "PATCH", `/api/rooms/${room.id}`, cookie, { name: "  After  " });
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ room: { ...room, name: "After", sizeBytes: 33 } });
-    for (const notification of notifications) expect(await notification).toEqual([{ name: "After", session: true, switches: { tokens: true, drawing: true, notes: true, fog: false, uploads: false } }]);
+    for (const notification of notifications) expect(await notification).toEqual([{ name: "After", session: true, hasPassword: false, switches: { tokens: true, drawing: true, notes: true, fog: false, uploads: false } }]);
     expect(await (await request(server, "GET", undefined, cookie)).json()).toEqual({ rooms: [{ ...room, name: "After", sizeBytes: 33 }] });
     await server.joinRoom(room.id);
   } finally { await server.dispose(); }

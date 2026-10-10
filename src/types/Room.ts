@@ -18,6 +18,8 @@ export type RoomState = {
   switches?: RoomSwitches;
   /** Whether a session is running */
   session?: boolean;
+  /** Whether players need a password to join */
+  hasPassword?: boolean;
 };
 
 /** What the server tells a connection about its own join */

@@ -1,6 +1,6 @@
 import { Box, Button, Flex, IconButton, Text } from "theme-ui";
 import prettyBytes from "pretty-bytes";
-import { useHistory } from "react-router-dom";
+import { Link } from "react-router-dom";
 
 import AddPartyMemberIcon from "../../icons/AddPartyMemberIcon";
 import ChangeNicknameIcon from "../../icons/ChangeNicknameIcon";
@@ -18,8 +18,6 @@ type RoomRowProps = {
 
 /** One of the account's rooms in its room list */
 function RoomRow({ room, onInvite, onRename, onDelete }: RoomRowProps) {
-  const history = useHistory();
-
   return (
     <Flex
       as="li"
@@ -91,12 +89,14 @@ function RoomRow({ room, onInvite, onRename, onDelete }: RoomRowProps) {
       >
         <RemoveMapIcon />
       </IconButton>
+      {/* A link, so the room also opens in a new tab */}
       <Button
+        as={Link}
+        {...{ to: `/game/${room.id}` }}
         ml={2}
         py={1}
         sx={{ flexShrink: 0 }}
         aria-label={`Open ${room.name}`}
-        onClick={() => history.push(`/game/${room.id}`)}
       >
         Open
       </Button>

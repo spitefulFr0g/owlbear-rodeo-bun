@@ -374,6 +374,7 @@ export default class GameServer {
         game.passwordHash = hash;
         game.hasPassword = password !== null && password !== "";
         this.gameRepo.save(gameId);
+        this.io.to(gameId).emit("room_state", this.gameRepo.roomState(gameId));
         if (typeof answer === "function") answer({ ok: true });
       });
 
