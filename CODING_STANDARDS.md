@@ -10,8 +10,6 @@ decide lives in the checks (`.githooks/pre-commit`, `.github/workflows/`).
   it with `fetch` and the socket client, the way a browser does. It opens no
   database and calls no module inside the server.
 - **Time rules are tested by moving the test clock**, with no wall-clock wait.
-  The test clock hides what the runtime's own timers do, so a change to a
-  timer is also run through `bun run smoke`.
 - **One executable.** The server stays a single `bun build --compile` file for
   Linux and Windows, so a new dependency has no native part. SQLite is
   `bun:sqlite`.
