@@ -30,6 +30,7 @@ export default class GameRepository {
       const game = new Game(gameId, record.passwordHash, record.displayToken);
       game.name = record.name;
       if (record.switches) game.switches = { ...game.switches, ...JSON.parse(record.switches) };
+      game.trustedPlayerIds = new Set(JSON.parse(record.trustedPlayerIds ?? "[]"));
       game.gmAccountId = record.gmAccountId;
       game.hasPassword = !!record.hasPassword;
       if (record.documentVersion === 1) game.state = JSON.parse(record.document);
@@ -53,6 +54,7 @@ export default class GameRepository {
     const game = this.games[gameId];
     this.database?.saveRoom({ id: game.gameId, passwordHash: game.passwordHash,
       name: game.name, gmAccountId: game.gmAccountId, hasPassword: Number(game.hasPassword),
+      trustedPlayerIds: JSON.stringify([...game.trustedPlayerIds]),
       switches: JSON.stringify(game.switches), displayToken: game.displayToken, documentVersion: 1, document: JSON.stringify(game.state) });
     this.pending.get(gameId)?.cancel();
     this.pending.delete(gameId);
