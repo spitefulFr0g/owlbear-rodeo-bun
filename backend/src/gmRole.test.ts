@@ -11,7 +11,7 @@ test("the room's signed-in GM joins on every device without the room password", 
       const joined = nextMessage(socket, "joined_game");
       socket.emit("join_game", room.id, "");
       const result = await joined;
-      expect(result[2]).toEqual({ role: "gm", room: { name: "Table" } });
+      expect(result[2]).toEqual({ role: "gm", room: { name: "Table", switches: { tokens: true, drawing: true, notes: true, fog: false } } });
     }
   } finally { await server.dispose(); }
 });
