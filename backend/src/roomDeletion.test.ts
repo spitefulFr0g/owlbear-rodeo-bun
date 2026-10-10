@@ -40,7 +40,7 @@ test("deleting a room tells every player and cast display before disconnecting a
   try {
     const { cookie } = await setupAdministrator(server);
     const room = await createRoom(server, cookie, "Room");
-    const writer = await server.joinRoom(room.id);
+    const writer = await server.joinRoomAsGM(room.id, cookie);
     const player = await server.joinRoom(room.id);
     const party = nextMessage(player.socket, "party_state");
     writer.socket.emit("player_state", { userId: "gm" });

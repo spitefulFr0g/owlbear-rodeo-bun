@@ -1,3 +1,4 @@
+import Accounts from "../accounts/Accounts";
 import { clientAddress } from "../clientRequest";
 import AttemptLimiter from "../AttemptLimiter";
 import { realClock, Clock } from "../clock";
@@ -23,7 +24,7 @@ export default class GameServer {
   private readonly attempts: AttemptLimiter;
   private readonly joinTokens: JoinTokens;
 
-  constructor(io: IOServer, joinTokens: JoinTokens, database?: OwlbearDatabase, clock?: Clock, attempts?: AttemptLimiter, private readonly behindProxy = false) {
+  constructor(io: IOServer, joinTokens: JoinTokens, database?: OwlbearDatabase, clock?: Clock, attempts?: AttemptLimiter, private readonly behindProxy = false, private readonly accounts?: Accounts) {
     this.attempts = attempts ?? new AttemptLimiter(clock ?? realClock);
     this.io = io;
     this.joinTokens = joinTokens;
@@ -41,13 +42,28 @@ export default class GameServer {
       const gameState = new GameState(this.io, socket, this.gameRepo);
       let _gameId: string;
       let joining = false;
+      const account = this.accounts?.resolveAccount(socket.request);
+      if (account && this.accounts) {
+        const unwatch = this.accounts.watchSignIn(socket.request, () => {
+          socket.emit("signed_out");
+          // Send the namespace disconnect in order after any queued state.
+          socket.disconnect();
+        });
+        socket.once("disconnect", unwatch);
+      }
 
       // Cast displays may only request read access. New write events are
       // refused here too, before any handler can change or forward state.
       socket.use(([event], next) => {
         if (
           socket.data.castDisplay && event !== "get_display_token" && event !== "join_display"
-        ) return;
+        ) {
+          const gameId = gameState.getGameId();
+          if (gameId && (event === "map" || event === "map_state")) {
+            socket.emit(event, this.gameRepo.getState(gameId, event === "map" ? "map" : "mapState"));
+          }
+          return;
+        }
         next();
       });
 
@@ -133,9 +149,10 @@ export default class GameServer {
             socket.emit("room_not_found");
             return;
           }
+          const role = account?.id === this.gameRepo.games[gameId].gmAccountId ? "gm" : "player";
           const keys = [`room:id:${gameId}`, `room:address:${clientAddress(socket.request, this.behindProxy, socket.handshake.address)}`];
           const retryAfterSeconds = this.attempts.retryAfterSeconds(keys);
-          if (retryAfterSeconds) {
+          if (role !== "gm" && retryAfterSeconds) {
             socket.emit("auth_wait", retryAfterSeconds);
             return;
           }
@@ -144,22 +161,24 @@ export default class GameServer {
           // A browser sends the last password it used, which a room made
           // without one must not refuse
           const open = game.gmAccountId !== null && !game.hasPassword;
-          if (!open && !await auth.checkPassword(password, hash)) {
+          if (role !== "gm" && !open && !await auth.checkPassword(password, hash)) {
             // Opening a room's link sends no password; only a guess is counted
             if (password !== "") this.attempts.wrong(keys);
             socket.emit("auth_error");
             return;
           }
+          if (!socket.connected) return;
           // The room may have been deleted while its password was checked.
           if (!this.gameRepo.isGameCreated(gameId)) {
             socket.emit("room_not_found");
             return;
           }
+          socket.data.role = role;
           await gameState.joinGame(gameId);
           _gameId = gameId;
           // Only the player who joined gets the token for the asset routes
-          const token = this.joinTokens.issue(socket.id, gameId);
-          socket.emit("joined_game", socket.id, token, { room: { name: this.gameRepo.games[gameId].name } });
+          const token = this.joinTokens.issue(socket.id, gameId, role);
+          socket.emit("joined_game", socket.id, token, { role, room: { name: this.gameRepo.games[gameId].name } });
           socket.emit("display_frozen", this.gameRepo.games[gameId].displayFrozen);
           socket.to(gameId).emit("joined_game", socket.id);
         } catch (error) {
@@ -227,6 +246,10 @@ export default class GameServer {
             }
           }
 
+          if (socket.data.role !== "gm") {
+            socket.emit("map", this.gameRepo.getState(gameId, "map"));
+            return;
+          }
           const game = this.gameRepo.games[gameId];
           const previousMap = game.getState("map") as Map | undefined;
           if (previousMap?.id !== map?.id) {
@@ -260,6 +283,10 @@ export default class GameServer {
             }
           }
 
+          if (socket.data.role !== "gm") {
+            socket.emit("map_state", this.gameRepo.getState(gameId, "mapState"));
+            return;
+          }
           this.gameRepo.setState(gameId, "mapState", mapState);
           const state = this.gameRepo.getState(gameId, "mapState");
           socket.broadcast.to(gameId).emit("map_state", state);
@@ -306,7 +333,7 @@ export default class GameServer {
             }
           }
 
-          this.gameRepo.setPlayerState(gameId, playerState, socket.id);
+          this.gameRepo.setPlayerState(gameId, { ...playerState, role: socket.data.role }, socket.id);
           await gameState.broadcastPlayerState(gameId, socket, "party_state");
         } catch (error) {
           console.error("PLAYER_STATE_ERROR", error);

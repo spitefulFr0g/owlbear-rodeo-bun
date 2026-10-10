@@ -7,11 +7,13 @@ const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 1, 2, 3, 4]);
 let server: Awaited<ReturnType<typeof startTestServer>>;
 let baseUrl: string;
 let token: string;
+let gmCookie: string;
 let roomId: string;
 
 beforeAll(async () => {
   server = await startTestServer();
   const { cookie } = await setupAdministrator(server);
+  gmCookie = cookie;
   roomId = (await createRoom(server, cookie, "Assets")).id;
   baseUrl = server.address;
   token = (await server.joinRoom(roomId)).token;
@@ -87,7 +89,7 @@ describe("asset routes", () => {
   describe("auth", () => {
     test("cast display tokens allow downloads but refuse uploads", async () => {
       await upload("display-download");
-      const owner = await server.joinRoom(roomId);
+      const owner = await server.joinRoomAsGM(roomId, gmCookie);
       owner.socket.emit("player_state", { userId: "gm" });
       owner.socket.emit("map", { id: "map", owner: "gm" });
       const link = await new Promise<string>(resolve => owner.socket.emit("get_display_token", resolve));

@@ -7,11 +7,11 @@ async function startRoomServer() {
   const room = await createRoom(server, cookie, "Room");
   const second = await createRoom(server, cookie, "Second room");
   const protectedRoom = await createRoom(server, cookie, "Protected", "secret");
-  return Object.assign(server, { roomId: room.id, secondRoomId: second.id, protectedRoomId: protectedRoom.id });
+  return Object.assign(server, { cookie, roomId: room.id, secondRoomId: second.id, protectedRoomId: protectedRoom.id });
 }
 
 async function change(server: Awaited<ReturnType<typeof startRoomServer>>, room = server.roomId) {
-  const owner = await server.joinRoom(room);
+  const owner = await server.joinRoomAsGM(room, server.cookie);
   const observer = await server.joinRoom(room);
   const map = { id: "map-one", owner: "gm", type: "file", file: "image" };
   const state = { mapId: "map-one", tokens: { hero: { x: 12, y: 34 } },
