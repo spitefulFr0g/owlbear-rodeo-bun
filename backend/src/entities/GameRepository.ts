@@ -61,6 +61,7 @@ export default class GameRepository {
   }
 
   forgetRoom(roomId: string): void {
+    this.games[roomId]?.cancelSessionCountdown?.();
     this.pending.get(roomId)?.cancel();
     this.pending.delete(roomId);
     delete this.games[roomId];
