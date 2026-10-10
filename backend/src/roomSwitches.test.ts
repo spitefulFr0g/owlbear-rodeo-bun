@@ -96,3 +96,42 @@ test("each placed-state kind requires its room switch while GM changes bypass al
     expect(restored.state.mapState.unknown).toBe(true);
   } finally { await server.dispose(); }
 }, 15000);
+
+test("player updates cannot traverse object prototypes through a permitted tool", async () => {
+  const server = await startTestServer();
+  try {
+    const { cookie } = await setupAdministrator(server);
+    const room = await createRoom(server, cookie, "Table");
+    const gm = await server.joinRoomAsGM(room.id, cookie);
+    await new Promise(resolve => gm.socket.emit("session", true, resolve));
+    const player = await server.joinRoom(room.id);
+    const state = { mapId: "map", tokens: {}, drawings: {}, notes: {}, fogs: {} };
+    const saved = nextMessage(player.socket, "map_state");
+    gm.socket.emit("map_state", state);
+    await saved;
+    // Deleting a nonexistent inherited field proves the traversal without
+    // polluting the test process when this regression runs against old code.
+    for (const path of [["tokens", "__proto__", "reviewMissing"], ["tokens", "constructor", "prototype", "reviewMissing"]]) {
+      const refused = nextMessage(player.socket, "map_state");
+      player.socket.emit("map_state_update", { id: "map", changes: [{ kind: "D", path }] });
+      expect((await refused)[0]).toEqual(state);
+    }
+    const nested = nextMessage(player.socket, "map_state");
+    player.socket.emit("map_state_update", { id: "map", changes: [
+      { kind: "N", path: ["tokens", "partial"], rhs: true },
+      { kind: "A", path: ["tokens"], index: "__proto__", item: { kind: "D", path: ["reviewMissing"] } },
+    ] });
+    expect((await nested)[0]).toEqual(state);
+    const manifest = { mapId: "map", assets: {} };
+    const manifestSaved = nextMessage(player.socket, "manifest");
+    gm.socket.emit("manifest", manifest);
+    await manifestSaved;
+    await new Promise(resolve => gm.socket.emit("room_switches", { uploads: true }, resolve));
+    const manifestRefused = nextMessage(player.socket, "manifest");
+    player.socket.emit("manifest_update", { id: "map", changes: [
+      { kind: "N", path: ["assets", "partial"], rhs: { id: "partial", owner: "player" } },
+      { kind: "D", path: ["assets", "__proto__", "reviewMissing"] },
+    ] });
+    expect((await manifestRefused)[0]).toEqual(manifest);
+  } finally { await server.dispose(); }
+}, 15000);
