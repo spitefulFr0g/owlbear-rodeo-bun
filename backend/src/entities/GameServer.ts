@@ -13,7 +13,7 @@ import { DisplayView } from "../types/DisplayView";
 import GameRepository from "./GameRepository";
 import GameState from "./GameState";
 import JoinTokens from "./JoinTokens";
-import { applyChanges, Update } from "../helpers/diff";
+import { applyChanges, isSafeUpdate, Update } from "../helpers/diff";
 import { Map } from "../types/Map";
 import { MapState } from "../types/MapState";
 import { PlayerState } from "../types/PlayerState";
@@ -481,9 +481,9 @@ export default class GameServer {
             }
           }
 
-          if (socket.data.role !== "gm" && !allowsLegacyMapStateUpdateV1(update, this.playerRole(socket, gameId) === "trusted"
+          if (!isSafeUpdate(update) || (socket.data.role !== "gm" && !allowsLegacyMapStateUpdateV1(update, this.playerRole(socket, gameId) === "trusted"
             ? { tokens: true, drawing: true, notes: true, fog: true, uploads: true }
-            : this.gameRepo.games[gameId].switches)) {
+            : this.gameRepo.games[gameId].switches))) {
             socket.emit("map_state", this.gameRepo.getState(gameId, "mapState"));
             return;
           }
@@ -561,6 +561,10 @@ export default class GameServer {
           }
 
           const current = this.gameRepo.getState(gameId, "manifest") as Manifest;
+          if (!isSafeUpdate(update)) {
+            socket.emit("manifest", current);
+            return;
+          }
           if (current && update.id === current.mapId) {
             const proposed = structuredClone(current);
             applyChanges(proposed, update.changes);

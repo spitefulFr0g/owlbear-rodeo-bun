@@ -200,6 +200,7 @@ test("HTTP use renews a socket's sign-in and lapse follows the renewed deadline"
     const room = await createRoom(server, cookie, "Table");
     const gm = await server.joinRoomAsGM(room.id, cookie);
     const day = 24 * 60 * 60 * 1000;
+    expect(server.clock.maximumScheduledDelay).toBeLessThanOrEqual(2147483647);
     await server.clock.advance(29 * day);
     expect((await fetch(`${server.address}/api/rooms`, { headers: { Cookie: cookie } })).status).toBe(200);
     await server.clock.advance(day);

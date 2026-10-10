@@ -97,7 +97,8 @@ export default class Accounts {
         ended();
         return;
       }
-      cancel = this.clock.after(row.lastUsedAt + SIGN_IN_LIFETIME_MS - this.clock.now(), check);
+      // Runtime timers accept at most a signed 32-bit delay; 30 days exceeds it.
+      cancel = this.clock.after(Math.min(2147483647, row.lastUsedAt + SIGN_IN_LIFETIME_MS - this.clock.now()), check);
     };
     const watchers = this.signInWatchers.get(hash) ?? new Set<() => void>();
     watchers.add(check);

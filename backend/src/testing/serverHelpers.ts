@@ -7,6 +7,7 @@ import { Clock } from "../clock";
 import { RunningServer, startServer } from "../server";
 
 export class TestClock implements Clock {
+  maximumScheduledDelay = 0;
   private time: number;
   private tasks = new Map<number, { at: number; task: () => void | Promise<void> }>();
   private nextId = 0;
@@ -14,6 +15,7 @@ export class TestClock implements Clock {
   constructor(time = Date.UTC(2026, 0, 1)) { this.time = time; }
   now() { return this.time; }
   after(delayMs: number, task: () => void | Promise<void>) {
+    this.maximumScheduledDelay = Math.max(this.maximumScheduledDelay, delayMs);
     const id = this.nextId++;
     this.tasks.set(id, { at: this.time + Math.max(0, delayMs), task });
     return () => { this.tasks.delete(id); };
