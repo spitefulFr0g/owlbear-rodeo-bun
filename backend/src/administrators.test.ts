@@ -85,7 +85,9 @@ test("removing an account ends every HTTP sign-in and passes loaded and unloaded
     expect((await request(server.address, "rooms", "GET", other.cookie)).status).toBe(401);
     const rejoined = await server.joinRoom(loaded.id, "room-password");
     expect(rejoined.state.mapState).toEqual(state);
-    expect(await new Promise<string>(resolve => rejoined.socket.emit("get_display_token", resolve))).toBe(displayToken);
+    expect(await new Promise<string | null>(resolve => rejoined.socket.emit("get_display_token", resolve))).toBeNull();
+    const newGM = await server.joinRoomAsGM(loaded.id, admin.cookie);
+    expect(await new Promise<string>(resolve => newGM.socket.emit("get_display_token", resolve))).toBe(displayToken);
     const image = await fetch(`${server.address}/assets/image`, { headers: { Authorization: `Bearer ${rejoined.token}` } });
     expect(new Uint8Array(await image.arrayBuffer())).toEqual(png);
     expect((await (await request(server.address, "admin/accounts", "GET", admin.cookie)).json() as any).accounts).toEqual([admin.account]);
