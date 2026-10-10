@@ -61,6 +61,13 @@ function NetworkedParty({ gameId, session }: NetworkedPartyProps) {
   return (
     <Party
       gameId={gameId}
+      onTrustChange={(playerId, trusted) => {
+        session.socket?.emit("room_trust", playerId, trusted, (result: { ok: boolean }) => {
+          if (!result.ok) {
+            addToast("The trusted mark could not be changed.", { appearance: "error" });
+          }
+        });
+      }}
       roomSettings={<RoomSettingsButton session={session} />}
     />
   );

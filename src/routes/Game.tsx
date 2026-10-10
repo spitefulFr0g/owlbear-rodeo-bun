@@ -15,6 +15,7 @@ import GameExpiredModal from "../modals/GameExpiredModal";
 import ForceUpdateModal from "../modals/ForceUpdateModal";
 import MaintenanceModal from "../modals/MaintenanceModal";
 
+import { useUserId } from "../contexts/UserIdContext";
 import { useAuth } from "../contexts/AuthContext";
 import { useServerStatus } from "../contexts/ServerStatusContext";
 import { MapStageProvider } from "../contexts/MapStageContext";
@@ -35,6 +36,7 @@ import Session, { SessionStatus } from "../network/Session";
 function Game() {
   const { id: gameId }: { id: string } = useParams();
   const { password } = useAuth();
+  const userId = useUserId();
   const { refresh } = useServerStatus();
   const { databaseStatus } = useDatabase();
 
@@ -82,15 +84,16 @@ function Game() {
   useEffect(() => {
     if (
       sessionStatus === "ready" &&
+      !!userId &&
       (databaseStatus === "loaded" || databaseStatus === "disabled")
     ) {
-      session.joinGame(gameId, password);
+      session.joinGame(gameId, password, userId);
     }
-  }, [gameId, password, databaseStatus, session, sessionStatus]);
+  }, [gameId, password, userId, databaseStatus, session, sessionStatus]);
 
   function handleAuthSubmit(newPassword: string) {
     if (databaseStatus === "loaded" || databaseStatus === "disabled") {
-      session.joinGame(gameId, newPassword);
+      session.joinGame(gameId, newPassword, userId);
     }
   }
 

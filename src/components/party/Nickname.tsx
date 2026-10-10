@@ -22,17 +22,13 @@ function Nickname({ nickname, diceRolls, role }: NicknameProps) {
         }}
       >
         {nickname}
-        {role === "gm" && (
-          <Text
-            as="span"
-            variant="caption"
-            ml={1}
-            title="The GM, who runs this room"
-            sx={{ color: "primary", fontWeight: "bold" }}
-          >
-            GM
-          </Text>
-        )}
+        <Text
+          as="span"
+          variant="caption"
+          sx={{ display: "block", color: role === "gm" ? "primary" : "text" }}
+        >
+          {role === "gm" ? "GM" : role === "trusted" ? "Trusted player" : "Player"}
+        </Text>
       </Text>
       {diceRolls && <DiceRolls rolls={diceRolls} />}
     </Flex>
