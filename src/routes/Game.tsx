@@ -109,6 +109,14 @@ function Game() {
   // the ref will be assigned in the MapInteraction component
   const mapStageRef = useRef<Konva.Stage | null>(null);
 
+  if (sessionStatus === "room_deleted") {
+    return (
+      <RoomNotice title="Room deleted">
+        The room was deleted. Ask your GM for a link to another room.
+      </RoomNotice>
+    );
+  }
+
   if (sessionStatus === "room_not_found") {
     return (
       <RoomNotice title="Room not found">

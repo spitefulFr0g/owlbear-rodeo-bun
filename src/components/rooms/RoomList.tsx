@@ -6,6 +6,7 @@ import RoomRow from "./RoomRow";
 import FormError from "../account/FormError";
 import LoadingOverlay from "../LoadingOverlay";
 
+import DeleteRoomModal from "../../modals/DeleteRoomModal";
 import RoomNameModal from "../../modals/RoomNameModal";
 
 import { copyText } from "../../helpers/clipboard";
@@ -14,6 +15,7 @@ import {
   ApiError,
   Room,
   createRoom,
+  deleteRoom,
   listRooms,
   renameRoom,
 } from "../../network/api";
@@ -50,6 +52,15 @@ function RoomList() {
 
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [renamingRoom, setRenamingRoom] = useState<Room>();
+
+  const [deletingRoom, setDeletingRoom] = useState<Room>();
+
+  async function handleDelete() {
+    if (!deletingRoom) return;
+    await deleteRoom(deletingRoom.id);
+    setDeletingRoom(undefined);
+    await load();
+  }
 
   async function handleCreate(name: string, password: string) {
     const room = await createRoom(name, password);
@@ -116,10 +127,16 @@ function RoomList() {
               room={room}
               onInvite={handleInvite}
               onRename={setRenamingRoom}
+              onDelete={setDeletingRoom}
             />
           ))}
         </Box>
       )}
+      <DeleteRoomModal
+        room={deletingRoom}
+        onRequestClose={() => setDeletingRoom(undefined)}
+        onConfirm={handleDelete}
+      />
       <RoomNameModal
         isOpen={isCreateModalOpen}
         onRequestClose={() => setIsCreateModalOpen(false)}
