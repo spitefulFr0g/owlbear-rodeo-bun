@@ -86,9 +86,9 @@ export default class Accounts {
   // Watch the original handshake sign-in without extending its lifetime.
   watchSignIn(request: Pick<IncomingMessage, "headers">, ended: () => void): () => void {
     const token = this.signInToken(request);
-    if (!token) return () => {};
+    if (!token) return () => undefined;
     const hash = this.tokenHash(token);
-    let cancel = () => {};
+    let cancel: () => void = () => undefined;
     const check = () => {
       cancel();
       const row = this.database.connection.query<{ lastUsedAt: number }, [string]>("SELECT lastUsedAt FROM sign_ins WHERE tokenHash = ?").get(hash);

@@ -12,7 +12,7 @@ The backend serves an embedded copy of the frontend's `build/`. `start`,
 `dev`, `test` and `typecheck` embed whatever `build/` holds at that moment,
 so an interface change shows in the running app only after
 `bun run build:frontend` in `backend/`. That build runs in Docker and takes
-about a minute.
+one to ten minutes, the long end when it installs dependencies first.
 
 ## Worktrees
 
@@ -30,6 +30,11 @@ prints only on failure. A fresh clone turns it on with
 `git config core.hooksPath .githooks`; worktrees share that setting.
 
 Tests hash passwords at the lowest bcrypt cost (`backend/scripts/test-setup.ts`).
+
+Tests run on a test clock, so they never run the runtime's own timers.
+`bun run smoke` in `backend/` does: it starts the real server, joins a room as
+the GM, restarts, and fails on anything unexpected on stderr. Give it a
+compiled executable to check a release: `bun scripts/smoke.ts dist/<file>`.
 
 ## Seeing it in a browser
 

@@ -15,3 +15,7 @@ Single-context: `GLOSSARY.md` at the root and ADRs in `docs/adr/`. See `docs/age
 ### Dev environment
 
 Building the frontend, working in a worktree, the pre-commit checks, running the app. See `docs/agents/dev-environment.md`.
+
+### Coding standards
+
+The rules a review enforces. See `CODING_STANDARDS.md`.
