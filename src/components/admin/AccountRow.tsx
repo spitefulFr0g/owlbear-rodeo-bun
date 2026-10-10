@@ -18,13 +18,23 @@ function AccountRow({ account, isSelf, children }: AccountRowProps) {
       py={2}
       sx={{
         alignItems: "center",
+        flexWrap: "wrap",
+        gap: 2,
         minHeight: "48px",
         borderBottomStyle: "solid",
         borderBottomWidth: "1px",
         borderBottomColor: "border",
       }}
     >
-      <Flex sx={{ flexGrow: 1, minWidth: 0, alignItems: "baseline" }} mr={2}>
+      <Flex
+        sx={{
+          flexGrow: 1,
+          minWidth: 0,
+          flexWrap: "wrap",
+          alignItems: "baseline",
+        }}
+        mr={2}
+      >
         <Text
           as="span"
           variant="heading"

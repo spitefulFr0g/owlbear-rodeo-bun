@@ -194,3 +194,24 @@ export function changePassword(currentPassword: string, newPassword: string) {
     newPassword,
   });
 }
+
+export type AdministratorRoom = Room & { gm: { id: string; username: string } };
+
+export function listAdministratorRooms() {
+  return request<{ rooms: AdministratorRoom[]; totalBytes: number }>(
+    "GET",
+    "/admin/rooms"
+  );
+}
+
+export function setAdministrator(id: string, administrator: boolean) {
+  return request<{ account: Account }>(
+    "POST",
+    `/admin/accounts/${encodeURIComponent(id)}/administrator`,
+    { administrator }
+  );
+}
+
+export function removeAccount(id: string) {
+  return request<void>("DELETE", `/admin/accounts/${encodeURIComponent(id)}`);
+}

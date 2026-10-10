@@ -1,3 +1,5 @@
+import { useEffect, useState } from "react";
+import AdministratorRoomList from "../components/admin/AdministratorRoomList";
 import { Flex, Text } from "theme-ui";
 
 import SignedInPage from "../components/account/SignedInPage";
@@ -10,7 +12,17 @@ import SignIn from "./SignIn";
 
 /** Where an administrator looks after the server's accounts */
 function Admin() {
-  const { account } = useServerStatus();
+  const [revision, setRevision] = useState(0);
+  const { account, refresh } = useServerStatus();
+
+  useEffect(() => {
+    refresh();
+    const onFocus = () => {
+      refresh();
+    };
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, [refresh]);
 
   if (!account) {
     return <SignIn />;
@@ -34,7 +46,16 @@ function Admin() {
         </Link>
       </Flex>
       {account.administrator ? (
-        <AccountList self={account} />
+        <>
+          <AccountList
+            self={account}
+            onChanged={async () => {
+              await refresh();
+              setRevision((value) => value + 1);
+            }}
+          />
+          <AdministratorRoomList revision={revision} />
+        </>
       ) : (
         <Text as="p" variant="body2" my={4} sx={{ textAlign: "center" }}>
           Only an administrator of this server can open this page.
