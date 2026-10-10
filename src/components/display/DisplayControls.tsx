@@ -70,10 +70,12 @@ function DisplayControls({ session }: DisplayControlsProps) {
     }
     request();
     session.on("status", handleStatus);
+    session.on("displayToken", setDisplayToken);
     return () => {
       active = false;
       clearTimeout(retry);
       session.off("status", handleStatus);
+      session.off("displayToken", setDisplayToken);
     };
   }, [isGM, session]);
 
@@ -98,21 +100,37 @@ function DisplayControls({ session }: DisplayControlsProps) {
     displayToken &&
     `${window.location.origin}/display/${gameId}#${displayToken}`;
 
-  function handlePopout() {
-    if (!displayLink) {
-      return;
-    }
-    const popout = window.open(
-      displayLink,
-      `display-${gameId}`,
-      "popup,width=1280,height=720"
-    );
-    if (!popout) {
-      addToast("Unable to open the display, allow popups for this page");
+  async function currentDisplayLink() {
+    if (!session.socket?.connected) return null;
+    try {
+      const token = await new Promise<string | null>((resolve, reject) => {
+        session.socket?.timeout(5000).emit("get_display_token", (error: Error | null, token: string | null) => {
+          if (error) reject(error);
+          else resolve(token);
+        });
+      });
+      setDisplayToken(token);
+      return token && `${window.location.origin}/display/${gameId}#${token}`;
+    } catch {
+      addToast("The room did not answer. Please try again.");
+      return null;
     }
   }
 
+  async function handlePopout() {
+    // Open during the click so popup blockers allow it, then load the current link.
+    const popout = window.open("about:blank", `display-${gameId}`, "popup,width=1280,height=720");
+    if (!popout) {
+      addToast("Unable to open the display, allow popups for this page");
+      return;
+    }
+    const link = await currentDisplayLink();
+    if (link) popout.location.href = link;
+    else popout.close();
+  }
+
   async function handleCopy() {
+    const displayLink = await currentDisplayLink();
     if (!displayLink) {
       return;
     }

@@ -148,7 +148,10 @@ class Session extends EventEmitter {
 
   // The display link was refused
   _handleDisplayError() {
+    this._left = true;
+    this.joinToken = undefined;
     this.emit("status", "display_error");
+    this.socket?.disconnect();
   }
 
   // Sent when anyone joins the game, the token only comes with our own join
@@ -266,6 +269,8 @@ export type RoomStateHandler = (room: RoomState) => void;
 export type RoleHandler = (role: Role) => void;
 
 declare interface Session {
+  /** Display token replaced by this GM connection */
+  on(event: "displayToken", listener: (token: string) => void): this;
   /** Session Status Event - Status of the session has changed */
   on(event: "status", listener: SessionStatusHandler): this;
   /** Player Joined Event - A player has joined the game */
