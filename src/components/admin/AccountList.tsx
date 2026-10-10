@@ -4,6 +4,7 @@ import { Box, Button, Flex, Text } from "theme-ui";
 import AccountRow from "./AccountRow";
 import OneUseLinkBox from "./OneUseLinkBox";
 import FormError from "../account/FormError";
+import RemoveAccountModal from "../../modals/RemoveAccountModal";
 import LoadingOverlay from "../LoadingOverlay";
 
 import {
@@ -13,6 +14,8 @@ import {
   createInvite,
   createResetLink,
   listAccounts,
+  setAdministrator,
+  removeAccount,
 } from "../../network/api";
 
 function asApiError(error: unknown, message: string) {
@@ -22,7 +25,38 @@ function asApiError(error: unknown, message: string) {
 }
 
 /** Every account on the server, and the way to let another person in */
-function AccountList({ self }: { self: Account }) {
+function AccountList({
+  self,
+  onChanged,
+}: {
+  self: Account;
+  onChanged: () => Promise<void>;
+}) {
+  const [removing, setRemoving] = useState<Account>();
+  const [isChanging, setIsChanging] = useState(false);
+
+  async function handleAdministrator(account: Account) {
+    setIsChanging(true);
+    setError(undefined);
+    try {
+      await setAdministrator(account.id, !account.administrator);
+      await onChanged();
+      await load();
+    } catch (error) {
+      setError(asApiError(error, "Unable to change the administrator mark."));
+      await onChanged();
+    }
+    setIsChanging(false);
+  }
+
+  async function handleRemove() {
+    if (!removing) return;
+    await removeAccount(removing.id);
+    setRemoving(undefined);
+    setReset(undefined);
+    await onChanged();
+    await load();
+  }
   const [accounts, setAccounts] = useState<Account[]>();
   const [error, setError] = useState<ApiError>();
 
@@ -113,19 +147,50 @@ function AccountList({ self }: { self: Account }) {
               account={account}
               isSelf={account.id === self.id}
             >
-              <Button
-                variant="secondary"
-                py={1}
-                sx={{ flexShrink: 0 }}
-                aria-label={`Reset the password of ${account.username}`}
-                onClick={() => handleReset(account)}
+              <Flex
+                sx={{ gap: 1, flexWrap: "wrap", justifyContent: "flex-end" }}
               >
-                Reset password
-              </Button>
+                <Button
+                  variant="secondary"
+                  py={1}
+                  disabled={isChanging}
+                  onClick={() => handleAdministrator(account)}
+                  aria-label={`${account.administrator ? "Unmake" : "Make"} ${
+                    account.username
+                  } an administrator`}
+                >
+                  {account.administrator
+                    ? "Unmake administrator"
+                    : "Make administrator"}
+                </Button>
+                <Button
+                  variant="secondary"
+                  py={1}
+                  disabled={isChanging}
+                  onClick={() => setRemoving(account)}
+                  aria-label={`Remove ${account.username}`}
+                >
+                  Remove account
+                </Button>
+                <Button
+                  variant="secondary"
+                  py={1}
+                  sx={{ flexShrink: 0 }}
+                  aria-label={`Reset the password of ${account.username}`}
+                  onClick={() => handleReset(account)}
+                >
+                  Reset password
+                </Button>
+              </Flex>
             </AccountRow>
           ))}
         </Box>
       )}
+      <RemoveAccountModal
+        account={removing}
+        onRequestClose={() => setRemoving(undefined)}
+        onConfirm={handleRemove}
+      />
       <Text as="p" variant="caption" mt={2}>
         An invite link is the only way onto this server. The person who opens it
         picks their own username and password.
