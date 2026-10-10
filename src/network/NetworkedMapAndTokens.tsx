@@ -7,6 +7,7 @@ import {
   RoomAssetsContext,
   useToolPermissions,
   useRole,
+  useRoom,
 } from "../contexts/RoomContext";
 import { useDatabase } from "../contexts/DatabaseContext";
 
@@ -21,6 +22,7 @@ import { getRoleControls } from "../helpers/roomControls";
 
 import Action from "../actions/Action";
 
+import WelcomeScreen from "../components/WelcomeScreen";
 import Map from "../components/map/Map";
 import TokenBar from "../components/token/TokenBar";
 
@@ -54,6 +56,8 @@ import {
 function NetworkedMapAndTokens({ session }: { session: Session }) {
   const userId = useUserId();
   const role = useRole();
+  const room = useRoom();
+  const waiting = role !== "gm" && room.session === false;
   const permissions = useToolPermissions();
   const { isLoading } = useMapLoading();
 
@@ -342,6 +346,21 @@ function NetworkedMapAndTokens({ session }: { session: Session }) {
       session.socket?.off("map", handleSocketMap);
     };
   });
+
+  useEffect(() => {
+    function clearOutsideSession() {
+      if (session.role !== "gm" && session.room.session === false) {
+        setCurrentMap(null);
+        setCurrentMapState(null, false);
+        setAssetManifest(null, false);
+        resetActions();
+      }
+    }
+    session.on("room", clearOutsideSession);
+    return () => { session.off("room", clearOutsideSession); };
+  }, [session, setCurrentMapState, setAssetManifest, resetActions]);
+
+  if (waiting) return <WelcomeScreen />;
 
   const canChangeMap = !isLoading && getRoleControls(role).map;
 

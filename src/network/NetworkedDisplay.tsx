@@ -5,6 +5,8 @@ import useAssetTransfers from "../hooks/useAssetTransfers";
 
 import Session from "./Session";
 
+import { useRoom } from "../contexts/RoomContext";
+import WelcomeScreen from "../components/WelcomeScreen";
 import DisplayMap from "../components/display/DisplayMap";
 
 import { DisplayView, fullMapRect } from "../helpers/displayView";
@@ -17,8 +19,9 @@ import { AssetManifest } from "../types/Asset";
  * The map of a room as a cast display receives it. Nothing is ever sent back.
  */
 function NetworkedDisplay({ session }: { session: Session }) {
+  const waiting = useRoom().session === false;
   const [currentMap, setCurrentMap] = useState<MapType | null>(null);
-  const [currentMapState] = useNetworkedState<MapState | null>(
+  const [currentMapState, setCurrentMapState] = useNetworkedState<MapState | null>(
     null,
     session,
     "map_state",
@@ -26,7 +29,7 @@ function NetworkedDisplay({ session }: { session: Session }) {
     true,
     "mapId"
   );
-  const [assetManifest] = useNetworkedState<AssetManifest | null>(
+  const [assetManifest, setAssetManifest] = useNetworkedState<AssetManifest | null>(
     null,
     session,
     "manifest",
@@ -58,6 +61,21 @@ function NetworkedDisplay({ session }: { session: Session }) {
       session.socket?.off("display_view", handleSocketDisplayView);
     };
   });
+
+  useEffect(() => {
+    function clearOutsideSession() {
+      if (session.room.session === false) {
+        setCurrentMap(null);
+        setCurrentMapState(null, false);
+        setAssetManifest(null, false);
+        setDisplayView(null);
+      }
+    }
+    session.on("room", clearOutsideSession);
+    return () => { session.off("room", clearOutsideSession); };
+  }, [session, setCurrentMapState, setAssetManifest]);
+
+  if (waiting) return <WelcomeScreen />;
 
   // Show the whole map until a view of it arrives
   const view =
