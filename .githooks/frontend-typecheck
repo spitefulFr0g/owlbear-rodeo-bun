@@ -1,0 +1,13 @@
+#!/bin/sh
+# Typechecks the frontend. A git worktree with no node_modules of its own
+# uses the main checkout's.
+root=$(git rev-parse --show-toplevel)
+main=$(dirname "$(cd "$root" && cd "$(git rev-parse --git-common-dir)" && pwd)")
+cd "$root" || exit 1
+if [ -x node_modules/.bin/tsc ]; then
+  exec node_modules/.bin/tsc --noEmit
+elif [ -x "$main/node_modules/.bin/tsc" ]; then
+  exec "$main/node_modules/.bin/tsc" --noEmit --typeRoots "$main/node_modules/@types"
+fi
+echo "frontend-typecheck: no node_modules here or in $main; run yarn install" >&2
+exit 1

@@ -1,0 +1,27 @@
+#!/bin/sh
+# Runs the checks CI runs, for the half of the repo the commit touches.
+# Quiet when they pass; prints the end of the failing check's output when not.
+# Turn it on once per clone: git config core.hooksPath .githooks
+root=$(git rev-parse --show-toplevel)
+log=$(mktemp)
+trap 'rm -f "$log"' EXIT
+
+check() {
+  if ! "$@" >"$log" 2>&1; then
+    echo "pre-commit: '$*' failed in $(pwd)" >&2
+    tail -n 40 "$log" >&2
+    exit 1
+  fi
+}
+
+if ! git diff --cached --quiet -- backend; then
+  cd "$root/backend" || exit 1
+  check bun run typecheck
+  check bun test
+  check bun run lint
+fi
+
+if ! git diff --cached --quiet -- src tsconfig.json; then
+  cd "$root" || exit 1
+  check .githooks/frontend-typecheck
+fi

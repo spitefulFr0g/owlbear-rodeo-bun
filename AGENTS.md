@@ -11,3 +11,7 @@ The five default labels: `needs-triage`, `needs-info`, `ready-for-agent`, `ready
 ### Domain docs
 
 Single-context: `GLOSSARY.md` at the root and ADRs in `docs/adr/`. See `docs/agents/domain.md`.
+
+### Dev environment
+
+Building the frontend, working in a worktree, the pre-commit checks, running the app. See `docs/agents/dev-environment.md`.

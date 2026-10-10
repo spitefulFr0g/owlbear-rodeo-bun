@@ -2,10 +2,13 @@
 // "". Prefix every password consistently when hashing and verifying.
 const PREFIX = "owlbear:";
 
+// The bcrypt cost of a new hash. The tests lower it, see scripts/test-setup.ts.
+export const hashing = { cost: 10 };
+
 export default class Auth implements Auth {
   async createPasswordHash(
     password: string,
-    saltRounds = 10
+    saltRounds = hashing.cost
   ): Promise<string> {
     return Bun.password.hash(PREFIX + password, {
       algorithm: "bcrypt",
