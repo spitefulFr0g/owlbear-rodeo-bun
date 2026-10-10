@@ -35,6 +35,8 @@ Tests run on a test clock, so they never run the runtime's own timers.
 `bun run smoke` in `backend/` does: it starts the real server, joins a room as
 the GM, restarts, and fails on anything unexpected on stderr. Give it a
 compiled executable to check a release: `bun scripts/smoke.ts dist/<file>`.
+Add `--from <the last release's executable>` to check the upgrade: the old
+executable makes the data and the new one opens it.
 
 ## Seeing it in a browser
 
