@@ -23,11 +23,12 @@ import { Pointer } from "../types/Pointer";
 
 export default class GameServer {
   private readonly io: IOServer;
+  private stopping = false;
   readonly gameRepo;
   private readonly attempts: AttemptLimiter;
   private readonly joinTokens: JoinTokens;
 
-  constructor(io: IOServer, joinTokens: JoinTokens, database?: OwlbearDatabase, clock?: Clock, attempts?: AttemptLimiter, private readonly behindProxy = false, private readonly accounts?: Accounts) {
+  constructor(io: IOServer, joinTokens: JoinTokens, database?: OwlbearDatabase, private readonly clock: Clock = realClock, attempts?: AttemptLimiter, private readonly behindProxy = false, private readonly accounts?: Accounts) {
     this.attempts = attempts ?? new AttemptLimiter(clock ?? realClock);
     this.io = io;
     this.joinTokens = joinTokens;
@@ -60,6 +61,30 @@ export default class GameServer {
         peer.emit(event, value);
       }
     }
+  }
+
+  private setSession(gameId: string, running: boolean): void {
+    const game = this.gameRepo.games[gameId];
+    game.cancelSessionCountdown?.();
+    game.cancelSessionCountdown = undefined;
+    const starting = running && !game.session;
+    game.session = running;
+    this.io.to(gameId).emit("room_state", this.gameRepo.roomState(gameId));
+    if (starting) {
+      for (const id of this.io.sockets.adapter.rooms.get(gameId) || []) {
+        const peer = this.io.sockets.sockets.get(id);
+        if (!peer || peer.data.role === "gm") continue;
+        peer.emit("map", game.getState("map"));
+        peer.emit("map_state", game.getState("mapState"));
+        peer.emit("manifest", game.getState("manifest"));
+        if (peer.data.castDisplay && game.shownDisplayView) peer.emit("display_view", game.shownDisplayView);
+      }
+    }
+  }
+
+  public stop(): void {
+    this.stopping = true;
+    for (const game of Object.values(this.gameRepo.games)) game.cancelSessionCountdown?.();
   }
 
   public flush(): void { this.gameRepo.flush(); }
@@ -150,6 +175,15 @@ export default class GameServer {
           }
 
           if (!this.gameRepo.games[gameId]) return;
+          const game = this.gameRepo.games[gameId];
+          const anotherGM = [...this.io.sockets.adapter.rooms.get(gameId) || []]
+            .some(id => id !== socket.id && this.io.sockets.sockets.get(id)?.data.role === "gm");
+          if (!this.stopping && game.session && socket.data.role === "gm" && !anotherGM) {
+            game.cancelSessionCountdown?.();
+            game.cancelSessionCountdown = this.clock.after(5 * 60 * 1000, () => {
+              this.setSession(gameId, false);
+            });
+          }
           socket.to(gameId).emit("player_left", socket.id);
           // Delete player state from game
           this.gameRepo.deletePlayer(gameId, socket.id);
@@ -210,6 +244,10 @@ export default class GameServer {
             playerColours.find(color => !usedColours.has(color)) ?? playerColours[0];
           await gameState.joinGame(gameId);
           _gameId = gameId;
+          if (role === "gm") {
+            game.cancelSessionCountdown?.();
+            game.cancelSessionCountdown = undefined;
+          }
           // Only the player who joined gets the token for the asset routes
           const token = this.joinTokens.issue(socket.id, gameId, role);
           socket.emit("joined_game", socket.id, token, { role: this.playerRole(socket, gameId), color: socket.data.color, room: this.gameRepo.roomState(gameId) });
@@ -297,20 +335,7 @@ export default class GameServer {
           if (typeof answer === "function") answer({ ok: false, error: "invalid" });
           return;
         }
-        const game = this.gameRepo.games[gameId];
-        const starting = running && !game.session;
-        game.session = running;
-        this.io.to(gameId).emit("room_state", this.gameRepo.roomState(gameId));
-        if (starting) {
-          for (const id of this.io.sockets.adapter.rooms.get(gameId) || []) {
-            const peer = this.io.sockets.sockets.get(id);
-            if (!peer || peer.data.role === "gm") continue;
-            peer.emit("map", game.getState("map"));
-            peer.emit("map_state", game.getState("mapState"));
-            peer.emit("manifest", game.getState("manifest"));
-            if (peer.data.castDisplay && game.shownDisplayView) peer.emit("display_view", game.shownDisplayView);
-          }
-        }
+        this.setSession(gameId, running);
         if (typeof answer === "function") answer({ ok: true });
       });
 

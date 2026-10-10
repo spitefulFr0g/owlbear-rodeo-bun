@@ -162,6 +162,7 @@ export async function startServer(options: ServerOptions): Promise<RunningServer
     address: `http://localhost:${boundPort}`,
     stop() {
       stopping ??= new Promise<void>((resolve, reject) => {
+        game.stop();
         io.close((error?: Error) => error ? reject(error) : resolve());
         httpServer.closeIdleConnections();
       }).finally(() => {
