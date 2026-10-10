@@ -1,5 +1,6 @@
 import { ReactNode, useEffect, useRef, useState } from "react";
-import { Checkbox, Divider, Flex, Label, Text } from "theme-ui";
+import { Button, Checkbox, Divider, Flex, Input, Label, Text } from "theme-ui";
+import { useParams } from "react-router-dom";
 import Modal from "../components/Modal";
 import { useRole, useRoom } from "../contexts/RoomContext";
 import { defaultRoomSwitches, getRoleControls } from "../helpers/roomControls";
@@ -30,7 +31,14 @@ export default function RoomSettingsModal({
   const isGM = getRoleControls(useRole()).room;
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
+  const [password, setPassword] = useState("");
+  const [message, setMessage] = useState("");
+  const [displayLink, setDisplayLink] = useState("");
+  const { id: roomId }: { id: string } = useParams();
   const request = useRef(0);
+  useEffect(() => {
+    if (!isOpen) setPassword("");
+  }, [isOpen]);
   useEffect(() => {
     return () => {
       request.current = -1;
@@ -67,10 +75,62 @@ export default function RoomSettingsModal({
       );
   }
 
+  function changeAccess(
+    event: "room_password" | "new_display_link",
+    value?: string | null
+  ) {
+    if (!isGM || pending) return;
+    if (!session.socket?.connected) {
+      setError("The room is disconnected. Reconnect before changing its settings.");
+      return;
+    }
+    setPending(true);
+    setError("");
+    setMessage("");
+    const id = ++request.current;
+    const answer = (
+      timeout: Error | null,
+      result?: { ok: boolean; error?: string; token?: string }
+    ) => {
+      if (request.current !== id) return;
+      setPending(false);
+      if (timeout) setError("The room did not answer. Please try again.");
+      else if (!result?.ok)
+        setError(
+          result?.error === "not_room_gm"
+            ? "Only the room's GM can change these settings."
+            : "The room could not save that setting. Please try again."
+        );
+      else if (event === "room_password") {
+        setPassword("");
+        setMessage(
+          value
+            ? "Room password saved. People already in the room stay connected."
+            : "Room password removed. People already in the room stay connected."
+        );
+      } else if (result.token) {
+        setDisplayLink(
+          `${window.location.origin}/display/${roomId}#${result.token}`
+        );
+        session.emit("displayToken", result.token);
+        setMessage(
+          "New display link ready. Cast displays using the old link have been disconnected."
+        );
+      } else setError("The room did not return a display link. Please try again.");
+    };
+    if (event === "room_password")
+      session.socket.timeout(10000).emit(event, value, answer);
+    else session.socket.timeout(5000).emit(event, answer);
+  }
+
   if (!isGM) return null;
   const switches = room.switches || defaultRoomSwitches;
   return (
-    <Modal isOpen={isOpen} onRequestClose={onRequestClose}>
+    <Modal
+      isOpen={isOpen}
+      onRequestClose={onRequestClose}
+      style={{ content: { width: "420px", maxWidth: "100%", overflowY: "auto" } }}
+    >
       <Flex sx={{ flexDirection: "column" }}>
         <Label py={2}>Room settings</Label>
         <Divider />
@@ -89,6 +149,62 @@ export default function RoomSettingsModal({
           The GM and trusted players can use every tool whatever these switches
           say.
         </Text>
+        <Divider />
+        <Label htmlFor="room-password" py={2}>Room password</Label>
+        <Text variant="caption" mb={2}>
+          Set or change the password for new players. People already in the room
+          stay connected.
+        </Text>
+        <Flex
+          as="form"
+          sx={{ flexDirection: "column" }}
+          onSubmit={(e) => {
+            e.preventDefault();
+            changeAccess("room_password", password);
+          }}
+        >
+          <Input
+            id="room-password"
+            type="password"
+            autoComplete="new-password"
+            value={password}
+            disabled={pending}
+            onChange={(e) => setPassword(e.target.value)}
+          />
+          <Flex my={2} sx={{ gap: 2 }}>
+            <Button type="submit" disabled={pending || !password}>
+              Save password
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={pending}
+              onClick={() => changeAccess("room_password", null)}
+            >
+              Remove password
+            </Button>
+          </Flex>
+        </Flex>
+        <Divider />
+        <Label py={2}>Display link</Label>
+        <Text variant="caption" mb={2}>
+          Replace the display link and disconnect cast displays using the old link.
+        </Text>
+        <Button disabled={pending} onClick={() => changeAccess("new_display_link")}>
+          New display link
+        </Button>
+        {displayLink && (
+          <>
+            <Label htmlFor="new-display-link" mt={2}>New display link</Label>
+            <Input
+              id="new-display-link"
+              readOnly
+              value={displayLink}
+              onFocus={(e) => e.target.select()}
+            />
+          </>
+        )}
+        {message && <Text role="status" my={2}>{message}</Text>}
         {error && (
           <Text role="alert" color="red" my={2}>
             {error}
