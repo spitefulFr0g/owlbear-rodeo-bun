@@ -174,9 +174,13 @@ function Party({ gameId, roomSettings, onTrustChange }: PartyProps) {
             ))}
         </SimpleBar>
         <Flex sx={{ flexDirection: "column" }}>
-          <Text variant="caption">Your colour</Text>
+          <Text variant="caption">
+            {/* The colour is shown beside its name, which stays in the text colour to be readable */}
+            {playerState.color && <Text as="span" aria-hidden="true" sx={{ color: colors[playerState.color], mr: 1 }}>●</Text>}
+            Your colour
+          </Text>
           <Select id="player-colour" aria-label="Your colour" value={playerState.color || ""}
-            sx={{ width: "100%", color: playerState.color ? colors[playerState.color] : "text", mb: 2 }}
+            sx={{ width: "100%", color: "text", mb: 2, option: { color: "text", backgroundColor: "background" } }}
             onChange={(event) => {
               const color = event.target.value;
               if (!isPlayerColour(color)) return;

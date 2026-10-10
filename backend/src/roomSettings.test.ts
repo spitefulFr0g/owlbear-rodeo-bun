@@ -123,3 +123,21 @@ test("room settings refuse players, displays, unjoined connections and malformed
     await server.joinDisplay(room.id, token);
   } finally { await server.dispose(); }
 }, 20000);
+
+test("everyone in the room is told when it gains or loses its password", async () => {
+  const server = await startTestServer();
+  try {
+    const { cookie } = await setupAdministrator(server);
+    const room = await createRoom(server, cookie, "Table");
+    const gm = await server.joinRoomAsGM(room.id, cookie);
+    const player = await server.joinRoom(room.id);
+    expect(gm.info.room.hasPassword).toBe(false);
+    for (const [value, expected] of [["secret", true], [null, false], ["secret", true], ["", false]] as const) {
+      const told = [gm, player].map(peer => nextMessage(peer.socket, "room_state"));
+      expect(await password(gm.socket, value)).toEqual({ ok: true });
+      for (const [state] of await Promise.all(told)) expect(state.hasPassword).toBe(expected);
+    }
+    expect(await password(gm.socket, "secret")).toEqual({ ok: true });
+    expect((await server.joinRoomAsGM(room.id, cookie)).info.room.hasPassword).toBe(true);
+  } finally { await server.dispose(); }
+}, 20000);

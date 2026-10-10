@@ -73,7 +73,7 @@ export default class GameRepository {
 
   roomState(gameId: string) {
     const game = this.games[gameId];
-    return { name: game.name, switches: { ...game.switches }, session: game.session };
+    return { name: game.name, switches: { ...game.switches }, session: game.session, hasPassword: game.hasPassword };
   }
 
   getPartyState(gameId: string): PartyState {

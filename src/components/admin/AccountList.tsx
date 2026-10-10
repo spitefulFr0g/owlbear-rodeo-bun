@@ -98,6 +98,10 @@ function AccountList({
     }
   }
 
+  // The server refuses to leave itself without an administrator
+  const onlyAdministrator =
+    accounts?.filter((account) => account.administrator).length === 1;
+
   return (
     <Box sx={{ width: "100%" }}>
       <Flex sx={{ alignItems: "center", justifyContent: "space-between" }}>
@@ -155,7 +159,14 @@ function AccountList({
                 <Button
                   variant="secondary"
                   py={1}
-                  disabled={isChanging}
+                  disabled={
+                    isChanging || (account.administrator && onlyAdministrator)
+                  }
+                  title={
+                    account.administrator && onlyAdministrator
+                      ? "The last administrator must keep the administrator mark."
+                      : undefined
+                  }
                   onClick={() => handleAdministrator(account)}
                   aria-label={`${account.administrator ? "Unmake" : "Make"} ${
                     account.username

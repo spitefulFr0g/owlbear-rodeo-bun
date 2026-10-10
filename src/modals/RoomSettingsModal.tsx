@@ -144,7 +144,7 @@ export default function RoomSettingsModal({
       style={{ content: { width: "420px", maxWidth: "100%", overflowY: "auto" } }}
     >
       <Flex sx={{ flexDirection: "column" }}>
-        <Label py={2}>Room settings</Label>
+        <Text as="h2" variant="heading" py={2}>Room settings</Text>
         <Divider />
         <Flex
           role="group"
@@ -196,7 +196,7 @@ export default function RoomSettingsModal({
             <Button
               type="button"
               variant="secondary"
-              disabled={pending}
+              disabled={pending || room.hasPassword === false}
               onClick={() => changeAccess("room_password", null)}
             >
               Remove password
@@ -204,7 +204,7 @@ export default function RoomSettingsModal({
           </Flex>
         </Flex>
         <Divider />
-        <Label py={2}>Display link</Label>
+        <Text as="h3" variant="heading" py={2}>Display link</Text>
         <Text variant="caption" mb={2}>
           Replace the display link and disconnect cast displays using the old link.
         </Text>

@@ -5,7 +5,8 @@ import { useParty } from "../contexts/PartyContext";
 export default function WelcomeScreen() {
   const room = useRoom();
   const party = useParty();
-  const people = Object.entries(party).filter(([, person]) => person.nickname);
+  // The GM is here but is who everyone else is waiting for
+  const people = Object.entries(party).filter(([, person]) => person.nickname && person.role !== "gm");
   return (
     <Flex p={4} sx={{ flexGrow: 1, flexBasis: 0, height: "100%", flexDirection: "column", minWidth: 0, overflowY: "auto", textAlign: "center" }}>
       <Box my="auto" sx={{ width: "100%", overflowWrap: "anywhere" }}>
