@@ -12,7 +12,7 @@ test("an image uploaded with a room connection survives a server restart", async
   try {
     const { cookie } = await setupAdministrator(server);
     const room = await createRoom(server, cookie, "Room");
-    const { token } = await server.joinRoom(room.id);
+    const { token } = await server.joinRoomAsGM(room.id, cookie);
     const uploaded = await fetch(`${server.address}/assets/image`, {
       method: "PUT", body: png,
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "image/png",
@@ -41,9 +41,10 @@ test("two servers keep room passwords, join tokens and images separate", async (
     expect(first.address).not.toBe(second.address);
     const a = await first.joinRoom(firstRoom.id, "first-password");
     const b = await second.joinRoom(secondRoom.id, "second-password");
+    const uploader = await first.joinRoomAsGM(firstRoom.id, firstAccount.cookie);
     const response = await fetch(`${first.address}/assets/separate`, {
       method: "PUT", body: png,
-      headers: { Authorization: `Bearer ${a.token}`, "Content-Type": "image/png",
+      headers: { Authorization: `Bearer ${uploader.token}`, "Content-Type": "image/png",
         "X-Asset-Width": "4", "X-Asset-Height": "2", "X-Asset-Owner": "gm" },
     });
     expect(response.status).toBe(201);

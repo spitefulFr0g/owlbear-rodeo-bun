@@ -95,8 +95,8 @@ for (const method of ["HEAD", "GET", "PUT"] as const) {
       const { cookie } = await setupAdministrator(server);
       const first = await createRoom(server, cookie, "First");
       const second = await createRoom(server, cookie, "Second");
-      const uploader = await server.joinRoom(first.id);
-      const reader = await server.joinRoom(second.id);
+      const uploader = await server.joinRoomAsGM(first.id, cookie);
+      const reader = await server.joinRoomAsGM(second.id, cookie);
       for (const [id, body] of [["exclusive", "exclusive bytes"], ["shared", "shared bytes"], ["same-hash", "shared bytes"]]) {
         const upload = await fetch(`${server.address}/assets/${id}`, { method: "PUT", headers: imageHeaders(uploader.token), body });
         expect(upload.status).toBe(201);
@@ -159,7 +159,7 @@ test("deleting a room frees its image files and keeps images no room has used", 
   try {
     const { cookie } = await setupAdministrator(server);
     const room = await createRoom(server, cookie, "Room");
-    const writer = await server.joinRoom(room.id);
+    const writer = await server.joinRoomAsGM(room.id, cookie);
     const upload = await fetch(`${server.address}/assets/exclusive`, { method: "PUT", headers: imageHeaders(writer.token), body: "exclusive bytes" });
     expect(upload.status).toBe(201);
     await upload.text();
@@ -182,7 +182,7 @@ test("file cleanup failure leaves the room and exclusive image records deleted w
     const { cookie } = await setupAdministrator(server);
     const first = await createRoom(server, cookie, "First");
     const second = await createRoom(server, cookie, "Second");
-    const writer = await server.joinRoom(first.id);
+    const writer = await server.joinRoomAsGM(first.id, cookie);
     const reader = await server.joinRoom(second.id);
     for (const id of ["exclusive", "shared"]) {
       const uploaded = await fetch(`${server.address}/assets/${id}`, { method: "PUT", headers: imageHeaders(writer.token), body: id });

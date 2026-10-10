@@ -11,7 +11,7 @@ test("the room's signed-in GM joins on every device without the room password", 
       const joined = nextMessage(socket, "joined_game");
       socket.emit("join_game", room.id, "");
       const result = await joined;
-      expect(result[2]).toEqual({ role: "gm", room: { name: "Table", switches: { tokens: true, drawing: true, notes: true, fog: false } } });
+      expect(result[2]).toEqual({ role: "gm", room: { name: "Table", switches: { tokens: true, drawing: true, notes: true, fog: false, uploads: false } } });
     }
   } finally { await server.dispose(); }
 });
@@ -48,6 +48,7 @@ test("players cannot switch maps, edit map settings or replace state, but can up
     player.socket.emit("map_state_update", update);
     expect((await forwarded)[0]).toEqual(update);
     expect(received).toEqual([]);
+    await new Promise(resolve => gm.socket.emit("room_switches", { uploads: true }, resolve));
     for (const [event, value] of [["manifest", { mapId: "map", assets: {} }], ["manifest_update", { id: "map", changes: [{ kind: "N", path: ["assets", "image"], rhs: { id: "image" } }] }]] as const) {
       const received = nextMessage(gm.socket, event);
       player.socket.emit(event, value);
