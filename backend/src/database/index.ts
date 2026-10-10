@@ -11,6 +11,7 @@ export interface RoomRecord {
   hasPassword: number;
   passwordHash: string;
   displayToken: string;
+  switches?: string;
   documentVersion: number;
   document: string;
 }
@@ -38,6 +39,7 @@ const layout = `
     hasPassword INTEGER NOT NULL DEFAULT 0,
     passwordHash TEXT NOT NULL,
     displayToken TEXT NOT NULL,
+    switches TEXT NOT NULL DEFAULT '{"tokens":true,"drawing":true,"notes":true,"fog":false}',
     documentVersion INTEGER NOT NULL,
     document TEXT NOT NULL
   );
@@ -112,12 +114,12 @@ export class OwlbearDatabase {
   }
 
   saveRoom(record: RoomRecord): void {
-    this.connection.query(`INSERT INTO rooms (id, passwordHash, displayToken, documentVersion, document, name, gmAccountId, hasPassword)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET
+    this.connection.query(`INSERT INTO rooms (id, passwordHash, displayToken, documentVersion, document, name, gmAccountId, hasPassword, switches)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET
       passwordHash = excluded.passwordHash, displayToken = excluded.displayToken,
       documentVersion = excluded.documentVersion, document = excluded.document,
-      name = excluded.name, gmAccountId = excluded.gmAccountId, hasPassword = excluded.hasPassword`)
-      .run(record.id, record.passwordHash, record.displayToken, record.documentVersion, record.document, record.name, record.gmAccountId, record.hasPassword);
+      name = excluded.name, gmAccountId = excluded.gmAccountId, hasPassword = excluded.hasPassword, switches = excluded.switches`)
+      .run(record.id, record.passwordHash, record.displayToken, record.documentVersion, record.document, record.name, record.gmAccountId, record.hasPassword, record.switches ?? JSON.stringify({ tokens: true, drawing: true, notes: true, fog: false }));
   }
 
   roomsForGM(accountId: string): RoomRecord[] {

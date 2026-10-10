@@ -1,3 +1,4 @@
+import { allowsLegacyMapStateUpdateV1 } from "../helpers/roomSwitches";
 import Accounts from "../accounts/Accounts";
 import { clientAddress } from "../clientRequest";
 import AttemptLimiter from "../AttemptLimiter";
@@ -56,7 +57,7 @@ export default class GameServer {
       // refused here too, before any handler can change or forward state.
       socket.use(([event], next) => {
         if (
-          socket.data.castDisplay && event !== "get_display_token" && event !== "join_display"
+          socket.data.castDisplay && event !== "get_display_token" && event !== "join_display" && event !== "room_switches"
         ) {
           const gameId = gameState.getGameId();
           if (gameId && (event === "map" || event === "map_state")) {
@@ -97,7 +98,7 @@ export default class GameServer {
         _gameId = gameId;
         await gameState.joinGame(gameId, true);
         const token = this.joinTokens.issue(socket.id, gameId, "display");
-        socket.emit("joined_display", socket.id, token, { room: { name: this.gameRepo.games[gameId].name } });
+        socket.emit("joined_display", socket.id, token, { room: this.gameRepo.roomState(gameId) });
         const game = this.gameRepo.games[gameId];
         socket.emit("display_frozen", game.displayFrozen);
         if (game.shownDisplayView) socket.emit("display_view", game.shownDisplayView);
@@ -178,7 +179,7 @@ export default class GameServer {
           _gameId = gameId;
           // Only the player who joined gets the token for the asset routes
           const token = this.joinTokens.issue(socket.id, gameId, role);
-          socket.emit("joined_game", socket.id, token, { role, room: { name: this.gameRepo.games[gameId].name } });
+          socket.emit("joined_game", socket.id, token, { role, room: this.gameRepo.roomState(gameId) });
           socket.emit("display_frozen", this.gameRepo.games[gameId].displayFrozen);
           socket.to(gameId).emit("joined_game", socket.id);
         } catch (error) {
@@ -229,6 +230,24 @@ export default class GameServer {
           game.shownDisplayView = game.latestDisplayView;
           forwardView(game.gameId, game.latestDisplayView);
         }
+      });
+
+      socket.on("room_switches", (change: unknown, answer?: (result: { ok: boolean; error?: string }) => void) => {
+        const gameId = gameState.getGameId();
+        if (!gameId || socket.data.role !== "gm") {
+          if (typeof answer === "function") answer({ ok: false, error: "not_room_gm" });
+          return;
+        }
+        const game = this.gameRepo.games[gameId];
+        if (!change || typeof change !== "object" || Array.isArray(change) ||
+          Object.entries(change).some(([key, value]) => !Object.hasOwn(game.switches, key) || typeof value !== "boolean")) {
+          if (typeof answer === "function") answer({ ok: false, error: "invalid" });
+          return;
+        }
+        Object.assign(game.switches, change);
+        this.gameRepo.save(gameId);
+        this.io.to(gameId).emit("room_state", this.gameRepo.roomState(gameId));
+        if (typeof answer === "function") answer({ ok: true });
       });
 
       socket.on("map", async (map: Map) => {
@@ -310,6 +329,10 @@ export default class GameServer {
             }
           }
 
+          if (socket.data.role !== "gm" && !allowsLegacyMapStateUpdateV1(update, this.gameRepo.games[gameId].switches)) {
+            socket.emit("map_state", this.gameRepo.getState(gameId, "mapState"));
+            return;
+          }
           if (await gameState.updateState(gameId, "mapState", update)) {
             socket.to(gameId).emit("map_state_update", update);
           }

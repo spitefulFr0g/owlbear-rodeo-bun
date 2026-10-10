@@ -1,3 +1,4 @@
+import { RoomSwitches } from "../types/RoomSwitches";
 import { randomBytes } from "crypto";
 import { DisplayView } from "../types/DisplayView";
 import { PlayerState } from "../types/PlayerState";
@@ -8,6 +9,7 @@ import { Map } from "../types/Map";
 
 export default class Game {
   name = "";
+  switches: RoomSwitches = { tokens: true, drawing: true, notes: true, fog: false };
   gmAccountId: string | null = null;
   hasPassword = false;
   displayFrozen = false;
