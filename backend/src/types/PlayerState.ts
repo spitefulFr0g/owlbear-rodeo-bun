@@ -2,7 +2,7 @@ import { Timer } from "./Timer";
 import { Dice } from "./Dice";
 
 export type PlayerState = {
-  role?: "gm" | "player";
+  role?: "gm" | "trusted" | "player";
   nickname: string;
   timer?: Timer;
   dice: Dice;

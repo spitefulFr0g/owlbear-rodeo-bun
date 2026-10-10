@@ -41,10 +41,10 @@ function next(socket: Socket, event: string): Promise<any[]> {
   return new Promise((resolve) => socket.once(event, (...args) => resolve(args)));
 }
 
-async function join(socket: Socket, gameId: string, password = "") {
+async function join(socket: Socket, gameId: string, password = "", playerId?: string) {
   const frozen = next(socket, "display_frozen");
   const joined = next(socket, "joined_game");
-  socket.emit("join_game", await roomId(gameId, password), password);
+  socket.emit("join_game", await roomId(gameId, password), password, undefined, { playerId });
   const result = await joined;
   await frozen;
   return result;
@@ -100,7 +100,7 @@ function displayToken(socket: Socket): Promise<string | null> {
 
 async function owner(gameId: string) {
   const socket = client(true);
-  await join(socket, gameId, "secret");
+  await join(socket, gameId, "secret", "gm");
   socket.emit("player_state", { userId: "gm", nickname: "GM" });
   socket.emit("map", { id: "map-1", owner: "gm" });
   return { socket, token: await displayToken(socket) };
