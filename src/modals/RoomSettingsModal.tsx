@@ -127,6 +127,7 @@ export default function RoomSettingsModal({
   const switches = room.switches || defaultRoomSwitches;
   return (
     <Modal
+      contentLabel="Room settings"
       isOpen={isOpen}
       onRequestClose={onRequestClose}
       style={{ content: { width: "420px", maxWidth: "100%", overflowY: "auto" } }}

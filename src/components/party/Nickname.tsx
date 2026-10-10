@@ -22,6 +22,7 @@ function Nickname({ nickname, diceRolls, role, color }: NicknameProps) {
         variant="body2"
         sx={{
           position: "relative",
+          overflowWrap: "anywhere",
         }}
       >
         {color && <Text as="span" aria-label={`${color} colour`} sx={{ color: colors[color], mr: 1 }}>●</Text>}

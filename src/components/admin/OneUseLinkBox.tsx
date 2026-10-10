@@ -8,6 +8,7 @@ import { copyText } from "../../helpers/clipboard";
 type OneUseLinkBoxProps = {
   /** What the link is for, e.g. "Invite link" */
   label: string;
+  id: string;
   link: string;
   /** When the link stops working, in milliseconds since the epoch */
   expiresAt: number;
@@ -25,6 +26,7 @@ function formatDay(time: number) {
 /** A freshly made invite or reset link, ready to be copied and handed over */
 function OneUseLinkBox({
   label,
+  id,
   link,
   expiresAt,
   recipient,
@@ -42,10 +44,10 @@ function OneUseLinkBox({
 
   return (
     <Box my={2} p={2} bg="muted" sx={{ borderRadius: "4px" }}>
-      <Label htmlFor="oneUseLink">{label}</Label>
+      <Label htmlFor={id}>{label}</Label>
       <Flex sx={{ alignItems: "center" }}>
         <Input
-          id="oneUseLink"
+          id={id}
           value={link}
           readOnly
           onFocus={(event: React.FocusEvent<HTMLInputElement>) =>

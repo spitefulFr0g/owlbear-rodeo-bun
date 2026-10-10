@@ -67,6 +67,7 @@ function RoomNameModal({
 
   return (
     <Modal
+      contentLabel={title}
       isOpen={isOpen}
       onRequestClose={onRequestClose}
       onAfterOpen={focusInput}

@@ -110,6 +110,7 @@ function AccountList({
       </Flex>
       {invite && (
         <OneUseLinkBox
+          id="invite-link"
           label="Invite link"
           link={`${window.location.origin}/invite/${invite.token}`}
           expiresAt={invite.expiresAt}
@@ -118,6 +119,7 @@ function AccountList({
       )}
       {reset && (
         <OneUseLinkBox
+          id="reset-link"
           label={`Reset link for ${reset.account.username}`}
           link={`${window.location.origin}/reset/${reset.link.token}`}
           expiresAt={reset.link.expiresAt}
