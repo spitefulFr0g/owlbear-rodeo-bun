@@ -195,13 +195,17 @@ test("file cleanup failure leaves the room and exclusive image records deleted w
     await rm(path);
     await mkdir(path);
     expect((await remove(server, first.id, cookie)).status).toBe(500);
-    await server.restart();
-    const rooms = await fetch(`${server.address}/api/rooms`, { headers: { Cookie: cookie } });
-    expect((await rooms.json() as any).rooms.map((room: any) => room.id)).toEqual([second.id]);
-    const joined = await server.joinRoom(second.id);
-    expect((await fetch(`${server.address}/assets/exclusive`, { headers: imageHeaders(joined.token) })).status).toBe(404);
-    const shared = await fetch(`${server.address}/assets/shared`, { headers: imageHeaders(joined.token) });
-    expect(shared.status).toBe(200);
-    expect(await shared.text()).toBe("shared");
+    // Recover durable files without the clean-stop save, as after a crash
+    // between committing the records and finishing file cleanup.
+    const recovered = await server.durableCopy();
+    try {
+      const rooms = await fetch(`${recovered.address}/api/rooms`, { headers: { Cookie: cookie } });
+      expect((await rooms.json() as any).rooms.map((room: any) => room.id)).toEqual([second.id]);
+      const joined = await recovered.joinRoom(second.id);
+      expect((await fetch(`${recovered.address}/assets/exclusive`, { headers: imageHeaders(joined.token) })).status).toBe(404);
+      const shared = await fetch(`${recovered.address}/assets/shared`, { headers: imageHeaders(joined.token) });
+      expect(shared.status).toBe(200);
+      expect(await shared.text()).toBe("shared");
+    } finally { await recovered.dispose(); }
   } finally { await server.dispose(); }
 });
