@@ -15,7 +15,6 @@ import NetworkedDisplayView from "../../network/NetworkedDisplayView";
 import DisplayControls from "../display/DisplayControls";
 
 import { useSettings } from "../../contexts/SettingsContext";
-import { useUserId } from "../../contexts/UserIdContext";
 import { useRole } from "../../contexts/RoomContext";
 import { getRoleControls } from "../../helpers/roomControls";
 
@@ -100,7 +99,6 @@ function Map({
 }: MapProps) {
   const { addToast } = useToasts();
 
-  const userId = useUserId();
   const roleControls = getRoleControls(useRole());
 
   const [selectedToolId, setSelectedToolId] = useState<MapToolId>("move");
@@ -197,7 +195,7 @@ function Map({
               onUndo={onUndo}
               onRedo={onRedo}
             />
-            <DisplayControls map={map} session={session} />
+            <DisplayControls session={session} />
             {tokenMenu}
             {noteMenu}
             {selectionMenu}
@@ -240,7 +238,7 @@ function Map({
           active={selectedToolId === "pointer"}
           session={session}
         />
-        {map && userId && map.owner === userId && (
+        {map && roleControls.room && (
           <NetworkedDisplayView session={session} mapId={map.id} />
         )}
         <MeasureTool map={map} active={selectedToolId === "measure"} />

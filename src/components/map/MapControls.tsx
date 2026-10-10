@@ -223,7 +223,7 @@ function MapContols({
         </>
       ),
     },
-  ];
+  ].filter((section) => section.id !== "map" || isGM);
 
   let controls = null;
   if (sections.length === 1 && sections[0].id === "map") {

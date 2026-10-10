@@ -16,6 +16,7 @@ import ForceUpdateModal from "../modals/ForceUpdateModal";
 import MaintenanceModal from "../modals/MaintenanceModal";
 
 import { useAuth } from "../contexts/AuthContext";
+import { useServerStatus } from "../contexts/ServerStatusContext";
 import { MapStageProvider } from "../contexts/MapStageContext";
 import { useDatabase } from "../contexts/DatabaseContext";
 import { PlayerProvider } from "../contexts/PlayerContext";
@@ -34,11 +35,18 @@ import Session, { SessionStatus } from "../network/Session";
 function Game() {
   const { id: gameId }: { id: string } = useParams();
   const { password } = useAuth();
+  const { refresh } = useServerStatus();
   const { databaseStatus } = useDatabase();
 
   const [session] = useState(new Session());
   const [sessionStatus, setSessionStatus] = useState<SessionStatus>();
   const [authWaitUntil, setAuthWaitUntil] = useState<number>();
+
+  useEffect(() => {
+    if (sessionStatus === "signed_out") {
+      refresh();
+    }
+  }, [sessionStatus, refresh]);
 
   const [maintenance, setMaintenance] = useState(
     process.env.REACT_APP_MAINTENANCE === "true"

@@ -14,6 +14,9 @@ import {
 } from "../../helpers/token";
 import Vector2 from "../../helpers/Vector2";
 
+import { useRole } from "../../contexts/RoomContext";
+import { getRoleControls } from "../../helpers/roomControls";
+
 import { useUserId } from "../../contexts/UserIdContext";
 import { useMapData } from "../../contexts/MapDataContext";
 import { useTokenData } from "../../contexts/TokenDataContext";
@@ -40,6 +43,7 @@ function GlobalImageDrop({
   const { addToast } = useToasts();
 
   const userId = useUserId();
+  const canChangeMap = getRoleControls(useRole()).map;
   const { addMap, getMapState } = useMapData();
   const { addToken } = useTokenData();
   const { addAssets } = useAssets();
@@ -52,7 +56,7 @@ function GlobalImageDrop({
 
   const droppedImagesRef = useRef<File[]>();
   const dropPositionRef = useRef<Vector2>();
-  const [droppingType, setDroppingType] = useState<"maps" | "tokens">("maps");
+  const [droppingType, setDroppingType] = useState<"maps" | "tokens">("tokens");
 
   async function handleDrop({ files, dropPosition }: ImageDropEvent) {
     if (navigator.storage) {
@@ -99,7 +103,7 @@ function GlobalImageDrop({
   }
 
   async function handleMaps() {
-    if (droppedImagesRef.current && userId) {
+    if (canChangeMap && droppedImagesRef.current && userId) {
       setIsLoading(true);
       let maps = [];
       for (let file of droppedImagesRef.current) {
@@ -191,36 +195,38 @@ function GlobalImageDrop({
           }}
           {...overlayListeners}
         >
-          <Flex
-            sx={{
-              height: "10%",
-              justifyContent: "center",
-              alignItems: "center",
-              color: droppingType === "maps" ? "primary" : "text",
-              opacity: droppingType === "maps" ? 1 : 0.8,
-              width: "100%",
-              position: "relative",
-            }}
-            onDragEnter={handleMapsOver}
-          >
-            <Box
-              bg="overlay"
+          {canChangeMap && (
+            <Flex
               sx={{
-                position: "absolute",
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                margin: "4px 16px",
-                border: "1px dashed",
-                borderRadius: "12px",
-                pointerEvents: "none",
+                height: "10%",
+                justifyContent: "center",
+                alignItems: "center",
+                color: droppingType === "maps" ? "primary" : "text",
+                opacity: droppingType === "maps" ? 1 : 0.8,
+                width: "100%",
+                position: "relative",
               }}
-            />
-            <Text sx={{ pointerEvents: "none", userSelect: "none" }}>
-              Drop as map
-            </Text>
-          </Flex>
+              onDragEnter={handleMapsOver}
+            >
+              <Box
+                bg="overlay"
+                sx={{
+                  position: "absolute",
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  margin: "4px 16px",
+                  border: "1px dashed",
+                  borderRadius: "12px",
+                  pointerEvents: "none",
+                }}
+              />
+              <Text sx={{ pointerEvents: "none", userSelect: "none" }}>
+                Drop as map
+              </Text>
+            </Flex>
+          )}
           <Flex
             sx={{
               flexGrow: 1,

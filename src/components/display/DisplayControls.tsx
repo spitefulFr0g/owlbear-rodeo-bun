@@ -9,31 +9,27 @@ import DisplayPopoutIcon from "../../icons/DisplayPopoutIcon";
 import DisplayLinkIcon from "../../icons/DisplayLinkIcon";
 import DisplayFreezeIcon from "../../icons/DisplayFreezeIcon";
 
-import { useUserId } from "../../contexts/UserIdContext";
+import { useRole } from "../../contexts/RoomContext";
+import { getRoleControls } from "../../helpers/roomControls";
 
 import Session from "../../network/Session";
 
 import { copyText } from "../../helpers/clipboard";
 
-import { Map } from "../../types/Map";
-
 type DisplayControlsProps = {
-  map: Map | null;
   session: Session;
 };
 
-/** The cast display controls, seen only by the player that cast displays follow */
-function DisplayControls({ map, session }: DisplayControlsProps) {
+/** The cast display controls, available on every GM device */
+function DisplayControls({ session }: DisplayControlsProps) {
   const { id: gameId }: { id: string } = useParams();
-  const userId = useUserId();
+  const isGM = getRoleControls(useRole()).room;
   const { addToast } = useToasts();
 
-  const isFollowed = !!map && !!userId && map.owner === userId;
-
-  // The server only hands the token to the player being followed
+  // The server only hands the token to a GM connection
   const [displayToken, setDisplayToken] = useState<string | null>(null);
   useEffect(() => {
-    if (!isFollowed) {
+    if (!isGM) {
       setDisplayToken(null);
       return;
     }
@@ -51,7 +47,7 @@ function DisplayControls({ map, session }: DisplayControlsProps) {
           return;
         }
         setDisplayToken(token);
-        // Our map may not have reached the server yet
+        // Our join may not have reached the server yet
         if (token) {
           requesting = false;
         } else {
@@ -79,7 +75,7 @@ function DisplayControls({ map, session }: DisplayControlsProps) {
       clearTimeout(retry);
       session.off("status", handleStatus);
     };
-  }, [isFollowed, session]);
+  }, [isGM, session]);
 
   const [frozen, setFrozen] = useState(false);
   useEffect(() => {
@@ -94,7 +90,7 @@ function DisplayControls({ map, session }: DisplayControlsProps) {
     };
   });
 
-  if (!isFollowed) {
+  if (!isGM) {
     return null;
   }
 
