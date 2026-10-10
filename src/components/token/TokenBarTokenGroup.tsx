@@ -1,3 +1,4 @@
+import { useCanPlaceToken } from "../../contexts/RoomContext";
 import { useState, useRef } from "react";
 import { Grid, Flex, Box } from "theme-ui";
 import { useSpring, animated } from "react-spring";
@@ -25,9 +26,11 @@ function TokenBarTokenGroup({
   tokens,
   draggable,
 }: TokenBarTokenGroupProps) {
+  const canPlaceToken = useCanPlaceToken();
+  const canDragGroup = draggable && tokens.every(canPlaceToken);
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
-    id: draggable ? group.id : "",
-    disabled: !draggable,
+    id: canDragGroup ? group.id : "",
+    disabled: !canDragGroup,
   });
   const [isOpen, setIsOpen] = useState(false);
 
@@ -36,7 +39,7 @@ function TokenBarTokenGroup({
   });
 
   function renderToken(token: Token) {
-    if (draggable) {
+    if (draggable && canPlaceToken(token)) {
       return (
         <Draggable id={token.id} key={token.id}>
           <TokenBarToken token={token} />

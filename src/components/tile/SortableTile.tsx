@@ -8,6 +8,7 @@ import { GROUP_ID_PREFIX } from "../../contexts/TileDragContext";
 
 type SortableTileProps = {
   id: string;
+  disableDragging?: boolean;
   disableGrouping: boolean;
   disableSorting: boolean;
   hidden: boolean;
@@ -18,6 +19,7 @@ type SortableTileProps = {
 
 function SortableTile({
   id,
+  disableDragging,
   disableGrouping,
   disableSorting,
   hidden,
@@ -32,7 +34,7 @@ function SortableTile({
     setDraggableNodeRef,
     over,
     active,
-  } = useSortable({ id });
+  } = useSortable({ id, disabled: disableDragging });
 
   const { setNodeRef: setGroupNodeRef } = useDroppable({
     id: `${GROUP_ID_PREFIX}${id}`,
