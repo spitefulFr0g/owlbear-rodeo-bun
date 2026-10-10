@@ -1,9 +1,11 @@
+import { PlayerColour } from "../helpers/playerColour";
 import { Timer } from "./Timer";
 import { DiceState } from "./Dice";
 import { Role } from "./Room";
 
 export type PlayerState = {
   nickname: string;
+  color?: PlayerColour;
   timer?: Timer;
   dice: DiceState;
   sessionId?: string;

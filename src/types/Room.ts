@@ -1,3 +1,5 @@
+import { PlayerColour } from "../helpers/playerColour";
+
 /** What a connection may do in a room, decided by the server */
 export type Role = "gm" | "trusted" | "player";
 
@@ -21,6 +23,6 @@ export type RoomState = {
 /** What the server tells a connection about its own join */
 export type JoinInfo = {
   role?: Role;
-  color?: string;
+  color?: PlayerColour;
   room?: RoomState;
 };

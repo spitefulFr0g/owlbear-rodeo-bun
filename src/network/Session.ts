@@ -1,3 +1,4 @@
+import { PlayerColour, rememberedColour, isPlayerColour, rememberColour } from "../helpers/playerColour";
 import io, { Socket } from "socket.io-client";
 import msgParser from "socket.io-msgpack-parser";
 import { EventEmitter } from "events";
@@ -42,6 +43,7 @@ class Session extends EventEmitter {
    * says otherwise
    */
   role: Role = "player";
+  color?: PlayerColour;
 
   // Store party id and password for reconnect
   _gameId: string = "";
@@ -122,7 +124,7 @@ class Session extends EventEmitter {
       gameId,
       password,
       process.env.REACT_APP_VERSION,
-      { playerId }
+      { playerId, color: rememberedColour() }
     );
     this.emit("status", "joining");
   }
@@ -155,6 +157,10 @@ class Session extends EventEmitter {
   _handleJoinedGame(_id: string, token?: string, info?: JoinInfo) {
     if (token) {
       this.joinToken = token;
+      if (isPlayerColour(info?.color)) {
+        this.color = info!.color;
+        rememberColour(this.color);
+      }
       this._handleRoomState(info?.room || {});
       this._handleRole(info?.role || "player");
     }
