@@ -80,6 +80,7 @@ class Session extends EventEmitter {
       this.socket.on("auth_error", this._handleAuthError.bind(this));
       this.socket.on("auth_wait", this._handleAuthWait.bind(this));
       this.socket.on("room_not_found", this._handleRoomNotFound.bind(this));
+      this.socket.on("room_deleted", this._handleRoomDeleted.bind(this));
       this.socket.on("signed_out", this._handleSignedOut.bind(this));
       this.socket.on("game_expired", this._handleGameExpired.bind(this));
       this.socket.on("disconnect", this._handleSocketDisconnect.bind(this));
@@ -197,6 +198,17 @@ class Session extends EventEmitter {
     this.socket?.disconnect();
   }
 
+  // The room is gone, so end this visit without reconnecting
+  _handleRoomDeleted() {
+    this._left = true;
+    this._gameId = "";
+    this._password = "";
+    this._displayToken = undefined;
+    this.joinToken = undefined;
+    this.emit("status", "room_deleted");
+    this.socket?.disconnect();
+  }
+
   // The sign-in this connection was made under has ended
   _handleSignedOut() {
     this._left = true;
@@ -215,6 +227,7 @@ class Session extends EventEmitter {
   }
 
   _handleSocketReconnect() {
+    if (this._left) return;
     if (this.socket) this.socket.sendBuffer = [];
     if (this._gameId && this._displayToken !== undefined) {
       this.joinDisplay(this._gameId, this._displayToken);
@@ -237,6 +250,7 @@ export type SessionStatus =
   | "reconnecting"
   | "auth"
   | "room_not_found"
+  | "room_deleted"
   | "signed_out"
   | "display_error"
   | "needs_update";

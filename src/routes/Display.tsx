@@ -3,6 +3,7 @@ import { Flex, Text } from "theme-ui";
 import { useParams } from "react-router-dom";
 import Konva from "konva";
 
+import RoomNotice from "../components/RoomNotice";
 import ReconnectBanner from "../components/banner/ReconnectBanner";
 import OfflineBanner from "../components/banner/OfflineBanner";
 import LoadingOverlay from "../components/LoadingOverlay";
@@ -89,6 +90,14 @@ function Display() {
   // A ref to the Konva stage
   // the ref will be assigned in the MapInteraction component
   const mapStageRef = useRef<Konva.Stage | null>(null);
+
+  if (sessionStatus === "room_deleted") {
+    return (
+      <RoomNotice title="Room deleted">
+        The room was deleted. Ask your GM for a link to another room.
+      </RoomNotice>
+    );
+  }
 
   if (sessionStatus === "display_error") {
     return (

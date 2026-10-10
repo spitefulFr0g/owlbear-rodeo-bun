@@ -125,6 +125,10 @@ export async function renameRoom(id: string, name: string) {
   return room;
 }
 
+export function deleteRoom(id: string) {
+  return request<void>("DELETE", `/rooms/${encodeURIComponent(id)}`);
+}
+
 /** A link that works once, for an invite or a password reset */
 export type OneUseLink = {
   token: string;
