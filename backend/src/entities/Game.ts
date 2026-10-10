@@ -15,7 +15,7 @@ export default class Game {
   displayFrozen = false;
   latestDisplayView?: DisplayView;
   shownDisplayView?: DisplayView;
-  readonly displayToken: string;
+  displayToken: string;
   gameId: string;
   partyState: PartyState;
   passwordHash: string;
