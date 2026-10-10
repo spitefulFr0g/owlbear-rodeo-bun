@@ -53,7 +53,7 @@ test("reopened setup preserves accounts, signed-in browsers, rooms and images wh
   try {
     const original = await setupAdministrator(server);
     const room = await createRoom(server, original.cookie, "Kept room", "room-password");
-    const owner = await server.joinRoom(room.id, "room-password");
+    const owner = await server.joinRoomAsGM(room.id, original.cookie);
     const observer = await server.joinRoom(room.id, "room-password");
     const map = { id: "kept-map", owner: "gm", type: "file", file: "kept-image" };
     const received = nextMessage(observer.socket, "map");

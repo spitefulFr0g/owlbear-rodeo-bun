@@ -49,7 +49,7 @@ test("removing an account ends every HTTP sign-in and passes loaded and unloaded
     const loaded = await createRoom(server, other.cookie, "Loaded", "room-password");
     const unloaded = await createRoom(server, other.cookie, "Unloaded");
     await server.restart();
-    const owner = await server.joinRoom(loaded.id, "room-password");
+    const owner = await server.joinRoomAsGM(loaded.id, other.cookie);
     const observer = await server.joinRoom(loaded.id, "room-password");
     const displayToken = await new Promise<string>(resolve => owner.socket.emit("get_display_token", resolve));
     const state = { mapId: "map", notes: { door: "Secret door" } };
