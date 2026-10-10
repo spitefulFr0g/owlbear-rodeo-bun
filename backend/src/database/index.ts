@@ -1,5 +1,5 @@
 import { Database } from "bun:sqlite";
-import { existsSync, mkdirSync } from "fs";
+import { existsSync, mkdirSync, statSync } from "fs";
 import { inspectDatabase } from "./startup";
 import { dirname } from "path";
 import type { AssetRecord } from "../entities/AssetStore";
@@ -75,7 +75,7 @@ const layout = `
 export class OwlbearDatabase {
   readonly connection: Database;
 
-  constructor(path: string, upgrades: readonly import("./startup").UpgradeStep[] = []) {
+  constructor(private readonly path: string, upgrades: readonly import("./startup").UpgradeStep[] = []) {
     mkdirSync(dirname(path), { recursive: true });
     const existing = existsSync(path);
     const version = existing ? inspectDatabase(path, LAYOUT_VERSION) : LAYOUT_VERSION;
@@ -122,6 +122,17 @@ export class OwlbearDatabase {
 
   roomsForGM(accountId: string): RoomRecord[] {
     return this.connection.query<RoomRecord, [string]>("SELECT * FROM rooms WHERE gmAccountId = ? ORDER BY name, id").all(accountId);
+  }
+
+  administratorRooms(): (RoomRecord & { gmUsername: string })[] {
+    return this.connection.query<RoomRecord & { gmUsername: string }, []>(`
+      SELECT rooms.*, accounts.username AS gmUsername FROM rooms
+      JOIN accounts ON accounts.id = rooms.gmAccountId ORDER BY rooms.name, rooms.id`).all();
+  }
+
+  diskSizeBytes(): number {
+    return [this.path, `${this.path}-wal`, `${this.path}-shm`, `${this.path}-journal`]
+      .reduce((total, path) => total + (existsSync(path) ? statSync(path).size : 0), 0);
   }
 
   /** Saved UTF-8 document bytes plus each image this room has used. */

@@ -9,14 +9,15 @@ const remove = (server: Server, id: string, cookie?: string, origin?: string) =>
   method: "DELETE", headers: { ...(cookie ? { Cookie: cookie } : {}), ...(origin ? { Origin: origin } : {}) },
 });
 
-test("only the room's GM can delete it and deleted rooms stay gone after restart", async () => {
+test("ordinary accounts can delete only their own rooms and deleted rooms stay gone after restart", async () => {
   const server = await startTestServer();
   try {
     const { cookie } = await setupAdministrator(server);
     const other = await inviteAccount(server, cookie, "Other", "test-password");
     const room = await createRoom(server, other.cookie, "Room");
     expect((await remove(server, room.id)).status).toBe(401);
-    const forbidden = await remove(server, room.id, cookie);
+    const stranger = await inviteAccount(server, cookie, "Stranger", "test-password");
+    const forbidden = await remove(server, room.id, stranger.cookie);
     expect(forbidden.status).toBe(403);
     expect((await forbidden.json() as any).error).toBe("not_room_gm");
     expect((await remove(server, room.id, other.cookie, "https://elsewhere.example")).status).toBe(403);
@@ -35,12 +36,13 @@ test("only the room's GM can delete it and deleted rooms stay gone after restart
   } finally { await server.dispose(); }
 });
 
-test("deleting a room tells every player and cast display before disconnecting and revokes their asset tokens", async () => {
+test("an administrator deleting another GM's room tells every player and cast display before disconnecting and revokes their asset tokens", async () => {
   const server = await startTestServer();
   try {
     const { cookie } = await setupAdministrator(server);
-    const room = await createRoom(server, cookie, "Room");
-    const writer = await server.joinRoomAsGM(room.id, cookie);
+    const other = await inviteAccount(server, cookie, "RoomGM", "test-password");
+    const room = await createRoom(server, other.cookie, "Room");
+    const writer = await server.joinRoomAsGM(room.id, other.cookie);
     const player = await server.joinRoom(room.id);
     const party = nextMessage(player.socket, "party_state");
     writer.socket.emit("player_state", { userId: "gm" });
