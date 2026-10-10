@@ -46,6 +46,7 @@ class Session extends EventEmitter {
   // Store party id and password for reconnect
   _gameId: string = "";
   _password: string = "";
+  _playerId?: string;
   // Set when joined as a cast display
   _displayToken?: string;
   // Set once we have left for good and the status is final
@@ -103,7 +104,7 @@ class Session extends EventEmitter {
    * @param {string} gameId - the id of the party to join
    * @param {string} password - the password of the party
    */
-  async joinGame(gameId: string, password: string) {
+  async joinGame(gameId: string, password: string, playerId = this._playerId) {
     if (typeof gameId !== "string" || typeof password !== "string") {
       console.error(
         "Unable to join game: invalid game ID or password",
@@ -115,11 +116,13 @@ class Session extends EventEmitter {
 
     this._gameId = gameId;
     this._password = password;
+    this._playerId = playerId;
     this.socket?.emit(
       "join_game",
       gameId,
       password,
-      process.env.REACT_APP_VERSION
+      process.env.REACT_APP_VERSION,
+      { playerId }
     );
     this.emit("status", "joining");
   }

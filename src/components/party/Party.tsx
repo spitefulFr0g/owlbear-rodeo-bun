@@ -1,5 +1,5 @@
 import { ReactNode, useEffect } from "react";
-import { Flex, Box, Text } from "theme-ui";
+import { Flex, Box, Text, Button } from "theme-ui";
 import SimpleBar from "simplebar-react";
 
 import AddPartyMemberButton from "./AddPartyMemberButton";
@@ -21,9 +21,10 @@ import { Timer as TimerType } from "../../types/Timer";
 type PartyProps = {
   gameId: string;
   roomSettings?: ReactNode;
+  onTrustChange?: (playerId: string, trusted: boolean) => void;
 };
 
-function Party({ gameId, roomSettings }: PartyProps) {
+function Party({ gameId, roomSettings, onTrustChange }: PartyProps) {
   const setPlayerState = usePlayerUpdater();
   const playerState = usePlayerState();
   const partyState = useParty();
@@ -135,13 +136,24 @@ function Party({ gameId, roomSettings }: PartyProps) {
             diceRolls={shareDice ? playerState.dice.rolls : undefined}
             role={role}
           />
-          {Object.entries(partyState).map(([id, { nickname, dice, role }]) => (
-            <Nickname
-              nickname={nickname}
-              key={id}
-              diceRolls={dice.share ? dice.rolls : undefined}
-              role={role}
-            />
+          {Object.entries(partyState).map(([id, { nickname, dice, role: playerRole, userId }]) => (
+            <Box key={id} mb={2}>
+              <Nickname
+                nickname={nickname}
+                diceRolls={dice.share ? dice.rolls : undefined}
+                role={playerRole}
+              />
+              {role === "gm" && playerRole !== "gm" && userId && onTrustChange && (
+                <Button
+                  variant="secondary"
+                  sx={{ fontSize: 0, width: "100%", padding: 1 }}
+                  aria-label={`${playerRole === "trusted" ? "Unmark" : "Mark"} ${nickname} as trusted`}
+                  onClick={() => onTrustChange(userId, playerRole !== "trusted")}
+                >
+                  {playerRole === "trusted" ? "Unmark trusted" : "Mark trusted"}
+                </Button>
+              )}
+            </Box>
           ))}
           {playerState.timer && <Timer timer={playerState.timer} index={0} />}
           {Object.entries(partyState)
