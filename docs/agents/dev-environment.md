@@ -38,6 +38,15 @@ compiled executable to check a release: `bun scripts/smoke.ts dist/<file>`.
 Add `--from <the last release's executable>` to check the upgrade: the old
 executable makes the data and the new one opens it.
 
+## Releasing
+
+Set the version in both `package.json` files, merge, then push the tag
+`v<version>` to the fork. `.github/workflows/release.yml` builds both
+executables, runs the smoke and upgrade checks on Linux and Windows, and
+leaves a draft release holding them. Write the notes on the draft and publish
+it. A manual run of the workflow makes a draft named `trial-<n>` with no tag;
+delete it after.
+
 ## Seeing it in a browser
 
 Start the backend on a spare port with its own data directory:

@@ -1,0 +1,127 @@
+name: Release
+
+# A pushed tag `v<version>` builds both executables, checks them and leaves a
+# draft release holding them. A person writes the notes and publishes it.
+#
+# A pull request that changes the build runs everything but the draft. A
+# manual run makes a draft for a tag that does not exist, to be deleted after.
+
+on:
+  push:
+    tags:
+      - "v*"
+  pull_request:
+    paths:
+      - ".github/workflows/release.yml"
+      - "backend/scripts/**"
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: The tag matches both package versions
+        if: github.ref_type == 'tag'
+        run: |
+          for file in package.json backend/package.json; do
+            version="v$(node -p "require('./$file').version")"
+            if [ "$version" != "$GITHUB_REF_NAME" ]; then
+              echo "::error::$file is at $version and the tag is $GITHUB_REF_NAME"
+              exit 1
+            fi
+          done
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 16.20.0
+          cache: yarn
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+      - run: bun install --frozen-lockfile
+        working-directory: backend
+      - name: Build the frontend
+        working-directory: backend
+        run: bun run build:frontend --local
+        env:
+          # Create React App fails the build on a lint warning when CI is set.
+          CI: "false"
+      - run: bun test
+        working-directory: backend
+      - run: bun run typecheck
+        working-directory: backend
+      - run: bun run lint
+        working-directory: backend
+      - run: bun run build
+        working-directory: backend
+      - name: The executable holds the frontend
+        run: test "$(find build -type f ! -name '*.map' | wc -l)" -gt 10
+      - name: Smoke check
+        working-directory: backend
+        run: bun scripts/smoke.ts dist/owlbear-rodeo-linux-x64
+      - name: Upgrade from the last release
+        working-directory: backend
+        run: |
+          gh release download --repo "$GITHUB_REPOSITORY" --pattern owlbear-rodeo-linux-x64 --dir "$RUNNER_TEMP/last"
+          chmod +x "$RUNNER_TEMP/last/owlbear-rodeo-linux-x64"
+          bun scripts/smoke.ts dist/owlbear-rodeo-linux-x64 --from "$RUNNER_TEMP/last/owlbear-rodeo-linux-x64"
+        env:
+          GH_TOKEN: ${{ github.token }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: executables
+          path: backend/dist/owlbear-rodeo-*
+          if-no-files-found: error
+          retention-days: 7
+
+  windows:
+    needs: build
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+      - run: bun install --frozen-lockfile
+      - uses: actions/download-artifact@v4
+        with:
+          name: executables
+          path: backend/dist
+      - name: Smoke check
+        run: bun scripts/smoke.ts dist/owlbear-rodeo-windows-x64.exe
+      - name: Upgrade from the last release
+        run: |
+          gh release download --repo "$GITHUB_REPOSITORY" --pattern owlbear-rodeo-windows-x64.exe --dir "$RUNNER_TEMP/last"
+          bun scripts/smoke.ts dist/owlbear-rodeo-windows-x64.exe --from "$RUNNER_TEMP/last/owlbear-rodeo-windows-x64.exe"
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+  draft:
+    needs: [build, windows]
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: executables
+          path: dist
+      - name: Make the draft release
+        run: |
+          if [ "$GITHUB_REF_TYPE" = tag ]; then
+            tag="$GITHUB_REF_NAME"
+            verify=--verify-tag
+          else
+            tag="trial-$GITHUB_RUN_NUMBER"
+            verify=
+          fi
+          gh release create "$tag" dist/owlbear-rodeo-linux-x64 dist/owlbear-rodeo-windows-x64.exe \
+            --repo "$GITHUB_REPOSITORY" --draft $verify --target "$GITHUB_SHA" --title "$tag" \
+            --notes "Made by the release workflow from $GITHUB_SHA. Write the notes, then publish."
+        env:
+          GH_TOKEN: ${{ github.token }}
