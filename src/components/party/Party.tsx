@@ -12,6 +12,7 @@ import DiceTrayButton from "./DiceTrayButton";
 
 import useSetting from "../../hooks/useSetting";
 
+import { useRole } from "../../contexts/RoomContext";
 import { useParty } from "../../contexts/PartyContext";
 import { usePlayerState, usePlayerUpdater } from "../../contexts/PlayerContext";
 import { DiceRoll } from "../../types/Dice";
@@ -25,6 +26,7 @@ function Party({ gameId }: PartyProps) {
   const setPlayerState = usePlayerUpdater();
   const playerState = usePlayerState();
   const partyState = useParty();
+  const role = useRole();
 
   const [fullScreen] = useSetting<boolean>("map.fullScreen");
   const [shareDice, setShareDice] = useSetting<boolean>("dice.shareDice");
@@ -130,12 +132,14 @@ function Party({ gameId }: PartyProps) {
           <Nickname
             nickname={`${playerState.nickname} (you)`}
             diceRolls={shareDice ? playerState.dice.rolls : undefined}
+            role={role}
           />
-          {Object.entries(partyState).map(([id, { nickname, dice }]) => (
+          {Object.entries(partyState).map(([id, { nickname, dice, role }]) => (
             <Nickname
               nickname={nickname}
               key={id}
               diceRolls={dice.share ? dice.rolls : undefined}
+              role={role}
             />
           ))}
           {playerState.timer && <Timer timer={playerState.timer} index={0} />}

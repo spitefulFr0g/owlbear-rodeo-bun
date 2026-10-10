@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from "react";
 import { useMapData } from "../contexts/MapDataContext";
 import { useMapLoading } from "../contexts/MapLoadingContext";
 import { useUserId } from "../contexts/UserIdContext";
+import { useRole } from "../contexts/RoomContext";
 import { useDatabase } from "../contexts/DatabaseContext";
 
 import useDebounce from "../hooks/useDebounce";
@@ -11,6 +12,8 @@ import useMapActions from "../hooks/useMapActions";
 import useAssetTransfers from "../hooks/useAssetTransfers";
 
 import Session from "./Session";
+
+import { getRoleControls } from "../helpers/roomControls";
 
 import Action from "../actions/Action";
 
@@ -46,6 +49,7 @@ import {
  */
 function NetworkedMapAndTokens({ session }: { session: Session }) {
   const userId = useUserId();
+  const role = useRole();
   const { isLoading } = useMapLoading();
 
   const { updateMapState } = useMapData();
@@ -309,7 +313,7 @@ function NetworkedMapAndTokens({ session }: { session: Session }) {
     };
   });
 
-  const canChangeMap = !isLoading;
+  const canChangeMap = !isLoading && getRoleControls(role).map;
 
   return (
     <GlobalImageDrop

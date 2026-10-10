@@ -8,6 +8,8 @@ import usePrevious from "../../hooks/usePrevious";
 import useGridSnapping from "../../hooks/useGridSnapping";
 
 import { useUserId } from "../../contexts/UserIdContext";
+import { useRole } from "../../contexts/RoomContext";
+import { getRoleControls } from "../../helpers/roomControls";
 import {
   useSetPreventMapInteraction,
   useMapWidth,
@@ -74,6 +76,7 @@ function Token({
   selected,
 }: MapTokenProps) {
   const userId = useUserId();
+  const roleControls = getRoleControls(useRole());
 
   const mapWidth = useMapWidth();
   const mapHeight = useMapHeight();
@@ -403,7 +406,7 @@ function Token({
   }, [getAttachedTokens, transformerActive]);
 
   // When a token is hidden if you aren't the map owner hide it completely
-  if (map && !tokenState.visible && map.owner !== userId) {
+  if (map && !tokenState.visible && !roleControls.hidden) {
     return null;
   }
 

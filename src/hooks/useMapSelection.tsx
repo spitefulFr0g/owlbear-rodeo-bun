@@ -6,6 +6,8 @@ import SelectionMenu from "../components/selection/SelectionMenu";
 import SelectTool from "../components/tools/SelectTool";
 import { useBlur, useKeyboard } from "../contexts/KeyboardContext";
 import { useUserId } from "../contexts/UserIdContext";
+import { useRole } from "../contexts/RoomContext";
+import { getRoleControls } from "../helpers/roomControls";
 import shortcuts from "../shortcuts";
 import {
   SelectionItemsChangeEventHandler,
@@ -29,9 +31,10 @@ function useMapSelection(
   settings: SelectToolSettings
 ) {
   const userId = useUserId();
+  const roleControls = getRoleControls(useRole());
   const disabledTokens: Record<string, boolean> = {};
   const disabledNotes: Record<string, boolean> = {};
-  if (mapState && map && map.owner !== userId) {
+  if (mapState && map && !roleControls.hidden) {
     if (!mapState.editFlags.includes("tokens")) {
       for (let token of Object.values(mapState.tokens)) {
         if (token.owner !== userId) {

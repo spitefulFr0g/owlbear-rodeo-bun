@@ -14,8 +14,21 @@ import { useServerStatus } from "../contexts/ServerStatusContext";
 
 import { ApiError, setup } from "../network/api";
 
-/** Shown on every page until the server has an administrator */
-function Setup() {
+type SetupProps = {
+  /**
+   * True when the host has reopened setup on a server that already has
+   * accounts, false for the first run
+   */
+  reopened?: boolean;
+  /** Leave the form for the sign in form, offered when setup was reopened */
+  onSignInInstead?: () => void;
+};
+
+/**
+ * Shown on every page until the server has an administrator, and on the home
+ * page of a signed out visitor while the host has setup reopened
+ */
+function Setup({ reopened, onSignInInstead }: SetupProps) {
   const { refresh } = useServerStatus();
 
   const [username, setUsername] = useState("");
@@ -48,10 +61,13 @@ function Setup() {
     !isSending;
 
   return (
-    <AccountPage title="Set up this server">
+    <AccountPage
+      title={reopened ? "Create a new administrator" : "Set up this server"}
+    >
       <Text as="p" variant="body2" mb={2} sx={{ textAlign: "center" }}>
-        Create the first account. It is the administrator of this server and
-        can invite everyone else.
+        {reopened
+          ? "The host has reopened setup. One new administrator can be created. Every account, room and image already here is kept."
+          : "Create the first account. It is the administrator of this server and can invite everyone else."}
       </Text>
       <Box as="form" onSubmit={handleSubmit}>
         <UsernameField
@@ -68,6 +84,11 @@ function Setup() {
           </Button>
         </Flex>
       </Box>
+      {onSignInInstead && (
+        <Button variant="secondary" onClick={onSignInInstead}>
+          Sign in to an account you have instead
+        </Button>
+      )}
     </AccountPage>
   );
 }

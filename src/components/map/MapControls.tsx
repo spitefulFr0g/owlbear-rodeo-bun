@@ -38,7 +38,8 @@ import { Settings } from "../../types/Settings";
 import { useKeyboard } from "../../contexts/KeyboardContext";
 
 import shortcuts from "../../shortcuts";
-import { useUserId } from "../../contexts/UserIdContext";
+import { useRole } from "../../contexts/RoomContext";
+import { getRoleControls } from "../../helpers/roomControls";
 import { isEmpty } from "../../helpers/shared";
 import { MapActions } from "../../hooks/useMapActions";
 
@@ -76,10 +77,10 @@ function MapContols({
   const [isExpanded, setIsExpanded] = useState(true);
   const [fullScreen, setFullScreen] = useSetting("map.fullScreen");
 
-  const userId = useUserId();
+  const isGM = getRoleControls(useRole()).hidden;
 
   const disabledControls = useMemo(() => {
-    const isOwner = map && map.owner === userId;
+    const isOwner = isGM;
     const allowMapDrawing = isOwner || mapState?.editFlags.includes("drawing");
     const allowFogDrawing = isOwner || mapState?.editFlags.includes("fog");
     const allowNoteEditing = isOwner || mapState?.editFlags.includes("notes");
@@ -110,7 +111,7 @@ function MapContols({
       disabled.push("redo");
     }
     return disabled;
-  }, [map, mapState, mapActions, allowMapChange, userId]);
+  }, [map, mapState, mapActions, allowMapChange, isGM]);
 
   // Change back to move tool if selected tool becomes disabled
   useEffect(() => {
@@ -222,7 +223,7 @@ function MapContols({
         </>
       ),
     },
-  ];
+  ].filter((section) => section.id !== "map" || isGM);
 
   let controls = null;
   if (sections.length === 1 && sections[0].id === "map") {
