@@ -1,26 +1,25 @@
 import { useState, useEffect } from "react";
-import { Flex, Button, Image, Text, IconButton, Link } from "theme-ui";
+import { Flex, Button, Text } from "theme-ui";
+import { useHistory } from "react-router-dom";
+import { useToasts } from "react-toast-notifications";
 
-import Footer from "../components/Footer";
+import SignedInPage from "../components/account/SignedInPage";
+import RoomList from "../components/rooms/RoomList";
 
-import StartModal from "../modals/StartModal";
-import JoinModal from "../modals/JoinModal";
 import GettingStartedModal from "../modals/GettingStartedModal";
+import ChangePasswordModal from "../modals/ChangePasswordModal";
 
 import HelpIcon from "../icons/HelpIcon";
 
 import { useAuth } from "../contexts/AuthContext";
+import { useServerStatus } from "../contexts/ServerStatusContext";
 
-import RedditIcon from "../icons/SocialRedditIcon";
-import TwitterIcon from "../icons/SocialTwitterIcon";
-import YouTubeIcon from "../icons/SocialYouTubeIcon";
-import SocialPatreonIcon from "../icons/SocialPatreonIcon";
+import { signOut } from "../network/api";
 
-import owlington from "../images/Owlington.png";
+import SignIn from "./SignIn";
+import Setup from "./Setup";
 
 function Home() {
-  const [isStartModalOpen, setIsStartModalOpen] = useState(false);
-  const [isJoinModalOpen, setIsJoinModalOpen] = useState(false);
   const [isGettingStartedModalOpen, setIsGettingStartedModalOpen] =
     useState(false);
 
@@ -30,101 +29,83 @@ function Home() {
     setPassword("");
   }, [setPassword]);
 
+  const { account, setup, refresh } = useServerStatus();
+
+  // While the host has setup reopened a visitor is offered it first
+  const [prefersSignIn, setPrefersSignIn] = useState(false);
+
+  async function handleSignOut() {
+    try {
+      await signOut();
+    } finally {
+      await refresh();
+    }
+  }
+
+  const [isChangePasswordModalOpen, setIsChangePasswordModalOpen] =
+    useState(false);
+  const { addToast } = useToasts();
+  function handlePasswordChanged() {
+    setIsChangePasswordModalOpen(false);
+    addToast("Password changed. Your other browsers have been signed out.");
+  }
+
+  const history = useHistory();
+
+  if (!account) {
+    if (setup === "open" && !prefersSignIn) {
+      return <Setup reopened onSignInInstead={() => setPrefersSignIn(true)} />;
+    }
+    return <SignIn />;
+  }
+
   return (
-    <Flex
-      sx={{
-        flexDirection: "column",
-        justifyContent: "space-between",
-        minHeight: "100%",
-        alignItems: "center",
-      }}
-    >
-      <Flex
-        sx={{
-          flexDirection: "column",
-          justifyContent: "center",
-          maxWidth: "300px",
-          flexGrow: 1,
-        }}
-        mb={2}
-      >
-        <Text variant="display" as="h1" sx={{ textAlign: "center" }}>
-          Owlbear Rodeo
-        </Text>
-        <Image src={owlington} m={2} />
+    <SignedInPage>
+      <RoomList />
+      <Text as="p" variant="body2" mt={4}>
+        Signed in as <strong>{account.username}</strong>
+      </Text>
+      <Flex sx={{ flexWrap: "wrap", justifyContent: "center" }}>
+        {account.administrator && (
+          <Button variant="secondary" onClick={() => history.push("/admin")}>
+            Administration
+          </Button>
+        )}
         <Button
           variant="secondary"
-          m={2}
-          onClick={() => setIsGettingStartedModalOpen(true)}
-          sx={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-          }}
+          onClick={() => setIsChangePasswordModalOpen(true)}
         >
-          Getting Started <HelpIcon />
+          Change password
         </Button>
-        <Button m={2} onClick={() => setIsStartModalOpen(true)}>
-          Start Game
+        <Button variant="secondary" onClick={handleSignOut}>
+          Sign out
         </Button>
-        <Button m={2} onClick={() => setIsJoinModalOpen(true)}>
-          Join Game
-        </Button>
-        <Text variant="caption" as="p" sx={{ textAlign: "center" }}>
-          Legacy v{process.env.REACT_APP_VERSION}
-        </Text>
-        <Button
-          as="a"
-          // @ts-ignore
-          href="https://owlbear.rodeo/"
-          mt={4}
-          mx={2}
-          mb={2}
-          sx={{
-            display: "flex",
-            alignItems: "flex-end",
-            justifyContent: "center",
-          }}
-        >
-          Owlbear Rodeo 2.0
-        </Button>
-        <Flex mb={4} mt={0} sx={{ justifyContent: "center" }}>
-          <Link href="https://www.reddit.com/r/OwlbearRodeo/">
-            <IconButton title="Reddit" aria-label="Reddit">
-              <RedditIcon />
-            </IconButton>
-          </Link>
-          <Link href="https://twitter.com/OwlbearRodeo">
-            <IconButton title="Twitter" aria-label="Twitter">
-              <TwitterIcon />
-            </IconButton>
-          </Link>
-          <Link href="https://www.youtube.com/channel/UCePe1wJC53_7fbBbSECG7YQ">
-            <IconButton title="YouTube" aria-label="YouTube">
-              <YouTubeIcon />
-            </IconButton>
-          </Link>
-          <Link href="https://patreon.com/owlbearrodeo">
-            <IconButton title="Patreon" aria-label="Patreon">
-              <SocialPatreonIcon />
-            </IconButton>
-          </Link>
-        </Flex>
-        <JoinModal
-          isOpen={isJoinModalOpen}
-          onRequestClose={() => setIsJoinModalOpen(false)}
-        />
-        <StartModal
-          isOpen={isStartModalOpen}
-          onRequestClose={() => setIsStartModalOpen(false)}
-        />
-        <GettingStartedModal
-          isOpen={isGettingStartedModalOpen}
-          onRequestClose={() => setIsGettingStartedModalOpen(false)}
-        />
       </Flex>
-      <Footer />
-    </Flex>
+      <Button
+        variant="secondary"
+        mt={2}
+        onClick={() => setIsGettingStartedModalOpen(true)}
+        sx={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        Getting Started <HelpIcon />
+      </Button>
+      <Text variant="caption" as="p" sx={{ textAlign: "center" }}>
+        Legacy v{process.env.REACT_APP_VERSION}
+      </Text>
+      <ChangePasswordModal
+        isOpen={isChangePasswordModalOpen}
+        onRequestClose={() => setIsChangePasswordModalOpen(false)}
+        onChanged={handlePasswordChanged}
+      />
+      <GettingStartedModal
+        isOpen={isGettingStartedModalOpen}
+        onRequestClose={() => setIsGettingStartedModalOpen(false)}
+      />
+    </SignedInPage>
   );
 }
 

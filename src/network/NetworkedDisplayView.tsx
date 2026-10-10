@@ -29,7 +29,7 @@ type NetworkedDisplayViewProps = {
 
 /**
  * Tells the server which part of the map this window shows, for cast displays
- * to follow. Rendered only for the player being followed.
+ * to follow. Rendered only for a GM connection.
  */
 function NetworkedDisplayView({ session, mapId }: NetworkedDisplayViewProps) {
   const mapStageRef = useMapStage();

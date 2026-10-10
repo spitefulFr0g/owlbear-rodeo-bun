@@ -12,9 +12,10 @@ import { useGroup } from "../../contexts/GroupContext";
 type TileActionBarProps = {
   onAdd: () => void;
   addTitle: string;
+  addDisabled?: boolean;
 };
 
-function TileActionBar({ onAdd, addTitle }: TileActionBarProps) {
+function TileActionBar({ onAdd, addTitle, addDisabled }: TileActionBarProps) {
   const {
     selectMode,
     onSelectModeChange,
@@ -65,7 +66,13 @@ function TileActionBar({ onAdd, addTitle }: TileActionBarProps) {
           <SelectMultipleIcon />
         </RadioIconButton>
       </Flex>
-      <IconButton onClick={onAdd} aria-label={addTitle} title={addTitle} mr={1}>
+      <IconButton
+        disabled={addDisabled}
+        onClick={onAdd}
+        aria-label={addTitle}
+        title={addTitle}
+        mr={1}
+      >
         <AddIcon />
       </IconButton>
     </Flex>

@@ -320,7 +320,6 @@ export const versions: Record<number, VersionCallback> = {
         .toCollection()
         .modify((state) => {
           state.notes = {};
-          state.editFlags = [...state.editFlags, "notes"];
         });
     });
   },

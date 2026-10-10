@@ -20,9 +20,10 @@ import { Group } from "../../types/Group";
 type SortableTilesProps = {
   renderTile: (group: Group) => React.ReactNode;
   subgroup: boolean;
+  canDrag?: (group: Group) => boolean;
 };
 
-function SortableTiles({ renderTile, subgroup }: SortableTilesProps) {
+function SortableTiles({ renderTile, subgroup, canDrag }: SortableTilesProps) {
   const dragId = useTileDragId();
   const dragCursor = useTileDragCursor();
   const overGroupId = useTileOverGroupId();
@@ -86,6 +87,7 @@ function SortableTiles({ renderTile, subgroup }: SortableTilesProps) {
         <LazyTile key={group.id}>
           <SortableTile
             id={group.id}
+            disableDragging={canDrag && !canDrag(group)}
             disableGrouping={disableTileGrouping}
             disableSorting={disableSorting}
             hidden={group.id === openGroupId}

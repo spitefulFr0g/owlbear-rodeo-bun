@@ -1,6 +1,9 @@
+import { PlayerColour, rememberedColour, isPlayerColour, rememberColour } from "../helpers/playerColour";
 import io, { Socket } from "socket.io-client";
 import msgParser from "socket.io-msgpack-parser";
 import { EventEmitter } from "events";
+
+import { JoinInfo, Role, RoomState } from "../types/Room";
 
 /** Handles the connection to the server. */
 class Session extends EventEmitter {
@@ -24,11 +27,32 @@ class Session extends EventEmitter {
    */
   joinToken?: string;
 
+  /**
+   * When the server will take a room password again, in milliseconds since
+   * the epoch. Set while it refuses them after too many wrong ones.
+   */
+  authWaitUntil?: number;
+
+  /**
+   * What the server last said about the room we have joined
+   */
+  room: RoomState = {};
+
+  /**
+   * What the server lets this connection do in the room, a player until it
+   * says otherwise
+   */
+  role: Role = "player";
+  color?: PlayerColour;
+
   // Store party id and password for reconnect
   _gameId: string = "";
   _password: string = "";
+  _playerId?: string;
   // Set when joined as a cast display
   _displayToken?: string;
+  // Set once we have left for good and the status is final
+  _left: boolean = false;
 
   /**
    * Connect to the websocket
@@ -53,8 +77,14 @@ class Session extends EventEmitter {
       this.socket.on("player_left", this._handlePlayerLeft.bind(this));
       this.socket.on("joined_game", this._handleJoinedGame.bind(this));
       this.socket.on("joined_display", this._handleJoinedDisplay.bind(this));
+      this.socket.on("room_state", this._handleRoomState.bind(this));
+      this.socket.on("player_role", this._handleRole.bind(this));
       this.socket.on("display_error", this._handleDisplayError.bind(this));
       this.socket.on("auth_error", this._handleAuthError.bind(this));
+      this.socket.on("auth_wait", this._handleAuthWait.bind(this));
+      this.socket.on("room_not_found", this._handleRoomNotFound.bind(this));
+      this.socket.on("room_deleted", this._handleRoomDeleted.bind(this));
+      this.socket.on("signed_out", this._handleSignedOut.bind(this));
       this.socket.on("game_expired", this._handleGameExpired.bind(this));
       this.socket.on("disconnect", this._handleSocketDisconnect.bind(this));
       this.socket.io.on("reconnect", this._handleSocketReconnect.bind(this));
@@ -76,7 +106,7 @@ class Session extends EventEmitter {
    * @param {string} gameId - the id of the party to join
    * @param {string} password - the password of the party
    */
-  async joinGame(gameId: string, password: string) {
+  async joinGame(gameId: string, password: string, playerId = this._playerId) {
     if (typeof gameId !== "string" || typeof password !== "string") {
       console.error(
         "Unable to join game: invalid game ID or password",
@@ -88,11 +118,13 @@ class Session extends EventEmitter {
 
     this._gameId = gameId;
     this._password = password;
+    this._playerId = playerId;
     this.socket?.emit(
       "join_game",
       gameId,
       password,
-      process.env.REACT_APP_VERSION
+      process.env.REACT_APP_VERSION,
+      { playerId, color: rememberedColour() }
     );
     this.emit("status", "joining");
   }
@@ -110,22 +142,42 @@ class Session extends EventEmitter {
     this.emit("status", "joining");
   }
 
-  _handleJoinedDisplay(_id: string, token: string) {
+  _handleJoinedDisplay(_id: string, token: string, info?: JoinInfo) {
     this.joinToken = token;
+    this._handleRoomState(info?.room || {});
     this.emit("status", "joined");
   }
 
   // The display link was refused
   _handleDisplayError() {
+    this._left = true;
+    this.joinToken = undefined;
     this.emit("status", "display_error");
+    this.socket?.disconnect();
   }
 
   // Sent when anyone joins the game, the token only comes with our own join
-  _handleJoinedGame(_id: string, token?: string) {
+  _handleJoinedGame(_id: string, token?: string, info?: JoinInfo) {
     if (token) {
       this.joinToken = token;
+      if (isPlayerColour(info?.color)) {
+        this.color = info!.color;
+        rememberColour(this.color);
+      }
+      this._handleRoomState(info?.room || {});
+      this._handleRole(info?.role || "player");
     }
     this.emit("status", "joined");
+  }
+
+  _handleRoomState(room: RoomState) {
+    this.room = room;
+    this.emit("room", room);
+  }
+
+  _handleRole(role: Role) {
+    this.role = role;
+    this.emit("role", role);
   }
 
   _handleGameExpired() {
@@ -144,13 +196,50 @@ class Session extends EventEmitter {
     this.emit("status", "auth");
   }
 
+  // Too many wrong passwords, even the right one is refused for a while
+  _handleAuthWait(retryAfterSeconds: number) {
+    this.authWaitUntil = Date.now() + retryAfterSeconds * 1000;
+    this.emit("status", "auth");
+  }
+
+  // The room link leads nowhere, there is nothing to reconnect to
+  _handleRoomNotFound() {
+    this._gameId = "";
+    this._left = true;
+    this.emit("status", "room_not_found");
+    this.socket?.disconnect();
+  }
+
+  // The room is gone, so end this visit without reconnecting
+  _handleRoomDeleted() {
+    this._left = true;
+    this._gameId = "";
+    this._password = "";
+    this._displayToken = undefined;
+    this.joinToken = undefined;
+    this.emit("status", "room_deleted");
+    this.socket?.disconnect();
+  }
+
+  // The sign-in this connection was made under has ended
+  _handleSignedOut() {
+    this._left = true;
+    this.emit("status", "signed_out");
+    this.socket?.disconnect();
+  }
+
   _handleSocketDisconnect() {
+    // A disconnect that ends the visit, there is nothing to come back to
+    if (this._left) {
+      return;
+    }
     // The server forgets the token when the socket disconnects
     this.joinToken = undefined;
     this.emit("status", "reconnecting");
   }
 
   _handleSocketReconnect() {
+    if (this._left) return;
     if (this.socket) this.socket.sendBuffer = [];
     if (this._gameId && this._displayToken !== undefined) {
       this.joinDisplay(this._gameId, this._displayToken);
@@ -172,6 +261,9 @@ export type SessionStatus =
   | "offline"
   | "reconnecting"
   | "auth"
+  | "room_not_found"
+  | "room_deleted"
+  | "signed_out"
   | "display_error"
   | "needs_update";
 export type SessionStatusHandler = (status: SessionStatus) => void;
@@ -179,8 +271,12 @@ export type SessionStatusHandler = (status: SessionStatus) => void;
 export type PlayerJoinedHandler = (id: string) => void;
 export type PlayerLeftHandler = (id: string) => void;
 export type GameExpiredHandler = () => void;
+export type RoomStateHandler = (room: RoomState) => void;
+export type RoleHandler = (role: Role) => void;
 
 declare interface Session {
+  /** Display token replaced by this GM connection */
+  on(event: "displayToken", listener: (token: string) => void): this;
   /** Session Status Event - Status of the session has changed */
   on(event: "status", listener: SessionStatusHandler): this;
   /** Player Joined Event - A player has joined the game */
@@ -189,6 +285,10 @@ declare interface Session {
   on(event: "playerLeft", listener: PlayerLeftHandler): this;
   /** Game Expired Event - A joining game has expired */
   on(event: "gameExpired", listener: GameExpiredHandler): this;
+  /** Room Event - The server said something new about the room */
+  on(event: "room", listener: RoomStateHandler): this;
+  /** Role Event - The server gave this connection a role in the room */
+  on(event: "role", listener: RoleHandler): this;
 }
 
 export default Session;

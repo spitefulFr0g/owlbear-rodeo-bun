@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useContext } from "react";
 import { Group } from "react-konva";
 
 import { useUserId } from "../contexts/UserIdContext";
@@ -7,9 +7,9 @@ import PointerTool from "../components/tools/PointerTool";
 import { isEmpty } from "../helpers/shared";
 import Vector2 from "../helpers/Vector2";
 
-import useSetting from "../hooks/useSetting";
+import { PlayerStateContext } from "../contexts/PlayerContext";
+import { useParty } from "../contexts/PartyContext";
 import Session from "./Session";
-import { Color } from "../helpers/colors";
 import { PointerState } from "../types/Pointer";
 
 // Send pointer updates every 50ms (20fps)
@@ -33,7 +33,9 @@ function NetworkedMapPointer({ session, active }: NetworkedMapPointerProps) {
   const [localPointerState, setLocalPointerState] = useState<
     Record<string, PointerState>
   >({});
-  const [pointerColor] = useSetting<Color>("pointer.color");
+  const player = useContext(PlayerStateContext);
+  const party = useParty();
+  const pointerColor = player?.color || "blue";
 
   const sessionRef = useRef(session);
   useEffect(() => {
@@ -225,7 +227,7 @@ function NetworkedMapPointer({ session, active }: NetworkedMapPointerProps) {
             pointer.id === userId ? handleOwnPointerMove : undefined
           }
           onPointerUp={pointer.id === userId ? handleOwnPointerUp : undefined}
-          color={pointer.color}
+          color={pointer.id === userId ? pointerColor : Object.values(party).find((person) => person.userId === pointer.id)?.color || pointer.color}
         />
       ))}
     </Group>

@@ -17,7 +17,8 @@ import TokenPropIcon from "../../icons/TokenPropIcon";
 import TokenMountIcon from "../../icons/TokenMountIcon";
 import TokenAttachmentIcon from "../../icons/TokenAttachmentIcon";
 
-import { useUserId } from "../../contexts/UserIdContext";
+import { useRole } from "../../contexts/RoomContext";
+import { getRoleControls } from "../../helpers/roomControls";
 
 import {
   RequestCloseEventHandler,
@@ -72,7 +73,7 @@ function TokenMenu({
   onTokenStateChange,
   map,
 }: TokenMenuProps) {
-  const userId = useUserId();
+  const roleControls = getRoleControls(useRole());
 
   const wasOpen = usePrevious(isOpen);
 
@@ -248,7 +249,7 @@ function TokenMenu({
             ))}
         </Box>
         {/* Only show hide and lock token actions to map owners */}
-        {map && map.owner === userId && tokenState && (
+        {map && roleControls.hidden && tokenState && (
           <Flex sx={{ alignItems: "center", justifyContent: "space-around" }}>
             <IconButton
               onClick={handleVisibleChange}

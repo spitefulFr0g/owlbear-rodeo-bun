@@ -3,11 +3,13 @@ import { Flex, Text } from "theme-ui";
 import { useParams } from "react-router-dom";
 import Konva from "konva";
 
+import RoomNotice from "../components/RoomNotice";
 import ReconnectBanner from "../components/banner/ReconnectBanner";
 import OfflineBanner from "../components/banner/OfflineBanner";
 import LoadingOverlay from "../components/LoadingOverlay";
 import MapLoadingOverlay from "../components/map/MapLoadingOverlay";
 
+import { RoomProvider } from "../contexts/RoomContext";
 import { MapStageProvider } from "../contexts/MapStageContext";
 import { useDatabase } from "../contexts/DatabaseContext";
 import { PartyProvider } from "../contexts/PartyContext";
@@ -90,6 +92,14 @@ function Display() {
   // the ref will be assigned in the MapInteraction component
   const mapStageRef = useRef<Konva.Stage | null>(null);
 
+  if (sessionStatus === "room_deleted") {
+    return (
+      <RoomNotice title="Room deleted">
+        The room was deleted. Ask your GM for a link to another room.
+      </RoomNotice>
+    );
+  }
+
   if (sessionStatus === "display_error") {
     return (
       <Flex
@@ -106,14 +116,14 @@ function Display() {
           This display link no longer works
         </Text>
         <Text as="p" variant="body2" mt={2} sx={{ maxWidth: "420px" }}>
-          The link changes when the server restarts. Open the game and use the
-          display button to get a new one.
+          Open the game and use the display button to get a new one.
         </Text>
       </Flex>
     );
   }
 
   return (
+    <RoomProvider session={session}>
     <AssetsProvider>
       <AssetURLsProvider>
         <MapLoadingProvider>
@@ -140,6 +150,7 @@ function Display() {
         </MapLoadingProvider>
       </AssetURLsProvider>
     </AssetsProvider>
+    </RoomProvider>
   );
 }
 

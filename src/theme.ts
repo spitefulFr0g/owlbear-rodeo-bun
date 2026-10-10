@@ -13,6 +13,7 @@ const theme = {
     gray: "hsl(0, 0%, 70%)",
     overlay: "hsla(230, 25%, 15%, 80%)",
     border: "hsla(210, 50%, 96%, 0.5)",
+    error: "hsl(10, 100%, 78%)",
     modes: {
       light: {
         text: "hsl(10, 20%, 20%)",
@@ -23,6 +24,7 @@ const theme = {
         muted: "hsla(230, 20%, 60%, 20%)",
         overlay: "hsla(230, 100%, 97%, 80%)",
         border: "hsla(10, 20%, 20%, 0.5)",
+        error: "hsl(0, 70%, 42%)",
       },
     },
   },

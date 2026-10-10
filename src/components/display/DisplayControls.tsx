@@ -9,48 +9,27 @@ import DisplayPopoutIcon from "../../icons/DisplayPopoutIcon";
 import DisplayLinkIcon from "../../icons/DisplayLinkIcon";
 import DisplayFreezeIcon from "../../icons/DisplayFreezeIcon";
 
-import { useUserId } from "../../contexts/UserIdContext";
+import { useRole } from "../../contexts/RoomContext";
+import { getRoleControls } from "../../helpers/roomControls";
 
 import Session from "../../network/Session";
 
-import { Map } from "../../types/Map";
+import { copyText } from "../../helpers/clipboard";
 
 type DisplayControlsProps = {
-  map: Map | null;
   session: Session;
 };
 
-async function copyText(text: string) {
-  // The clipboard api is missing on a page loaded over http from another machine
-  if (navigator.clipboard) {
-    await navigator.clipboard.writeText(text);
-    return;
-  }
-  const input = document.createElement("textarea");
-  input.value = text;
-  input.style.position = "fixed";
-  input.style.opacity = "0";
-  document.body.appendChild(input);
-  input.select();
-  const copied = document.execCommand("copy");
-  document.body.removeChild(input);
-  if (!copied) {
-    throw new Error("Unable to copy");
-  }
-}
-
-/** The cast display controls, seen only by the player that cast displays follow */
-function DisplayControls({ map, session }: DisplayControlsProps) {
+/** The cast display controls, available on every GM device */
+function DisplayControls({ session }: DisplayControlsProps) {
   const { id: gameId }: { id: string } = useParams();
-  const userId = useUserId();
+  const isGM = getRoleControls(useRole()).room;
   const { addToast } = useToasts();
 
-  const isFollowed = !!map && !!userId && map.owner === userId;
-
-  // The server only hands the token to the player being followed
+  // The server only hands the token to a GM connection
   const [displayToken, setDisplayToken] = useState<string | null>(null);
   useEffect(() => {
-    if (!isFollowed) {
+    if (!isGM) {
       setDisplayToken(null);
       return;
     }
@@ -68,7 +47,7 @@ function DisplayControls({ map, session }: DisplayControlsProps) {
           return;
         }
         setDisplayToken(token);
-        // Our map may not have reached the server yet
+        // Our join may not have reached the server yet
         if (token) {
           requesting = false;
         } else {
@@ -91,12 +70,14 @@ function DisplayControls({ map, session }: DisplayControlsProps) {
     }
     request();
     session.on("status", handleStatus);
+    session.on("displayToken", setDisplayToken);
     return () => {
       active = false;
       clearTimeout(retry);
       session.off("status", handleStatus);
+      session.off("displayToken", setDisplayToken);
     };
-  }, [isFollowed, session]);
+  }, [isGM, session]);
 
   const [frozen, setFrozen] = useState(false);
   useEffect(() => {
@@ -111,7 +92,7 @@ function DisplayControls({ map, session }: DisplayControlsProps) {
     };
   });
 
-  if (!isFollowed) {
+  if (!isGM) {
     return null;
   }
 
@@ -119,21 +100,37 @@ function DisplayControls({ map, session }: DisplayControlsProps) {
     displayToken &&
     `${window.location.origin}/display/${gameId}#${displayToken}`;
 
-  function handlePopout() {
-    if (!displayLink) {
-      return;
-    }
-    const popout = window.open(
-      displayLink,
-      `display-${gameId}`,
-      "popup,width=1280,height=720"
-    );
-    if (!popout) {
-      addToast("Unable to open the display, allow popups for this page");
+  async function currentDisplayLink() {
+    if (!session.socket?.connected) return null;
+    try {
+      const token = await new Promise<string | null>((resolve, reject) => {
+        session.socket?.timeout(5000).emit("get_display_token", (error: Error | null, token: string | null) => {
+          if (error) reject(error);
+          else resolve(token);
+        });
+      });
+      setDisplayToken(token);
+      return token && `${window.location.origin}/display/${gameId}#${token}`;
+    } catch {
+      addToast("The room did not answer. Please try again.");
+      return null;
     }
   }
 
+  async function handlePopout() {
+    // Open during the click so popup blockers allow it, then load the current link.
+    const popout = window.open("about:blank", `display-${gameId}`, "popup,width=1280,height=720");
+    if (!popout) {
+      addToast("Unable to open the display, allow popups for this page");
+      return;
+    }
+    const link = await currentDisplayLink();
+    if (link) popout.location.href = link;
+    else popout.close();
+  }
+
   async function handleCopy() {
+    const displayLink = await currentDisplayLink();
     if (!displayLink) {
       return;
     }

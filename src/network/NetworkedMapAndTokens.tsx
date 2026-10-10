@@ -3,17 +3,26 @@ import { useState, useEffect, useRef } from "react";
 import { useMapData } from "../contexts/MapDataContext";
 import { useMapLoading } from "../contexts/MapLoadingContext";
 import { useUserId } from "../contexts/UserIdContext";
+import {
+  RoomAssetsContext,
+  useToolPermissions,
+  useRole,
+  useRoom,
+} from "../contexts/RoomContext";
 import { useDatabase } from "../contexts/DatabaseContext";
 
 import useDebounce from "../hooks/useDebounce";
 import useNetworkedState from "../hooks/useNetworkedState";
-import useMapActions from "../hooks/useMapActions";
+import useMapActions, { MapAction } from "../hooks/useMapActions";
 import useAssetTransfers from "../hooks/useAssetTransfers";
 
 import Session from "./Session";
 
+import { getRoleControls } from "../helpers/roomControls";
+
 import Action from "../actions/Action";
 
+import WelcomeScreen from "../components/WelcomeScreen";
 import Map from "../components/map/Map";
 import TokenBar from "../components/token/TokenBar";
 
@@ -46,6 +55,10 @@ import {
  */
 function NetworkedMapAndTokens({ session }: { session: Session }) {
   const userId = useUserId();
+  const role = useRole();
+  const room = useRoom();
+  const waiting = role !== "gm" && room.session === false;
+  const permissions = useToolPermissions();
   const { isLoading } = useMapLoading();
 
   const { updateMapState } = useMapData();
@@ -114,7 +127,7 @@ function NetworkedMapAndTokens({ session }: { session: Session }) {
     });
   }
 
-  useAssetTransfers(session, assetManifest, userId);
+  useAssetTransfers(session, assetManifest, userId, false, permissions.uploads);
 
   /**
    * Map state
@@ -156,8 +169,19 @@ function NetworkedMapAndTokens({ session }: { session: Session }) {
     await loadAssetManifestFromMap(newMap, newMapState);
   }
 
-  const [mapActions, addActions, updateActionIndex, resetActions] =
+  const [mapActions, applyActions, updateActionIndex, resetActions] =
     useMapActions(setCurrentMapState);
+
+  function addActions(actions: MapAction[]) {
+    const allowed = actions.every((action) =>
+      action.type === "drawings"
+        ? permissions.drawing
+        : action.type === "fogs"
+        ? permissions.fog
+        : permissions[action.type]
+    );
+    if (allowed) applyActions(actions);
+  }
 
   function handleMapReset(newMapState: MapState) {
     setCurrentMapState(newMapState, true, true);
@@ -217,6 +241,17 @@ function NetworkedMapAndTokens({ session }: { session: Session }) {
       return;
     }
 
+    if (
+      !permissions.tokens ||
+      tokenStates.some(
+        (state) =>
+          state.type === "file" &&
+          !permissions.uploads &&
+          !assetManifest?.assets[state.file]
+      )
+    )
+      return;
+
     let assets: AssetManifestAsset[] = [];
     for (let tokenState of tokenStates) {
       if (tokenState.type === "file") {
@@ -263,10 +298,11 @@ function NetworkedMapAndTokens({ session }: { session: Session }) {
     }
     const noteAction = new EditStatesAction(noteEdits);
 
-    addActions([
-      { type: "tokens", action: tokenAction },
-      { type: "notes", action: noteAction },
-    ]);
+    const actions: MapAction[] = [];
+    if (tokenEdits.length)
+      actions.push({ type: "tokens", action: tokenAction });
+    if (noteEdits.length) actions.push({ type: "notes", action: noteAction });
+    addActions(actions);
   }
 
   function handleSelectionItemsRemove(
@@ -275,10 +311,11 @@ function NetworkedMapAndTokens({ session }: { session: Session }) {
   ) {
     const tokenAction = new RemoveStatesAction<TokenState>(tokenStateIds);
     const noteAction = new RemoveStatesAction<Note>(noteIds);
-    addActions([
-      { type: "tokens", action: tokenAction },
-      { type: "notes", action: noteAction },
-    ]);
+    const actions: MapAction[] = [];
+    if (tokenStateIds.length)
+      actions.push({ type: "tokens", action: tokenAction });
+    if (noteIds.length) actions.push({ type: "notes", action: noteAction });
+    addActions(actions);
   }
 
   function handleSelectionItemsCreate(
@@ -287,10 +324,11 @@ function NetworkedMapAndTokens({ session }: { session: Session }) {
   ) {
     const tokenAction = new AddStatesAction(tokenStates);
     const noteAction = new AddStatesAction(notes);
-    addActions([
-      { type: "tokens", action: tokenAction },
-      { type: "notes", action: noteAction },
-    ]);
+    const actions: MapAction[] = [];
+    if (tokenStates.length)
+      actions.push({ type: "tokens", action: tokenAction });
+    if (notes.length) actions.push({ type: "notes", action: noteAction });
+    addActions(actions);
   }
 
   useEffect(() => {
@@ -309,37 +347,56 @@ function NetworkedMapAndTokens({ session }: { session: Session }) {
     };
   });
 
-  const canChangeMap = !isLoading;
+  useEffect(() => {
+    function clearOutsideSession() {
+      if (session.role !== "gm" && session.room.session === false) {
+        setCurrentMap(null);
+        setCurrentMapState(null, false);
+        setAssetManifest(null, false);
+        resetActions();
+      }
+    }
+    session.on("room", clearOutsideSession);
+    return () => { session.off("room", clearOutsideSession); };
+  }, [session, setCurrentMapState, setAssetManifest, resetActions]);
+
+  if (waiting) return <WelcomeScreen />;
+
+  const canChangeMap = !isLoading && getRoleControls(role).map;
 
   return (
-    <GlobalImageDrop
-      onMapChange={handleMapChange}
-      onMapTokensStateCreate={handleMapTokensStateCreate}
+    <RoomAssetsContext.Provider
+      value={Object.keys(assetManifest?.assets || {})}
     >
-      <Map
-        map={currentMap}
-        mapState={currentMapState}
-        mapActions={mapActions}
-        onMapTokenStateChange={handleMapTokenStateChange}
-        onMapTokenStateRemove={handleMapTokenStateRemove}
-        onMapTokensStateCreate={handleMapTokensStateCreate}
-        onSelectionItemsChange={handleSelectionItemsChange}
-        onSelectionItemsRemove={handleSelectionItemsRemove}
-        onSelectionItemsCreate={handleSelectionItemsCreate}
+      <GlobalImageDrop
         onMapChange={handleMapChange}
-        onMapReset={handleMapReset}
-        onMapDraw={handleMapDraw}
-        onFogDraw={handleFogDraw}
-        onMapNoteCreate={handleNoteCreate}
-        onMapNoteChange={handleNoteChange}
-        onMapNoteRemove={handleNoteRemove}
-        allowMapChange={canChangeMap}
-        session={session}
-        onUndo={handleUndo}
-        onRedo={handleRedo}
-      />
-      <TokenBar onMapTokensStateCreate={handleMapTokensStateCreate} />
-    </GlobalImageDrop>
+        onMapTokensStateCreate={handleMapTokensStateCreate}
+      >
+        <Map
+          map={currentMap}
+          mapState={currentMapState}
+          mapActions={mapActions}
+          onMapTokenStateChange={handleMapTokenStateChange}
+          onMapTokenStateRemove={handleMapTokenStateRemove}
+          onMapTokensStateCreate={handleMapTokensStateCreate}
+          onSelectionItemsChange={handleSelectionItemsChange}
+          onSelectionItemsRemove={handleSelectionItemsRemove}
+          onSelectionItemsCreate={handleSelectionItemsCreate}
+          onMapChange={handleMapChange}
+          onMapReset={handleMapReset}
+          onMapDraw={handleMapDraw}
+          onFogDraw={handleFogDraw}
+          onMapNoteCreate={handleNoteCreate}
+          onMapNoteChange={handleNoteChange}
+          onMapNoteRemove={handleNoteRemove}
+          allowMapChange={canChangeMap}
+          session={session}
+          onUndo={handleUndo}
+          onRedo={handleRedo}
+        />
+        <TokenBar onMapTokensStateCreate={handleMapTokensStateCreate} />
+      </GlobalImageDrop>
+    </RoomAssetsContext.Provider>
   );
 }
 

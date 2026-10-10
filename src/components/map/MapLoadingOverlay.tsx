@@ -2,12 +2,17 @@ import { Box } from "theme-ui";
 
 import { useMapLoading } from "../../contexts/MapLoadingContext";
 
+import { useRole, useRoom } from "../../contexts/RoomContext";
 import LoadingBar from "../LoadingBar";
 
 function MapLoadingOverlay() {
   const { isLoading, loadingProgressRef } = useMapLoading();
 
-  if (!isLoading) {
+  const room = useRoom();
+  const role = useRole();
+  const waiting = room.session === false && role !== "gm";
+
+  if (!isLoading || waiting) {
     return null;
   }
 

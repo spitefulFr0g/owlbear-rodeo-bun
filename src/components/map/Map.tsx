@@ -15,7 +15,8 @@ import NetworkedDisplayView from "../../network/NetworkedDisplayView";
 import DisplayControls from "../display/DisplayControls";
 
 import { useSettings } from "../../contexts/SettingsContext";
-import { useUserId } from "../../contexts/UserIdContext";
+import { useToolPermissions, useRole } from "../../contexts/RoomContext";
+import { getRoleControls } from "../../helpers/roomControls";
 
 import Action from "../../actions/Action";
 import {
@@ -98,7 +99,8 @@ function Map({
 }: MapProps) {
   const { addToast } = useToasts();
 
-  const userId = useUserId();
+  const permissions = useToolPermissions();
+  const roleControls = getRoleControls(useRole());
 
   const [selectedToolId, setSelectedToolId] = useState<MapToolId>("move");
   const { settings, setSettings } = useSettings();
@@ -194,7 +196,7 @@ function Map({
               onUndo={onUndo}
               onRedo={onRedo}
             />
-            <DisplayControls map={map} session={session} />
+            <DisplayControls session={session} />
             {tokenMenu}
             {noteMenu}
             {selectionMenu}
@@ -228,16 +230,13 @@ function Map({
           onShapeError={addToast}
           active={selectedToolId === "fog"}
           toolSettings={settings.fog}
-          editable={
-            !!(map?.owner === userId || mapState?.editFlags.includes("fog")) &&
-            !settings.fog.preview
-          }
+          editable={permissions.fog && !settings.fog.preview}
         />
         <NetworkedMapPointer
           active={selectedToolId === "pointer"}
           session={session}
         />
-        {map && userId && map.owner === userId && (
+        {map && roleControls.room && (
           <NetworkedDisplayView session={session} mapId={map.id} />
         )}
         <MeasureTool map={map} active={selectedToolId === "measure"} />

@@ -6,6 +6,7 @@ import Konva from "konva";
 import ReconnectBanner from "../components/banner/ReconnectBanner";
 import OfflineBanner from "../components/banner/OfflineBanner";
 import LoadingOverlay from "../components/LoadingOverlay";
+import RoomNotice from "../components/RoomNotice";
 import MapLoadingOverlay from "../components/map/MapLoadingOverlay";
 import UpgradingLoadingOverlay from "../components/UpgradingLoadingOverlay";
 
@@ -14,7 +15,9 @@ import GameExpiredModal from "../modals/GameExpiredModal";
 import ForceUpdateModal from "../modals/ForceUpdateModal";
 import MaintenanceModal from "../modals/MaintenanceModal";
 
+import { useUserId } from "../contexts/UserIdContext";
 import { useAuth } from "../contexts/AuthContext";
+import { useServerStatus } from "../contexts/ServerStatusContext";
 import { MapStageProvider } from "../contexts/MapStageContext";
 import { useDatabase } from "../contexts/DatabaseContext";
 import { PlayerProvider } from "../contexts/PlayerContext";
@@ -23,6 +26,7 @@ import { AssetsProvider, AssetURLsProvider } from "../contexts/AssetsContext";
 import { MapDataProvider } from "../contexts/MapDataContext";
 import { TokenDataProvider } from "../contexts/TokenDataContext";
 import { MapLoadingProvider } from "../contexts/MapLoadingContext";
+import { RoomProvider } from "../contexts/RoomContext";
 
 import NetworkedMapAndTokens from "../network/NetworkedMapAndTokens";
 import NetworkedParty from "../network/NetworkedParty";
@@ -32,10 +36,19 @@ import Session, { SessionStatus } from "../network/Session";
 function Game() {
   const { id: gameId }: { id: string } = useParams();
   const { password } = useAuth();
+  const userId = useUserId();
+  const { refresh } = useServerStatus();
   const { databaseStatus } = useDatabase();
 
   const [session] = useState(new Session());
   const [sessionStatus, setSessionStatus] = useState<SessionStatus>();
+  const [authWaitUntil, setAuthWaitUntil] = useState<number>();
+
+  useEffect(() => {
+    if (sessionStatus === "signed_out") {
+      refresh();
+    }
+  }, [sessionStatus, refresh]);
 
   const [maintenance, setMaintenance] = useState(
     process.env.REACT_APP_MAINTENANCE === "true"
@@ -44,6 +57,7 @@ function Game() {
   useEffect(() => {
     function handleStatus(status: SessionStatus) {
       setSessionStatus(status);
+      setAuthWaitUntil(session.authWaitUntil);
     }
 
     session.on("status", handleStatus);
@@ -70,15 +84,16 @@ function Game() {
   useEffect(() => {
     if (
       sessionStatus === "ready" &&
+      !!userId &&
       (databaseStatus === "loaded" || databaseStatus === "disabled")
     ) {
-      session.joinGame(gameId, password);
+      session.joinGame(gameId, password, userId);
     }
-  }, [gameId, password, databaseStatus, session, sessionStatus]);
+  }, [gameId, password, userId, databaseStatus, session, sessionStatus]);
 
   function handleAuthSubmit(newPassword: string) {
     if (databaseStatus === "loaded" || databaseStatus === "disabled") {
-      session.joinGame(gameId, newPassword);
+      session.joinGame(gameId, newPassword, userId);
     }
   }
 
@@ -97,57 +112,86 @@ function Game() {
   // the ref will be assigned in the MapInteraction component
   const mapStageRef = useRef<Konva.Stage | null>(null);
 
+  if (sessionStatus === "room_deleted") {
+    return (
+      <RoomNotice title="Room deleted">
+        The room was deleted. Ask your GM for a link to another room.
+      </RoomNotice>
+    );
+  }
+
+  if (sessionStatus === "room_not_found") {
+    return (
+      <RoomNotice title="Room not found">
+        No room has this link. Check that all of it was copied, or ask your GM
+        for it again.
+      </RoomNotice>
+    );
+  }
+
+  if (sessionStatus === "signed_out") {
+    return (
+      <RoomNotice title="You were signed out">
+        Your sign-in ended, so you have left the room. Sign in again from the
+        home page to run it.
+      </RoomNotice>
+    );
+  }
+
   return (
-    <AssetsProvider>
-      <AssetURLsProvider>
-        <MapLoadingProvider>
-          <MapDataProvider>
-            <TokenDataProvider>
-              <PlayerProvider session={session}>
-                <PartyProvider session={session}>
-                  <MapStageProvider value={mapStageRef}>
-                    <Flex
-                      sx={{
-                        justifyContent: "space-between",
-                        flexGrow: 1,
-                        height: "100%",
-                      }}
-                    >
-                      <NetworkedParty session={session} gameId={gameId} />
-                      <NetworkedMapAndTokens session={session} />
-                    </Flex>
-                    <OfflineBanner isOpen={sessionStatus === "offline"} />
-                    <ReconnectBanner
-                      isOpen={sessionStatus === "reconnecting"}
-                    />
-                    <AuthModal
-                      isOpen={sessionStatus === "auth"}
-                      onSubmit={handleAuthSubmit}
-                    />
-                    <GameExpiredModal
-                      isOpen={gameExpired}
-                      onRequestClose={() => setGameExpired(false)}
-                    />
-                    <ForceUpdateModal
-                      isOpen={sessionStatus === "needs_update"}
-                    />
-                    {!sessionStatus && <LoadingOverlay />}
-                    {sessionStatus && databaseStatus === "upgrading" && (
-                      <UpgradingLoadingOverlay />
-                    )}
-                    <MaintenanceModal
-                      isOpen={maintenance}
-                      onRequestClose={() => setMaintenance(false)}
-                    />
-                    <MapLoadingOverlay />
-                  </MapStageProvider>
-                </PartyProvider>
-              </PlayerProvider>
-            </TokenDataProvider>
-          </MapDataProvider>
-        </MapLoadingProvider>
-      </AssetURLsProvider>
-    </AssetsProvider>
+    <RoomProvider session={session}>
+      <AssetsProvider>
+        <AssetURLsProvider>
+          <MapLoadingProvider>
+            <MapDataProvider>
+              <TokenDataProvider>
+                <PlayerProvider session={session}>
+                  <PartyProvider session={session}>
+                    <MapStageProvider value={mapStageRef}>
+                      <Flex
+                        sx={{
+                          justifyContent: "space-between",
+                          flexGrow: 1,
+                          height: "100%",
+                        }}
+                      >
+                        <NetworkedParty session={session} gameId={gameId} />
+                        <NetworkedMapAndTokens session={session} />
+                      </Flex>
+                      <OfflineBanner isOpen={sessionStatus === "offline"} />
+                      <ReconnectBanner
+                        isOpen={sessionStatus === "reconnecting"}
+                      />
+                      <AuthModal
+                        isOpen={sessionStatus === "auth"}
+                        waitUntil={authWaitUntil}
+                        onSubmit={handleAuthSubmit}
+                      />
+                      <GameExpiredModal
+                        isOpen={gameExpired}
+                        onRequestClose={() => setGameExpired(false)}
+                      />
+                      <ForceUpdateModal
+                        isOpen={sessionStatus === "needs_update"}
+                      />
+                      {!sessionStatus && <LoadingOverlay />}
+                      {sessionStatus && databaseStatus === "upgrading" && (
+                        <UpgradingLoadingOverlay />
+                      )}
+                      <MaintenanceModal
+                        isOpen={maintenance}
+                        onRequestClose={() => setMaintenance(false)}
+                      />
+                      <MapLoadingOverlay />
+                    </MapStageProvider>
+                  </PartyProvider>
+                </PlayerProvider>
+              </TokenDataProvider>
+            </MapDataProvider>
+          </MapLoadingProvider>
+        </AssetURLsProvider>
+      </AssetsProvider>
+    </RoomProvider>
   );
 }
 

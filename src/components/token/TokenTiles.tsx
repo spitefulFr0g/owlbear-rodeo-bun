@@ -1,3 +1,4 @@
+import { useCanPlaceToken } from "../../contexts/RoomContext";
 import TokenTile from "./TokenTile";
 import TokenTileGroup from "./TokenTileGroup";
 import TokenHiddenBadge from "./TokenHiddenBadge";
@@ -18,8 +19,15 @@ type TokenTilesProps = {
 };
 
 function TokenTiles({ tokensById, onTokenEdit, subgroup }: TokenTilesProps) {
+  const canPlaceToken = useCanPlaceToken();
   const { selectedGroupIds, selectMode, onGroupOpen, onGroupSelect } =
     useGroup();
+
+  function canDrag(group: Group): boolean {
+    return getGroupItems(group).every(
+      (item) => tokensById[item.id] && canPlaceToken(tokensById[item.id])
+    );
+  }
 
   function renderTile(group: Group) {
     if (group.type === "item") {
@@ -40,7 +48,9 @@ function TokenTiles({ tokensById, onTokenEdit, subgroup }: TokenTilesProps) {
             onTokenEdit={onTokenEdit}
             canEdit={canEdit}
             badges={[
-              `${token.defaultSize}x`,
+              canPlaceToken(token)
+                ? `${token.defaultSize}x`
+                : "Placement unavailable",
               <TokenHiddenBadge hidden={token.hideInSidebar} />,
             ]}
           />
@@ -66,7 +76,11 @@ function TokenTiles({ tokensById, onTokenEdit, subgroup }: TokenTilesProps) {
 
   return (
     <>
-      <SortableTiles renderTile={renderTile} subgroup={subgroup} />
+      <SortableTiles
+        renderTile={renderTile}
+        subgroup={subgroup}
+        canDrag={canDrag}
+      />
       <SortableTilesDragOverlay renderTile={renderTile} subgroup={subgroup} />
     </>
   );

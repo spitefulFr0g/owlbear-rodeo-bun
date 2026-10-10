@@ -5,7 +5,8 @@ import SelectionDragOverlay from "../components/selection/SelectionDragOverlay";
 import SelectionMenu from "../components/selection/SelectionMenu";
 import SelectTool from "../components/tools/SelectTool";
 import { useBlur, useKeyboard } from "../contexts/KeyboardContext";
-import { useUserId } from "../contexts/UserIdContext";
+import { useToolPermissions, useRole } from "../contexts/RoomContext";
+import { getRoleControls } from "../helpers/roomControls";
 import shortcuts from "../shortcuts";
 import {
   SelectionItemsChangeEventHandler,
@@ -28,18 +29,17 @@ function useMapSelection(
   selectedToolId: MapToolId,
   settings: SelectToolSettings
 ) {
-  const userId = useUserId();
+  const permissions = useToolPermissions();
+  const roleControls = getRoleControls(useRole());
   const disabledTokens: Record<string, boolean> = {};
   const disabledNotes: Record<string, boolean> = {};
-  if (mapState && map && map.owner !== userId) {
-    if (!mapState.editFlags.includes("tokens")) {
+  if (mapState && map && !roleControls.hidden) {
+    if (!permissions.tokens) {
       for (let token of Object.values(mapState.tokens)) {
-        if (token.owner !== userId) {
-          disabledTokens[token.id] = true;
-        }
+        disabledTokens[token.id] = true;
       }
     }
-    if (!mapState.editFlags.includes("notes")) {
+    if (!permissions.notes) {
       for (let note of Object.values(mapState.notes)) {
         disabledNotes[note.id] = true;
       }
@@ -69,7 +69,7 @@ function useMapSelection(
   useEffect(() => {
     setSelection(null);
     setIsSelectionMenuOpen(false);
-  }, [map]);
+  }, [map, permissions.tokens, permissions.notes]);
 
   function handleSelectionDragStart() {
     if (duplicateSelection && selection) {

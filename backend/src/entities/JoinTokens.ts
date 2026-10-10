@@ -7,7 +7,7 @@ import { randomBytes } from "crypto";
  */
 export default class JoinTokens {
   private readonly gameByToken = new Map<
-    string, { gameId: string; role: "player" | "display" }
+    string, { gameId: string; role: "gm" | "player" | "display"; socketId: string }
   >();
   private readonly tokenBySocket = new Map<string, string>();
 
@@ -15,17 +15,23 @@ export default class JoinTokens {
   issue(
     socketId: string,
     gameId: string,
-    role: "player" | "display" = "player"
+    role: "gm" | "player" | "display" = "player"
   ): string {
     this.revoke(socketId);
     const token = randomBytes(32).toString("base64url");
-    this.gameByToken.set(token, { gameId, role });
+    this.gameByToken.set(token, { gameId, role, socketId });
     this.tokenBySocket.set(socketId, token);
     return token;
   }
 
+  // The room server resolves the live connection and room on each request.
+  uploadAllowed?: (gameId: string, socketId: string) => boolean;
+
   canUpload(token: string): boolean {
-    return this.gameByToken.get(token)?.role === "player";
+    const connection = this.gameByToken.get(token);
+    if (connection && this.uploadAllowed) return this.uploadAllowed(connection.gameId, connection.socketId);
+    const role = this.gameByToken.get(token)?.role;
+    return role === "gm" || role === "player";
   }
 
   revoke(socketId: string): void {

@@ -1,7 +1,10 @@
-import { useEffect } from "react";
-import { Flex, Box, Text } from "theme-ui";
+import { ReactNode, useEffect } from "react";
+import { Flex, Box, Text, Button } from "theme-ui";
 import SimpleBar from "simplebar-react";
 
+import colors from "../../helpers/colors";
+import { playerColours, isPlayerColour, rememberColour } from "../../helpers/playerColour";
+import { Select } from "theme-ui";
 import AddPartyMemberButton from "./AddPartyMemberButton";
 import Nickname from "./Nickname";
 import ChangeNicknameButton from "./ChangeNicknameButton";
@@ -12,6 +15,7 @@ import DiceTrayButton from "./DiceTrayButton";
 
 import useSetting from "../../hooks/useSetting";
 
+import { useRole } from "../../contexts/RoomContext";
 import { useParty } from "../../contexts/PartyContext";
 import { usePlayerState, usePlayerUpdater } from "../../contexts/PlayerContext";
 import { DiceRoll } from "../../types/Dice";
@@ -19,12 +23,15 @@ import { Timer as TimerType } from "../../types/Timer";
 
 type PartyProps = {
   gameId: string;
+  roomSettings?: ReactNode;
+  onTrustChange?: (playerId: string, trusted: boolean) => void;
 };
 
-function Party({ gameId }: PartyProps) {
+function Party({ gameId, roomSettings, onTrustChange }: PartyProps) {
   const setPlayerState = usePlayerUpdater();
   const playerState = usePlayerState();
   const partyState = useParty();
+  const role = useRole();
 
   const [fullScreen] = useSetting<boolean>("map.fullScreen");
   const [shareDice, setShareDice] = useSetting<boolean>("dice.shareDice");
@@ -95,6 +102,7 @@ function Party({ gameId }: PartyProps) {
       bg="background"
       sx={{
         position: "relative",
+        flexShrink: 0,
       }}
     >
       <Box
@@ -130,13 +138,28 @@ function Party({ gameId }: PartyProps) {
           <Nickname
             nickname={`${playerState.nickname} (you)`}
             diceRolls={shareDice ? playerState.dice.rolls : undefined}
+            role={role}
+            color={playerState.color}
           />
-          {Object.entries(partyState).map(([id, { nickname, dice }]) => (
-            <Nickname
-              nickname={nickname}
-              key={id}
-              diceRolls={dice.share ? dice.rolls : undefined}
-            />
+          {Object.entries(partyState).map(([id, { nickname, dice, role: playerRole, userId, color }]) => (
+            <Box key={id} mb={2}>
+              <Nickname
+                nickname={nickname}
+                diceRolls={dice.share ? dice.rolls : undefined}
+                role={playerRole}
+                color={color}
+              />
+              {role === "gm" && playerRole !== "gm" && userId && onTrustChange && (
+                <Button
+                  variant="secondary"
+                  sx={{ fontSize: 0, width: "100%", padding: 1 }}
+                  aria-label={`${playerRole === "trusted" ? "Unmark" : "Mark"} ${nickname} as trusted`}
+                  onClick={() => onTrustChange(userId, playerRole !== "trusted")}
+                >
+                  {playerRole === "trusted" ? "Unmark trusted" : "Mark trusted"}
+                </Button>
+              )}
+            </Box>
           ))}
           {playerState.timer && <Timer timer={playerState.timer} index={0} />}
           {Object.entries(partyState)
@@ -151,6 +174,18 @@ function Party({ gameId }: PartyProps) {
             ))}
         </SimpleBar>
         <Flex sx={{ flexDirection: "column" }}>
+          <Text variant="caption">Your colour</Text>
+          <Select id="player-colour" aria-label="Your colour" value={playerState.color || ""}
+            sx={{ width: "100%", color: playerState.color ? colors[playerState.color] : "text", mb: 2 }}
+            onChange={(event) => {
+              const color = event.target.value;
+              if (!isPlayerColour(color)) return;
+              rememberColour(color);
+              setPlayerState((previous) => ({ ...previous, color }));
+            }}>
+            {!playerState.color && <option value="" disabled>Assigned on join</option>}
+            {playerColours.map((color) => <option key={color} value={color}>{color[0].toUpperCase() + color.slice(1)}</option>)}
+          </Select>
           <ChangeNicknameButton
             nickname={playerState.nickname}
             onChange={handleNicknameChange}
@@ -161,6 +196,7 @@ function Party({ gameId }: PartyProps) {
             onTimerStop={handleTimerStop}
             timer={playerState.timer}
           />
+          {roomSettings}
           <SettingsButton />
         </Flex>
       </Box>

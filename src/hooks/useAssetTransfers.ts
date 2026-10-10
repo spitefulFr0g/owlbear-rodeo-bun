@@ -43,9 +43,12 @@ function useAssetTransfers(
   session: Session,
   assetManifest: AssetManifest | null,
   userId: string | undefined,
-  loadOnly = false
+  loadOnly = false,
+  allowUploads = true
 ) {
   const { addToast } = useToasts();
+  const allowUploadsRef = useRef(allowUploads);
+  allowUploadsRef.current = allowUploads;
   const partyState = useParty();
   const { assetLoadStart, assetProgressUpdate, assetLoadCancel } =
     useMapLoading();
@@ -118,6 +121,10 @@ function useAssetTransfers(
         if (!(await hasAsset(access, asset.id))) {
           const storedAsset = await getAsset(asset.id);
           if (!storedAsset) {
+            retryLater(transfer);
+            return;
+          }
+          if (!allowUploadsRef.current) {
             retryLater(transfer);
             return;
           }
@@ -210,8 +217,7 @@ function useAssetTransfers(
       // Ensure transfers are marked before any async operation to prevent them from starting twice
       transfer.isBusy = true;
       const currentTransfer = transfer;
-      const run =
-        !loadOnly && asset.owner === userId ? shareAsset : loadAsset;
+      const run = !loadOnly && asset.owner === userId ? shareAsset : loadAsset;
       run(asset, currentTransfer).finally(() => {
         currentTransfer.isBusy = false;
         if (currentTransfer.done) {
@@ -227,6 +233,7 @@ function useAssetTransfers(
     retryCount,
     userId,
     loadOnly,
+    allowUploads,
     addToast,
     getAsset,
     putAsset,

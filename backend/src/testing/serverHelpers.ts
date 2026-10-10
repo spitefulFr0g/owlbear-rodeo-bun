@@ -1,0 +1,168 @@
+import { cp, mkdtemp, rm } from "fs/promises";
+import { tmpdir } from "os";
+import { join } from "path";
+import { io, Socket } from "socket.io-client";
+import msgParser from "socket.io-msgpack-parser";
+import { Clock } from "../clock";
+import { RunningServer, startServer } from "../server";
+
+export class TestClock implements Clock {
+  maximumScheduledDelay = 0;
+  private time: number;
+  private tasks = new Map<number, { at: number; task: () => void | Promise<void> }>();
+  private nextId = 0;
+
+  constructor(time = Date.UTC(2026, 0, 1)) { this.time = time; }
+  now() { return this.time; }
+  after(delayMs: number, task: () => void | Promise<void>) {
+    this.maximumScheduledDelay = Math.max(this.maximumScheduledDelay, delayMs);
+    const id = this.nextId++;
+    this.tasks.set(id, { at: this.time + Math.max(0, delayMs), task });
+    return () => { this.tasks.delete(id); };
+  }
+  async advance(ms: number) {
+    if (ms < 0 || !Number.isFinite(ms)) throw new Error("Clock must move forward by a finite duration");
+    const end = this.time + ms;
+    for (;;) {
+      const next = [...this.tasks].filter(([, value]) => value.at <= end)
+        .sort((a, b) => a[1].at - b[1].at || a[0] - b[0])[0];
+      if (!next) break;
+      this.time = next[1].at;
+      this.tasks.delete(next[0]);
+      await next[1].task();
+    }
+    this.time = end;
+  }
+}
+
+export function nextMessage(socket: Socket, event: string): Promise<any[]> {
+  return new Promise((resolve, reject) => {
+    const receive = (...args: any[]) => {
+      clearTimeout(timeout);
+      resolve(args);
+    };
+    // A deadline catches missing network messages; server time uses TestClock.
+    const timeout = setTimeout(() => {
+      socket.off(event, receive);
+      reject(new Error(`Did not receive ${event}`));
+    }, 2000);
+    socket.once(event, receive);
+  });
+}
+
+/** Owns a temporary directory across restarts; dispose it in a finally block. */
+export async function startTestServer(prepare?: (dataDir: string) => Promise<void>, preparedDataDir?: string) {
+  const dataDir = preparedDataDir ?? await mkdtemp(join(tmpdir(), "owlbear-server-"));
+  const clock = new TestClock();
+  const options = { dataDir, clock, port: 0, allowOrigin: null };
+  let server: RunningServer;
+  try {
+    await prepare?.(dataDir);
+    server = await startServer(options);
+  }
+  catch (error) {
+    if (!preparedDataDir) await rm(dataDir, { recursive: true, force: true });
+    throw error;
+  }
+  const sockets = new Set<Socket>();
+  const connect = (cookie?: string) => {
+    const socket = io(server.address, { parser: msgParser, transports: ["websocket"], reconnection: false, extraHeaders: cookie ? { Cookie: cookie } : undefined });
+    sockets.add(socket);
+    return socket;
+  };
+  // Both helpers join rooms already created through POST /api/rooms.
+  const joinConnection = async (roomId: string, credential: string, event: "join_game" | "join_display", cookie?: string) => {
+    const socket = connect(cookie);
+    const saved: any = {};
+    socket.on("map", value => { saved.map = value; });
+    socket.on("map_state", value => { saved.mapState = value; });
+    socket.on("manifest", value => { saved.manifest = value; });
+    const party = nextMessage(socket, "party_state");
+    const joined = nextMessage(socket, event === "join_game" ? "joined_game" : "joined_display");
+    const frozen = nextMessage(socket, "display_frozen");
+    socket.emit(event, roomId, credential);
+    const [[, token, info], [displayFrozen]] = await Promise.all([joined, frozen]);
+    const [partyState] = await party;
+    return { socket, info, token: token as string, state: { ...saved, partyState }, displayFrozen };
+  };
+  return {
+    clock,
+    connect,
+    get address() { return server.address; },
+    joinRoom: (roomId: string, password = "") => joinConnection(roomId, password, "join_game"),
+    joinRoomAsGM: (roomId: string, cookie: string) => joinConnection(roomId, "", "join_game", cookie),
+    joinDisplay: (roomId: string, displayToken: string) => joinConnection(roomId, displayToken, "join_display"),
+    // Capture durable files without invoking the clean-stop flush. The tests
+    // recover this copy through a second whole server, never through SQLite.
+    async durableCopy() {
+      return startTestServer(async (copyDir) => {
+        await cp(join(dataDir, "owlbear.db"), join(copyDir, "owlbear.db"));
+        await cp(join(dataDir, "assets"), join(copyDir, "assets"), { recursive: true });
+      });
+    },
+    stop: () => server.stop(),
+    async restart(overrides: { reopenSetup?: boolean; behindProxy?: boolean } = {}) {
+      await server.stop();
+      for (const socket of sockets) socket.disconnect();
+      sockets.clear();
+      server = await startServer({ ...options, ...overrides });
+    },
+    async dispose() {
+      await server.stop();
+      for (const socket of sockets) socket.disconnect();
+      await rm(dataDir, { recursive: true, force: true });
+    },
+  };
+}
+
+/** Creates the first administrator through the same setup route a browser uses. */
+export async function setupAdministrator(server: Pick<RunningServer, "address">, username = "Administrator", password = "test-password") {
+  const response = await fetch(`${server.address}/api/setup`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ username, password }),
+  });
+  if (response.status !== 201) throw new Error(`Administrator setup failed: ${await response.text()}`);
+  const { account } = await response.json() as { account: import("../accounts/Accounts").Account };
+  const cookie = response.headers.get("set-cookie")!.split(";")[0];
+  return { account, cookie };
+}
+
+/** Signs in through HTTP and keeps the cookie for later browser requests. */
+export async function signIn(server: Pick<RunningServer, "address">, username: string, password: string) {
+  const response = await fetch(`${server.address}/api/sign-in`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ username, password }),
+  });
+  if (response.status !== 200) throw new Error(`Sign-in failed: ${await response.text()}`);
+  const { account } = await response.json() as { account: import("../accounts/Accounts").Account };
+  const cookie = response.headers.get("set-cookie")!.split(";")[0];
+  return { account, cookie };
+}
+
+/** Creates a room through the signed-in HTTP route. */
+export async function createRoom(server: Pick<RunningServer, "address">, cookie: string, name: string, password?: string) {
+  const response = await fetch(`${server.address}/api/rooms`, {
+    method: "POST", headers: { Cookie: cookie, "Content-Type": "application/json" },
+    body: JSON.stringify({ name, password }),
+  });
+  if (response.status !== 201) throw new Error(`Room creation failed: ${await response.text()}`);
+  return (await response.json() as { room: import("../controllers/RoomController").Room }).room;
+}
+
+/** Creates an ordinary account through an administrator's invite link. */
+export async function inviteAccount(server: Pick<RunningServer, "address">, administratorCookie: string, username: string, password: string) {
+  const invite = await fetch(`${server.address}/api/admin/invites`, {
+    method: "POST", headers: { Cookie: administratorCookie },
+  });
+  if (invite.status !== 201) throw new Error(`Invite creation failed: ${await invite.text()}`);
+  const { token } = await invite.json() as { token: string };
+  const response = await fetch(`${server.address}/api/invites/${token}`, {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ username, password }),
+  });
+  if (response.status !== 201) throw new Error(`Invite acceptance failed: ${await response.text()}`);
+  const { account } = await response.json() as { account: import("../accounts/Accounts").Account };
+  const cookie = response.headers.get("set-cookie")!.split(";")[0];
+  return { account, cookie };
+}

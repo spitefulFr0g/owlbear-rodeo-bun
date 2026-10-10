@@ -1,5 +1,5 @@
 import { describe, expect, spyOn, test } from "bun:test";
-import { defaultDataDir, parseConfig } from "./config";
+import { defaultDataDir, parseConfig, USAGE } from "./config";
 
 describe("parseConfig", () => {
   test("defaults to port 9000, same-origin", () => {
@@ -52,7 +52,7 @@ describe("parseConfig", () => {
     try {
       expect(parseConfig(["--ice-servers", "/missing/ice.json"], {
         ICE_SERVERS_FILE: "/also-missing/ice.json",
-      })).toEqual({ port: 9000, allowOrigin: null, dataDir: undefined, help: false });
+      })).toEqual({ port: 9000, allowOrigin: null, dataDir: undefined, help: false, reopenSetup: false, behindProxy: false });
       expect(warning.mock.calls).toEqual([[
         "Warning: --ice-servers / ICE_SERVERS_FILE no longer does anything because peer-to-peer connections were removed.",
       ]]);
@@ -119,4 +119,18 @@ describe("defaultDataDir", () => {
       )
     ).toBe("/home/gm/owlbear/backend/data");
   });
+});
+
+test("reopen setup is a command-line-only flag described in help", () => {
+  expect(parseConfig(["--reopen-setup", "--port", "8081", "--data-dir", "saved"], {}).reopenSetup).toBe(true);
+  expect(parseConfig([], { REOPEN_SETUP: "true", OWLBEAR_REOPEN_SETUP: "1" }).reopenSetup).toBe(false);
+  expect(USAGE).toContain("--reopen-setup");
+  expect(USAGE).toContain("one new administrator");
+});
+
+test("behind proxy is an explicit command-line flag described in help", () => {
+  expect(parseConfig([], {}).behindProxy).toBe(false);
+  expect(parseConfig(["--behind-proxy"], {}).behindProxy).toBe(true);
+  expect(USAGE).toContain("--behind-proxy");
+  expect(USAGE).toContain("nearest proxy");
 });

@@ -7,10 +7,9 @@ import { getGridUpdatedInset } from "../../helpers/grid";
 import { useDataURL } from "../../contexts/AssetsContext";
 import { mapSources as defaultMapSources } from "../../maps";
 
-import Divider from "../Divider";
 import Select from "../Select";
 import { Map, MapQuality } from "../../types/Map";
-import { EditFlag, MapState } from "../../types/MapState";
+import { MapState } from "../../types/MapState";
 import {
   MapSettingsChangeEventHandler,
   MapStateSettingsChangeEventHandler,
@@ -53,25 +52,7 @@ type MapSettingsProps = {
   onStateSettingsChange: MapStateSettingsChangeEventHandler;
 };
 
-function MapSettings({
-  map,
-  mapState,
-  onSettingsChange,
-  onStateSettingsChange,
-}: MapSettingsProps) {
-  function handleFlagChange(
-    event: React.ChangeEvent<HTMLInputElement>,
-    flag: EditFlag
-  ) {
-    if (event.target.checked) {
-      onStateSettingsChange({ editFlags: [...mapState.editFlags, flag] });
-    } else {
-      onStateSettingsChange({
-        editFlags: mapState.editFlags.filter((f) => f !== flag),
-      });
-    }
-  }
-
+function MapSettings({ map, onSettingsChange }: MapSettingsProps) {
   function handleGridSizeXChange(event: React.ChangeEvent<HTMLInputElement>) {
     const value = parseInt(event.target.value) || 0;
     let grid = {
@@ -169,7 +150,6 @@ function MapSettings({
   }, [mapURL]);
 
   const mapEmpty = !map || isEmpty(map);
-  const mapStateEmpty = !mapState || isEmpty(mapState);
 
   return (
     <Flex sx={{ flexDirection: "column" }}>
@@ -314,44 +294,6 @@ function MapSettings({
           </Label>
         </Flex>
       )}
-      <Divider fill />
-      <Box my={2} sx={{ flexGrow: 1 }}>
-        <Label>Allow Others to Edit</Label>
-        <Flex my={1}>
-          <Label>
-            <Checkbox
-              checked={!mapStateEmpty && mapState.editFlags.includes("fog")}
-              disabled={mapStateEmpty}
-              onChange={(e) => handleFlagChange(e, "fog")}
-            />
-            Fog
-          </Label>
-          <Label>
-            <Checkbox
-              checked={!mapStateEmpty && mapState.editFlags.includes("drawing")}
-              disabled={mapStateEmpty}
-              onChange={(e) => handleFlagChange(e, "drawing")}
-            />
-            Drawings
-          </Label>
-          <Label>
-            <Checkbox
-              checked={!mapStateEmpty && mapState.editFlags.includes("tokens")}
-              disabled={mapStateEmpty}
-              onChange={(e) => handleFlagChange(e, "tokens")}
-            />
-            Tokens
-          </Label>
-          <Label>
-            <Checkbox
-              checked={!mapStateEmpty && mapState.editFlags.includes("notes")}
-              disabled={mapStateEmpty}
-              onChange={(e) => handleFlagChange(e, "notes")}
-            />
-            Notes
-          </Label>
-        </Flex>
-      </Box>
     </Flex>
   );
 }

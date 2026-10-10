@@ -1,3 +1,4 @@
+import { RoomSwitches } from "../types/RoomSwitches";
 import { randomBytes } from "crypto";
 import { DisplayView } from "../types/DisplayView";
 import { PlayerState } from "../types/PlayerState";
@@ -7,16 +8,24 @@ import { Manifest } from "../types/Manifest";
 import { Map } from "../types/Map";
 
 export default class Game {
+  name = "";
+  session = false;
+  cancelSessionCountdown?: () => void;
+  switches: RoomSwitches = { tokens: true, drawing: true, notes: true, fog: false, uploads: false };
+  trustedPlayerIds = new Set<string>();
+  gmAccountId: string | null = null;
+  hasPassword = false;
   displayFrozen = false;
   latestDisplayView?: DisplayView;
   shownDisplayView?: DisplayView;
-  readonly displayToken = randomBytes(32).toString("base64url");
+  displayToken: string;
   gameId: string;
   partyState: PartyState;
   passwordHash: string;
   state: Record<string, MapState | Manifest | Map>;
 
-  constructor(gameId: string, hash: string) {
+  constructor(gameId: string, hash: string, displayToken = randomBytes(32).toString("base64url")) {
+    this.displayToken = displayToken;
     this.gameId = gameId;
     this.partyState = {};
     this.passwordHash = hash;
