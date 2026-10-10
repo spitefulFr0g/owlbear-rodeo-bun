@@ -24,17 +24,15 @@ const dataDir = await mkdtemp(join(tmpdir(), "owlbear-smoke-"));
 const expected = [
   // A server started from source may have no frontend build to embed.
   /^No frontend is embedded/,
-  // A dependency of the compiled executable still calls url.parse().
-  /\[DEP0169\]/,
-  /--trace-warnings/,
 ];
 const unexpected: string[] = [];
 
-async function start(command: string[]) {
+/** Starts a server. Only the one under test has its stderr judged, a released one has shipped. */
+async function start(command: string[], judged = true) {
   const server = Bun.spawn([...command, "--port", "0", "--data-dir", dataDir], { stdout: "pipe", stderr: "pipe" });
   const errors = (async () => {
     const lines = (await new Response(server.stderr).text()).split("\n").filter(line => line.trim());
-    unexpected.push(...lines.filter(line => !expected.some(pattern => pattern.test(line))));
+    if (judged) unexpected.push(...lines.filter(line => !expected.some(pattern => pattern.test(line))));
   })();
   let output = "";
   const decoder = new TextDecoder();
@@ -79,7 +77,7 @@ async function joinAsGM(address: string, roomId: string, cookie: string) {
 }
 
 const image = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 1, 2, 3, 4]);
-let server = await start(released ? [released] : command);
+let server = released ? await start([released], false) : await start(command);
 try {
   const setup = await post(server.address, "/api/setup", { username: "Administrator", password: "smoke-password" });
   const cookie = setup.headers.get("set-cookie")!.split(";")[0];
