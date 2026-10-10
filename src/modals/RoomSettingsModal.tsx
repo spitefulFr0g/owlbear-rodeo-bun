@@ -36,9 +36,20 @@ export default function RoomSettingsModal({
   const [displayLink, setDisplayLink] = useState("");
   const { id: roomId }: { id: string } = useParams();
   const request = useRef(0);
+  const feedback = useRef<HTMLDivElement>(null);
+  // Nothing from the last visit is shown when the settings open again
   useEffect(() => {
-    if (!isOpen) setPassword("");
+    if (!isOpen) {
+      setPassword("");
+      setMessage("");
+      setError("");
+      setDisplayLink("");
+    }
   }, [isOpen]);
+  // The answer sits below the settings, so bring it into view
+  useEffect(() => {
+    if (message || error) feedback.current?.scrollIntoView({ block: "nearest" });
+  }, [message, error, displayLink]);
   useEffect(() => {
     return () => {
       request.current = -1;
@@ -135,17 +146,23 @@ export default function RoomSettingsModal({
       <Flex sx={{ flexDirection: "column" }}>
         <Label py={2}>Room settings</Label>
         <Divider />
-        <Text my={2}>Allow players to use:</Text>
-        {(Object.keys(switchLabels) as (keyof RoomSwitches)[]).map((key) => (
-          <Label key={key} py={2}>
-            <Checkbox
-              checked={switches[key]}
-              disabled={pending}
-              onChange={(e) => changeSwitch(key, e.target.checked)}
-            />
-            {switchLabels[key]}
-          </Label>
-        ))}
+        <Flex
+          role="group"
+          aria-labelledby="room-switches"
+          sx={{ flexDirection: "column" }}
+        >
+          <Text id="room-switches" my={2}>Allow players to use:</Text>
+          {(Object.keys(switchLabels) as (keyof RoomSwitches)[]).map((key) => (
+            <Label key={key} py={2}>
+              <Checkbox
+                checked={switches[key]}
+                disabled={pending}
+                onChange={(e) => changeSwitch(key, e.target.checked)}
+              />
+              {switchLabels[key]}
+            </Label>
+          ))}
+        </Flex>
         <Text variant="caption" my={2}>
           The GM and trusted players can use every tool whatever these switches
           say.
@@ -205,12 +222,14 @@ export default function RoomSettingsModal({
             />
           </>
         )}
-        {message && <Text role="status" my={2}>{message}</Text>}
-        {error && (
-          <Text role="alert" color="red" my={2}>
-            {error}
-          </Text>
-        )}
+        <Flex ref={feedback} sx={{ flexDirection: "column" }}>
+          {message && <Text role="status" my={2}>{message}</Text>}
+          {error && (
+            <Text role="alert" my={2} sx={{ color: "error" }}>
+              {error}
+            </Text>
+          )}
+        </Flex>
         {children}
       </Flex>
     </Modal>

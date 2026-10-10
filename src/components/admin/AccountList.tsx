@@ -165,15 +165,18 @@ function AccountList({
                     ? "Unmake administrator"
                     : "Make administrator"}
                 </Button>
-                <Button
-                  variant="secondary"
-                  py={1}
-                  disabled={isChanging}
-                  onClick={() => setRemoving(account)}
-                  aria-label={`Remove ${account.username}`}
-                >
-                  Remove account
-                </Button>
+                {/* The server never lets an administrator remove themselves */}
+                {account.id !== self.id && (
+                  <Button
+                    variant="secondary"
+                    py={1}
+                    disabled={isChanging}
+                    onClick={() => setRemoving(account)}
+                    aria-label={`Remove ${account.username}`}
+                  >
+                    Remove account
+                  </Button>
+                )}
                 <Button
                   variant="secondary"
                   py={1}

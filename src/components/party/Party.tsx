@@ -176,7 +176,7 @@ function Party({ gameId, roomSettings, onTrustChange }: PartyProps) {
         <Flex sx={{ flexDirection: "column" }}>
           <Text variant="caption">Your colour</Text>
           <Select id="player-colour" aria-label="Your colour" value={playerState.color || ""}
-            sx={{ width: "112px", color: playerState.color ? colors[playerState.color] : "text", mb: 2 }}
+            sx={{ width: "100%", color: playerState.color ? colors[playerState.color] : "text", mb: 2 }}
             onChange={(event) => {
               const color = event.target.value;
               if (!isPlayerColour(color)) return;
