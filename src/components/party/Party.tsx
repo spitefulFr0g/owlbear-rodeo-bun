@@ -2,6 +2,9 @@ import { ReactNode, useEffect } from "react";
 import { Flex, Box, Text, Button } from "theme-ui";
 import SimpleBar from "simplebar-react";
 
+import colors from "../../helpers/colors";
+import { playerColours, isPlayerColour, rememberColour } from "../../helpers/playerColour";
+import { Select } from "theme-ui";
 import AddPartyMemberButton from "./AddPartyMemberButton";
 import Nickname from "./Nickname";
 import ChangeNicknameButton from "./ChangeNicknameButton";
@@ -135,13 +138,15 @@ function Party({ gameId, roomSettings, onTrustChange }: PartyProps) {
             nickname={`${playerState.nickname} (you)`}
             diceRolls={shareDice ? playerState.dice.rolls : undefined}
             role={role}
+            color={playerState.color}
           />
-          {Object.entries(partyState).map(([id, { nickname, dice, role: playerRole, userId }]) => (
+          {Object.entries(partyState).map(([id, { nickname, dice, role: playerRole, userId, color }]) => (
             <Box key={id} mb={2}>
               <Nickname
                 nickname={nickname}
                 diceRolls={dice.share ? dice.rolls : undefined}
                 role={playerRole}
+                color={color}
               />
               {role === "gm" && playerRole !== "gm" && userId && onTrustChange && (
                 <Button
@@ -168,6 +173,18 @@ function Party({ gameId, roomSettings, onTrustChange }: PartyProps) {
             ))}
         </SimpleBar>
         <Flex sx={{ flexDirection: "column" }}>
+          <Text variant="caption">Your colour</Text>
+          <Select id="player-colour" aria-label="Your colour" value={playerState.color || ""}
+            sx={{ width: "112px", color: playerState.color ? colors[playerState.color] : "text", mb: 2 }}
+            onChange={(event) => {
+              const color = event.target.value;
+              if (!isPlayerColour(color)) return;
+              rememberColour(color);
+              setPlayerState((previous) => ({ ...previous, color }));
+            }}>
+            {!playerState.color && <option value="" disabled>Assigned on join</option>}
+            {playerColours.map((color) => <option key={color} value={color}>{color[0].toUpperCase() + color.slice(1)}</option>)}
+          </Select>
           <ChangeNicknameButton
             nickname={playerState.nickname}
             onChange={handleNicknameChange}

@@ -28,6 +28,7 @@ export function PlayerProvider({ session, children }: PlayerProviderProps) {
   const [playerState, setPlayerState] = useNetworkedState<PlayerState>(
     {
       nickname: "",
+      color: session.color,
       timer: undefined,
       dice: { share: false, rolls: [] },
       sessionId: undefined,
@@ -69,6 +70,10 @@ export function PlayerProvider({ session, children }: PlayerProviderProps) {
   }, [playerState, database, databaseStatus]);
 
   useEffect(() => {
+    if (playerState.color) session.color = playerState.color;
+  }, [playerState.color, session]);
+
+  useEffect(() => {
     if (userId) {
       setPlayerState((prevState) => {
         if (prevState) {
@@ -89,6 +94,7 @@ export function PlayerProvider({ session, children }: PlayerProviderProps) {
           return {
             ...prevState,
             sessionId: session.id,
+            color: session.color,
           };
         }
         return prevState;

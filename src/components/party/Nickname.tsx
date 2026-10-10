@@ -1,3 +1,5 @@
+import colors from "../../helpers/colors";
+import { PlayerColour } from "../../helpers/playerColour";
 import { Text, Flex } from "theme-ui";
 
 import DiceRolls from "./DiceRolls";
@@ -8,9 +10,10 @@ type NicknameProps = {
   nickname: string;
   diceRolls?: DiceRoll[];
   role?: Role;
+  color?: PlayerColour;
 };
 
-function Nickname({ nickname, diceRolls, role }: NicknameProps) {
+function Nickname({ nickname, diceRolls, role, color }: NicknameProps) {
   return (
     <Flex sx={{ flexDirection: "column" }}>
       <Text
@@ -21,6 +24,7 @@ function Nickname({ nickname, diceRolls, role }: NicknameProps) {
           position: "relative",
         }}
       >
+        {color && <Text as="span" aria-label={`${color} colour`} sx={{ color: colors[color], mr: 1 }}>●</Text>}
         {nickname}
         <Text
           as="span"
