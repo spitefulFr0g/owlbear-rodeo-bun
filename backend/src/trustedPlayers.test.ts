@@ -17,6 +17,7 @@ test("trusted marks follow join identity across connections and restarts, with l
     const { cookie } = await setupAdministrator(server);
     const room = await createRoom(server, cookie, "Trust");
     const gm = await server.joinRoomAsGM(room.id, cookie);
+    await new Promise(resolve => gm.socket.emit("session", true, resolve));
     const first = await join(server, room.id, "remembered");
     const second = await join(server, room.id, "remembered");
     const stranger = await join(server, room.id, "stranger");
@@ -67,6 +68,7 @@ test("trust immediately bypasses tool and upload switches but preserves GM setti
     const { cookie } = await setupAdministrator(server);
     const room = await createRoom(server, cookie, "Tools");
     const gm = await server.joinRoomAsGM(room.id, cookie);
+    await new Promise(resolve => gm.socket.emit("session", true, resolve));
     const first = await join(server, room.id, "remembered");
     const second = await join(server, room.id, "remembered");
     await new Promise(resolve => gm.socket.emit("room_switches", { tokens: false, drawing: false, notes: false, fog: false, uploads: false }, resolve));

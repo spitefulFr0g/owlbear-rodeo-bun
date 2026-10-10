@@ -11,7 +11,7 @@ test("the room's signed-in GM joins on every device without the room password", 
       const joined = nextMessage(socket, "joined_game");
       socket.emit("join_game", room.id, "");
       const result = await joined;
-      expect(result[2]).toEqual({ role: "gm", color: expect.stringMatching(/^(blue|orange|red|yellow|purple|green|pink|teal)$/), room: { name: "Table", switches: { tokens: true, drawing: true, notes: true, fog: false, uploads: false } } });
+      expect(result[2]).toEqual({ role: "gm", color: expect.stringMatching(/^(blue|orange|red|yellow|purple|green|pink|teal)$/), room: { name: "Table", session: false, switches: { tokens: true, drawing: true, notes: true, fog: false, uploads: false } } });
     }
   } finally { await server.dispose(); }
 });
@@ -22,6 +22,7 @@ test("players cannot switch maps, edit map settings or replace state, but can up
     const { cookie } = await setupAdministrator(server);
     const room = await createRoom(server, cookie, "Table");
     const gm = await server.joinRoomAsGM(room.id, cookie);
+    await new Promise(resolve => gm.socket.emit("session", true, resolve));
     const player = await server.joinRoom(room.id);
     expect(player.info.role).toBe("player");
     const map = { id: "map", owner: "another browser", name: "Original", showGrid: true };
@@ -215,6 +216,7 @@ test("cast displays receive current map and state when they attempt GM changes",
     const { cookie } = await setupAdministrator(server);
     const room = await createRoom(server, cookie, "Table");
     const gm = await server.joinRoomAsGM(room.id, cookie);
+    await new Promise(resolve => gm.socket.emit("session", true, resolve));
     gm.socket.emit("player_state", { nickname: "GM", userId: "gm" });
     gm.socket.emit("map", { id: "map", owner: "gm" });
     gm.socket.emit("map_state", { mapId: "map", notes: {} });

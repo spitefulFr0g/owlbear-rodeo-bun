@@ -12,6 +12,7 @@ async function startRoomServer() {
 
 async function change(server: Awaited<ReturnType<typeof startRoomServer>>, room = server.roomId) {
   const owner = await server.joinRoomAsGM(room, server.cookie);
+  await new Promise(resolve => owner.socket.emit("session", true, resolve));
   const observer = await server.joinRoom(room);
   const map = { id: "map-one", owner: "gm", type: "file", file: "image" };
   const state = { mapId: "map-one", tokens: { hero: { x: 12, y: 34 } },
@@ -32,7 +33,7 @@ test("a clean stop keeps every room's map, placed state and image list", async (
     await change(server, server.secondRoomId);
     await server.restart();
     for (const room of [server.roomId, server.secondRoomId]) {
-      const joined = await server.joinRoom(room);
+      const joined = await server.joinRoomAsGM(room, server.cookie);
       expect(joined.state.map).toEqual(expected.map);
       expect(joined.state.mapState).toEqual(expected.state);
       expect(joined.state.manifest).toEqual(expected.manifest);
@@ -50,11 +51,11 @@ test("a room change is saved three seconds after the last change", async () => {
     await received;
     await server.clock.advance(2999);
     const before = await server.durableCopy();
-    try { expect((await before.joinRoom(server.roomId)).state.map).toBeUndefined(); }
+    try { expect((await before.joinRoomAsGM(server.roomId, server.cookie)).state.map).toBeUndefined(); }
     finally { await before.dispose(); }
     await server.clock.advance(1);
     const after = await server.durableCopy();
-    try { expect((await after.joinRoom(server.roomId)).state.map.name).toBe("Latest map"); }
+    try { expect((await after.joinRoomAsGM(server.roomId, server.cookie)).state.map.name).toBe("Latest map"); }
     finally { await after.dispose(); }
   } finally { await server.dispose(); }
 });
@@ -71,7 +72,7 @@ test("steady room changes are saved within eight seconds", async () => {
     }
     await server.clock.advance(1000);
     const copy = await server.durableCopy();
-    try { expect((await copy.joinRoom(server.roomId)).state.map.name).toBe("Revision 7"); }
+    try { expect((await copy.joinRoomAsGM(server.roomId, server.cookie)).state.map.name).toBe("Revision 7"); }
     finally { await copy.dispose(); }
   } finally { await server.dispose(); }
 });
@@ -107,19 +108,18 @@ test("the old display link joins after restart without restoring presence, dice,
     const display = server.connect();
     const events: string[] = [];
     display.onAny((event) => events.push(event));
-    const initialMap = nextMessage(display, "map");
     const initialParty = nextMessage(display, "party_state");
     const initialFrozen = nextMessage(display, "display_frozen");
     const joined = nextMessage(display, "joined_display");
     display.emit("join_display", server.roomId, token);
     await joined;
-    expect((await initialMap)[0]).toEqual(map);
+    expect(events).not.toContain("map");
     expect((await initialParty)[0]).toEqual({});
     expect((await initialFrozen)[0]).toBe(false);
     // This acknowledgement follows all initial events on the same connection.
     await new Promise((resolve) => display.emit("get_display_token", resolve));
     expect(events).not.toContain("display_view");
-    expect((await server.joinRoom(server.roomId)).state.partyState).toEqual({});
+    expect((await server.joinRoomAsGM(server.roomId, server.cookie)).state.partyState).toEqual({});
   } finally { await server.dispose(); }
 });
 
@@ -146,7 +146,7 @@ test("saved image references remain downloadable and incremental edits survive r
     owner.socket.disconnect();
     observer.socket.disconnect();
     await server.restart();
-    const joined = await server.joinRoom(server.roomId);
+    const joined = await server.joinRoomAsGM(server.roomId, server.cookie);
     expect(joined.state.mapState.notes.note).toBe("The door is open");
     expect(joined.state.manifest.assets.token).toEqual({ id: "image", owner: "gm" });
     for (const asset of Object.values(joined.state.manifest.assets) as { id: string }[]) {
@@ -169,7 +169,7 @@ test("a room that disconnects before its save delay still reaches durable storag
     observer.socket.disconnect();
     await server.clock.advance(3000);
     const copy = await server.durableCopy();
-    try { expect((await copy.joinRoom(server.roomId)).state.mapState).toEqual(state); }
+    try { expect((await copy.joinRoomAsGM(server.roomId, server.cookie)).state.mapState).toEqual(state); }
     finally { await copy.dispose(); }
   } finally { await server.dispose(); }
 });

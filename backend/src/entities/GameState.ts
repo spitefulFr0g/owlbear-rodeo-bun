@@ -29,14 +29,16 @@ export default class GameState {
     const partyState = this.gameRepository.getPartyState(gameId);
     this.socket.emit("party_state", partyState);
 
-    const mapState = this.gameRepository.getState(gameId, "mapState");
-    this.socket.emit("map_state", mapState);
+    if (this.socket.data.role === "gm" || this.gameRepository.games[gameId].session) {
+      const mapState = this.gameRepository.getState(gameId, "mapState");
+      this.socket.emit("map_state", mapState);
 
-    const map = this.gameRepository.getState(gameId, "map");
-    this.socket.emit("map", map);
+      const map = this.gameRepository.getState(gameId, "map");
+      this.socket.emit("map", map);
 
-    const manifest = this.gameRepository.getState(gameId, "manifest");
-    this.socket.emit("manifest", manifest);
+      const manifest = this.gameRepository.getState(gameId, "manifest");
+      this.socket.emit("manifest", manifest);
+    }
 
     if (!castDisplay) this.socket.to(gameId).emit("player_joined", this.socket.id);
   }

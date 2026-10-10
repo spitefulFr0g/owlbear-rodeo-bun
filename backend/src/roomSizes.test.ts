@@ -67,6 +67,7 @@ test("legacy images count only after first use, including a cast display downloa
     const room = await createRoom(server, cookie, "Room");
     expect(room.sizeBytes).toBe(2);
     const player = await server.joinRoomAsGM(room.id, cookie);
+    await new Promise(resolve => player.socket.emit("session", true, resolve));
     const observer = await server.joinRoom(room.id);
     const party = nextMessage(observer.socket, "party_state");
     player.socket.emit("player_state", { userId: "gm" });
@@ -97,6 +98,7 @@ test("room size counts saved document UTF-8 bytes and changes only after saving"
     const { cookie } = await setupAdministrator(server);
     const room = await createRoom(server, cookie, "Room");
     const writer = await server.joinRoomAsGM(room.id, cookie);
+    await new Promise(resolve => writer.socket.emit("session", true, resolve));
     const observer = await server.joinRoom(room.id);
     const received = nextMessage(observer.socket, "map");
     writer.socket.emit("map", { name: "é" });

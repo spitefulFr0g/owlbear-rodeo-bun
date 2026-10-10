@@ -11,6 +11,7 @@ test("room switches default, reject players and malformed changes, broadcast and
     const { cookie } = await setupAdministrator(server);
     const room = await createRoom(server, cookie, "Table");
     const gm = await server.joinRoomAsGM(room.id, cookie);
+    await new Promise(resolve => gm.socket.emit("session", true, resolve));
     const player = await server.joinRoom(room.id);
     expect(player.info.room.switches).toEqual(defaults);
     expect(await change(player.socket, { fog: true })).toEqual({ ok: false, error: "not_room_gm" });
@@ -26,13 +27,13 @@ test("room switches default, reject players and malformed changes, broadcast and
     const messages = [gm, player, display].map(peer => nextMessage(peer.socket, "room_state"));
     expect(await change(gm.socket, { tokens: false, fog: true, uploads: true })).toEqual({ ok: true });
     const switches = { ...defaults, tokens: false, fog: true, uploads: true };
-    for (const message of await Promise.all(messages)) expect(message[0]).toEqual({ name: "Table", switches });
+    for (const message of await Promise.all(messages)) expect(message[0]).toEqual({ name: "Table", switches, session: true });
     const renamed = nextMessage(player.socket, "room_state");
     await fetch(`${server.address}/api/rooms/${room.id}`, { method: "PATCH", headers: { Cookie: cookie, "Content-Type": "application/json" }, body: JSON.stringify({ name: "Renamed" }) });
-    expect((await renamed)[0]).toEqual({ name: "Renamed", switches });
+    expect((await renamed)[0]).toEqual({ name: "Renamed", switches, session: true });
     await server.clock.advance(3000);
     await server.restart();
-    expect((await server.joinRoom(room.id)).info.room).toEqual({ name: "Renamed", switches });
+    expect((await server.joinRoom(room.id)).info.room).toEqual({ name: "Renamed", switches, session: false });
   } finally { await server.dispose(); }
 }, 15000);
 
@@ -42,6 +43,7 @@ test("each placed-state kind requires its room switch while GM changes bypass al
     const { cookie } = await setupAdministrator(server);
     const room = await createRoom(server, cookie, "Table");
     const gm = await server.joinRoomAsGM(room.id, cookie);
+    await new Promise(resolve => gm.socket.emit("session", true, resolve));
     const player = await server.joinRoom(room.id);
     const state: any = { mapId: "map", tokens: {}, drawings: {}, notes: {}, fogs: {}, editFlags: [] };
     const saved = nextMessage(player.socket, "map_state");
@@ -89,7 +91,7 @@ test("each placed-state kind requires its room switch while GM changes bypass al
     gm.socket.emit("map_state_update", { id: "map", changes: [{ kind: "N", path: ["unknown"], rhs: true }] });
     await unknown;
     await server.restart();
-    const restored = await server.joinRoom(room.id);
+    const restored = await server.joinRoomAsGM(room.id, cookie);
     expect(restored.state.mapState.editFlags).toEqual([]);
     expect(restored.state.mapState.unknown).toBe(true);
   } finally { await server.dispose(); }
