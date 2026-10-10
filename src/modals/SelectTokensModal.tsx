@@ -1,3 +1,4 @@
+import { useCanPlaceToken, useToolPermissions } from "../contexts/RoomContext";
 import { useRef, useState, useEffect } from "react";
 import { Flex, Label, Button, Box } from "theme-ui";
 import { useToasts } from "react-toast-notifications";
@@ -59,6 +60,8 @@ function SelectTokensModal({
   const { databaseStatus } = useDatabase();
 
   const userId = useUserId();
+  const canPlaceToken = useCanPlaceToken();
+  const permissions = useToolPermissions();
   const {
     tokens,
     addToken,
@@ -88,6 +91,7 @@ function SelectTokensModal({
   const largeImageWarningFiles = useRef<File[]>();
 
   async function handleImagesUpload(files: File[]) {
+    if (!permissions.uploads) return;
     if (navigator.storage) {
       // Attempt to enable persistant storage
       await navigator.storage.persist();
@@ -124,7 +128,7 @@ function SelectTokensModal({
   }
 
   function openImageDialog() {
-    if (fileInputRef.current) {
+    if (permissions.uploads && fileInputRef.current) {
       fileInputRef.current.click();
     }
   }
@@ -149,7 +153,7 @@ function SelectTokensModal({
   }
 
   async function handleImageUpload(file: File) {
-    if (!userId) {
+    if (!userId || !permissions.uploads) {
       return;
     }
     setIsLoading(true);
@@ -185,7 +189,7 @@ function SelectTokensModal({
     let newTokenStates: TokenState[] = [];
 
     for (let id of groupIds) {
-      if (id in tokensById) {
+      if (id in tokensById && canPlaceToken(tokensById[id])) {
         newTokenStates.push(createTokenState(tokensById[id], position, userId));
         position = Vector2.add(position, 0.01);
       } else {
@@ -197,7 +201,7 @@ function SelectTokensModal({
           // Add all tokens of group
           const items = getGroupItems(group);
           for (let item of items) {
-            if (item.id in tokensById) {
+            if (item.id in tokensById && canPlaceToken(tokensById[item.id])) {
               newTokenStates.push(
                 createTokenState(tokensById[item.id], position, userId)
               );
@@ -236,7 +240,11 @@ function SelectTokensModal({
     >
       <ImageDrop
         onDrop={({ files }) => handleImagesUpload(files)}
-        dropText="Drop token to import"
+        dropText={
+          permissions.uploads
+            ? "Drop token to import"
+            : "Uploads are unavailable in this room"
+        }
       >
         <input
           onChange={(event) =>
@@ -271,7 +279,12 @@ function SelectTokensModal({
               </Label>
               <TileActionBar
                 onAdd={openImageDialog}
-                addTitle="Import Token(s)"
+                addTitle={
+                  permissions.uploads
+                    ? "Import Token(s)"
+                    : "Uploads unavailable"
+                }
+                addDisabled={!permissions.uploads}
               />
               <Box sx={{ position: "relative" }}>
                 <TileDragProvider

@@ -14,14 +14,13 @@ import {
   TokenStateChangeEventHandler,
   TokensStateCreateHandler,
 } from "../types/Events";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Konva from "konva";
 import Token from "../components/konva/Token";
 import { KonvaEventObject } from "konva/lib/Node";
 import TokenMenu from "../components/token/TokenMenu";
 import TokenDragOverlay from "../components/token/TokenDragOverlay";
-import { useUserId } from "../contexts/UserIdContext";
-import { useRole } from "../contexts/RoomContext";
+import { useToolPermissions, useRole } from "../contexts/RoomContext";
 import { getRoleControls } from "../helpers/roomControls";
 import { useBlur, useKeyboard } from "../contexts/KeyboardContext";
 import shortcuts from "../shortcuts";
@@ -34,15 +33,13 @@ function useMapTokens(
   onTokensStateCreate: TokensStateCreateHandler,
   selectedToolId: MapToolId
 ) {
-  const userId = useUserId();
+  const permissions = useToolPermissions();
   const roleControls = getRoleControls(useRole());
   const disabledTokens: Record<string, boolean> = {};
   if (mapState && map) {
-    if (!mapState.editFlags.includes("tokens") && !roleControls.hidden) {
+    if (!permissions.tokens) {
       for (let token of Object.values(mapState.tokens)) {
-        if (token.owner !== userId) {
-          disabledTokens[token.id] = true;
-        }
+        disabledTokens[token.id] = true;
       }
     }
   }
@@ -51,6 +48,10 @@ function useMapTokens(
   const [tokenMenuOptions, setTokenMenuOptions] = useState<TokenMenuOptions>();
   const [tokenDraggingOptions, setTokenDraggingOptions] =
     useState<TokenDraggingOptions>();
+
+  useEffect(() => {
+    if (!permissions.tokens) setIsTokenMenuOpen(false);
+  }, [permissions.tokens]);
 
   function handleTokenMenuOpen(
     tokenStateId: string,

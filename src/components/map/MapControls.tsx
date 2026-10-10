@@ -38,7 +38,7 @@ import { Settings } from "../../types/Settings";
 import { useKeyboard } from "../../contexts/KeyboardContext";
 
 import shortcuts from "../../shortcuts";
-import { useRole } from "../../contexts/RoomContext";
+import { useToolPermissions, useRole } from "../../contexts/RoomContext";
 import { getRoleControls } from "../../helpers/roomControls";
 import { isEmpty } from "../../helpers/shared";
 import { MapActions } from "../../hooks/useMapActions";
@@ -77,13 +77,13 @@ function MapContols({
   const [isExpanded, setIsExpanded] = useState(true);
   const [fullScreen, setFullScreen] = useSetting("map.fullScreen");
 
+  const permissions = useToolPermissions();
   const isGM = getRoleControls(useRole()).hidden;
 
   const disabledControls = useMemo(() => {
-    const isOwner = isGM;
-    const allowMapDrawing = isOwner || mapState?.editFlags.includes("drawing");
-    const allowFogDrawing = isOwner || mapState?.editFlags.includes("fog");
-    const allowNoteEditing = isOwner || mapState?.editFlags.includes("notes");
+    const allowMapDrawing = permissions.drawing;
+    const allowFogDrawing = permissions.fog;
+    const allowNoteEditing = permissions.notes;
 
     const disabled: MapToolId[] = [];
     if (!allowMapChange) {
@@ -95,6 +95,7 @@ function MapContols({
       disabled.push("pointer");
       disabled.push("select");
     }
+    if (!permissions.tokens && !permissions.notes) disabled.push("select");
     if (!map || !allowMapDrawing) {
       disabled.push("drawing");
     }
@@ -104,14 +105,35 @@ function MapContols({
     if (!map || !allowNoteEditing) {
       disabled.push("note");
     }
-    if (!map || mapActions.actionIndex < 0) {
+    const allowed = (index: number) =>
+      (mapActions.actions[index] || []).every((action) =>
+        action.type === "drawings"
+          ? permissions.drawing
+          : action.type === "fogs"
+          ? permissions.fog
+          : permissions[action.type]
+      );
+    if (
+      !map ||
+      mapActions.actionIndex < 0 ||
+      !allowed(mapActions.actionIndex)
+    ) {
       disabled.push("undo");
     }
-    if (!map || mapActions.actionIndex === mapActions.actions.length - 1) {
+    if (
+      !map ||
+      mapActions.actionIndex === mapActions.actions.length - 1 ||
+      !allowed(mapActions.actionIndex + 1)
+    ) {
       disabled.push("redo");
     }
     return disabled;
-  }, [map, mapState, mapActions, allowMapChange, isGM]);
+  }, [
+    map,
+    mapActions,
+    allowMapChange,
+    permissions,
+  ]);
 
   // Change back to move tool if selected tool becomes disabled
   useEffect(() => {

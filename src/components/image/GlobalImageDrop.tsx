@@ -14,7 +14,7 @@ import {
 } from "../../helpers/token";
 import Vector2 from "../../helpers/Vector2";
 
-import { useRole } from "../../contexts/RoomContext";
+import { useToolPermissions, useRole } from "../../contexts/RoomContext";
 import { getRoleControls } from "../../helpers/roomControls";
 
 import { useUserId } from "../../contexts/UserIdContext";
@@ -43,6 +43,7 @@ function GlobalImageDrop({
   const { addToast } = useToasts();
 
   const userId = useUserId();
+  const permissions = useToolPermissions();
   const canChangeMap = getRoleControls(useRole()).map;
   const { addMap, getMapState } = useMapData();
   const { addToken } = useTokenData();
@@ -59,6 +60,13 @@ function GlobalImageDrop({
   const [droppingType, setDroppingType] = useState<"maps" | "tokens">("tokens");
 
   async function handleDrop({ files, dropPosition }: ImageDropEvent) {
+    if (
+      !permissions.uploads ||
+      (droppingType === "tokens" && !permissions.tokens)
+    ) {
+      addToast("Image uploads are unavailable in this room.");
+      return;
+    }
     if (navigator.storage) {
       // Attempt to enable persistant storage
       await navigator.storage.persist();
@@ -127,7 +135,12 @@ function GlobalImageDrop({
   }
 
   async function handleTokens() {
-    if (droppedImagesRef.current && userId) {
+    if (
+      permissions.uploads &&
+      permissions.tokens &&
+      droppedImagesRef.current &&
+      userId
+    ) {
       setIsLoading(true);
       // Keep track of tokens so we can add them to the map
       let tokens = [];
@@ -254,7 +267,9 @@ function GlobalImageDrop({
               }}
             />
             <Text sx={{ pointerEvents: "none", userSelect: "none" }}>
-              Drop as token
+              {permissions.uploads && permissions.tokens
+                ? "Drop as token"
+                : "Image uploads are unavailable in this room"}
             </Text>
           </Flex>
         </Flex>

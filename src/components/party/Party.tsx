@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { ReactNode, useEffect } from "react";
 import { Flex, Box, Text } from "theme-ui";
 import SimpleBar from "simplebar-react";
 
@@ -20,9 +20,10 @@ import { Timer as TimerType } from "../../types/Timer";
 
 type PartyProps = {
   gameId: string;
+  roomSettings?: ReactNode;
 };
 
-function Party({ gameId }: PartyProps) {
+function Party({ gameId, roomSettings }: PartyProps) {
   const setPlayerState = usePlayerUpdater();
   const playerState = usePlayerState();
   const partyState = useParty();
@@ -165,6 +166,7 @@ function Party({ gameId }: PartyProps) {
             onTimerStop={handleTimerStop}
             timer={playerState.timer}
           />
+          {roomSettings}
           <SettingsButton />
         </Flex>
       </Box>

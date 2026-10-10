@@ -1,7 +1,7 @@
 import Konva from "konva";
 import { Group } from "react-konva";
 import { KonvaEventObject } from "konva/lib/Node";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { v4 as uuid } from "uuid";
 
 import Note from "../components/konva/Note";
@@ -9,8 +9,7 @@ import NoteDragOverlay from "../components/note/NoteDragOverlay";
 import NoteMenu from "../components/note/NoteMenu";
 import NoteTool from "../components/tools/NoteTool";
 import { useBlur, useKeyboard } from "../contexts/KeyboardContext";
-import { useRole } from "../contexts/RoomContext";
-import { getRoleControls } from "../helpers/roomControls";
+import { useToolPermissions } from "../contexts/RoomContext";
 import shortcuts from "../shortcuts";
 import {
   NoteChangeEventHandler,
@@ -33,15 +32,17 @@ function useMapNotes(
   onNoteRemove: NoteRemoveEventHander,
   selectedToolId: MapToolId
 ) {
-  const roleControls = getRoleControls(useRole());
-  const allowNoteEditing = !!(
-    roleControls.hidden || mapState?.editFlags.includes("notes")
-  );
+  const permissions = useToolPermissions();
+  const allowNoteEditing = permissions.notes;
 
   const [isNoteMenuOpen, setIsNoteMenuOpen] = useState<boolean>(false);
   const [noteMenuOptions, setNoteMenuOptions] = useState<NoteMenuOptions>();
   const [noteDraggingOptions, setNoteDraggingOptions] =
     useState<NoteDraggingOptions>();
+
+  useEffect(() => {
+    if (!permissions.notes) setIsNoteMenuOpen(false);
+  }, [permissions.notes]);
 
   function handleNoteMenuOpen(
     noteId: string,

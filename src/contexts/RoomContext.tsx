@@ -1,5 +1,8 @@
 import React, { useContext, useEffect, useState } from "react";
 
+import { getToolPermissions, canPlaceImage } from "../helpers/roomControls";
+import { Token } from "../types/Token";
+
 import Session from "../network/Session";
 
 import { Role, RoomState } from "../types/Room";
@@ -62,3 +65,15 @@ export function useRole() {
 }
 
 export default RoomContext;
+
+export function useToolPermissions() {
+  return getToolPermissions(useRole(), useRoom().switches);
+}
+
+export const RoomAssetsContext = React.createContext<string[]>([]);
+
+export function useCanPlaceToken() {
+  const permissions = useToolPermissions();
+  const assets = useContext(RoomAssetsContext);
+  return (token: Token) => canPlaceImage(token, permissions, assets);
+}

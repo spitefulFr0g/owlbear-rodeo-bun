@@ -1,3 +1,4 @@
+import { useCanPlaceToken } from "../../contexts/RoomContext";
 import { useState } from "react";
 import { createPortal } from "react-dom";
 import { Box, Flex, Grid } from "theme-ui";
@@ -41,6 +42,7 @@ type TokenBarProps = {
 
 function TokenBar({ onMapTokensStateCreate }: TokenBarProps) {
   const userId = useUserId();
+  const canPlaceToken = useCanPlaceToken();
   const { tokensById, tokenGroups } = useTokenData();
   const [fullScreen] = useSetting<boolean>("map.fullScreen");
 
@@ -85,6 +87,7 @@ function TokenBar({ onMapTokensStateCreate }: TokenBarProps) {
       if (group && mapPosition) {
         if (group.type === "item") {
           const token = tokensById[group.id];
+          if (!token || !canPlaceToken(token)) return;
           const tokenState = createTokenState(token, mapPosition, userId);
           onMapTokensStateCreate([tokenState]);
         } else {
@@ -92,7 +95,7 @@ function TokenBar({ onMapTokensStateCreate }: TokenBarProps) {
           let offset = new Vector2(0, 0);
           for (let item of group.items) {
             const token = tokensById[item.id];
-            if (token && !token.hideInSidebar) {
+            if (token && !token.hideInSidebar && canPlaceToken(token)) {
               tokenStates.push(
                 createTokenState(
                   token,
@@ -120,7 +123,7 @@ function TokenBar({ onMapTokensStateCreate }: TokenBarProps) {
     if (group.type === "item") {
       const token = tokensById[group.id];
       if (token && !token.hideInSidebar) {
-        if (draggable) {
+        if (draggable && canPlaceToken(token)) {
           return (
             <Draggable id={token.id} key={token.id}>
               <TokenBarToken token={token} />
