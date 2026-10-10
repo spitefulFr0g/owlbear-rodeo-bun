@@ -43,6 +43,7 @@ test("an administrator deleting another GM's room tells every player and cast di
     const other = await inviteAccount(server, cookie, "RoomGM", "test-password");
     const room = await createRoom(server, other.cookie, "Room");
     const writer = await server.joinRoomAsGM(room.id, other.cookie);
+    await new Promise(resolve => writer.socket.emit("session", true, resolve));
     const player = await server.joinRoom(room.id);
     const party = nextMessage(player.socket, "party_state");
     writer.socket.emit("player_state", { userId: "gm" });

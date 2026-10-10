@@ -7,6 +7,7 @@ test("uploads follow the live switch, GM bypasses it, and refused manifest addit
     const { cookie } = await setupAdministrator(server);
     const room = await createRoom(server, cookie, "Uploads");
     const gm = await server.joinRoomAsGM(room.id, cookie);
+    await new Promise(resolve => gm.socket.emit("session", true, resolve));
     const player = await server.joinRoom(room.id);
     const change = (uploads: boolean) => new Promise(resolve => gm.socket.emit("room_switches", { uploads }, resolve));
     const put = (token: string, id: string) => fetch(`${server.address}/assets/${id}`, { method: "PUT", body: new Uint8Array([1]), headers: { Authorization: `Bearer ${token}`, "Content-Type": "image/png", "X-Asset-Width": "1", "X-Asset-Height": "1", "X-Asset-Owner": "player" } });

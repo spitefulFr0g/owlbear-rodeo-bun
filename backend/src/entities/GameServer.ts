@@ -53,6 +53,15 @@ export default class GameServer {
     return Object.values(manifest?.assets ?? {}).every(asset => used.has(asset.id));
   }
 
+  private broadcastCanvas(sender: Socket, gameId: string, event: string, value: unknown): void {
+    for (const id of this.io.sockets.adapter.rooms.get(gameId) || []) {
+      const peer = this.io.sockets.sockets.get(id);
+      if (peer && peer.id !== sender.id && (this.gameRepo.games[gameId].session || peer.data.role === "gm")) {
+        peer.emit(event, value);
+      }
+    }
+  }
+
   public flush(): void { this.gameRepo.flush(); }
 
   public initaliseSocketServer(httpServer: HttpServer) {
@@ -77,8 +86,12 @@ export default class GameServer {
       // Cast displays may only request read access. New write events are
       // refused here too, before any handler can change or forward state.
       socket.use(([event], next) => {
+        const roomId = gameState.getGameId();
+        // Waiting connections must not receive even the full state used to refuse an edit.
+        if (roomId && !this.gameRepo.games[roomId].session && socket.data.role !== "gm" &&
+          ["map", "map_state", "map_state_update", "manifest", "manifest_update", "player_pointer"].includes(event)) return;
         if (
-          socket.data.castDisplay && !["get_display_token", "join_display", "room_switches", "room_trust", "room_password", "new_display_link"].includes(event)
+          socket.data.castDisplay && !["get_display_token", "join_display", "room_switches", "room_trust", "room_password", "new_display_link", "session"].includes(event)
         ) {
           const gameId = gameState.getGameId();
           if (gameId && (event === "map" || event === "map_state")) {
@@ -116,7 +129,7 @@ export default class GameServer {
         socket.emit("joined_display", socket.id, token, { room: this.gameRepo.roomState(gameId) });
         const game = this.gameRepo.games[gameId];
         socket.emit("display_frozen", game.displayFrozen);
-        if (game.shownDisplayView) socket.emit("display_view", game.shownDisplayView);
+        if (game.session && game.shownDisplayView) socket.emit("display_view", game.shownDisplayView);
       });
 
       socket.on("disconnecting", async () => {
@@ -218,7 +231,7 @@ export default class GameServer {
       const forwardView = (gameId: string, view: DisplayView) => {
         for (const id of this.io.sockets.adapter.rooms.get(gameId) || []) {
           const display = this.io.sockets.sockets.get(id);
-          if (display?.data.castDisplay) display.emit("display_view", view);
+          if (this.gameRepo.games[gameId].session && display?.data.castDisplay) display.emit("display_view", view);
         }
       };
 
@@ -271,6 +284,33 @@ export default class GameServer {
           peer.emit("player_role", role);
         }
         this.io.to(gameId).emit("party_state", game.partyState);
+        if (typeof answer === "function") answer({ ok: true });
+      });
+
+      socket.on("session", (running: unknown, answer?: (result: { ok: boolean; error?: string }) => void) => {
+        const gameId = gameState.getGameId();
+        if (!gameId || socket.data.role !== "gm") {
+          if (typeof answer === "function") answer({ ok: false, error: "not_room_gm" });
+          return;
+        }
+        if (typeof running !== "boolean") {
+          if (typeof answer === "function") answer({ ok: false, error: "invalid" });
+          return;
+        }
+        const game = this.gameRepo.games[gameId];
+        const starting = running && !game.session;
+        game.session = running;
+        this.io.to(gameId).emit("room_state", this.gameRepo.roomState(gameId));
+        if (starting) {
+          for (const id of this.io.sockets.adapter.rooms.get(gameId) || []) {
+            const peer = this.io.sockets.sockets.get(id);
+            if (!peer || peer.data.role === "gm") continue;
+            peer.emit("map", game.getState("map"));
+            peer.emit("map_state", game.getState("mapState"));
+            peer.emit("manifest", game.getState("manifest"));
+            if (peer.data.castDisplay && game.shownDisplayView) peer.emit("display_view", game.shownDisplayView);
+          }
+        }
         if (typeof answer === "function") answer({ ok: true });
       });
 
@@ -368,7 +408,7 @@ export default class GameServer {
           }
           this.gameRepo.setState(gameId, "map", map);
           const state = this.gameRepo.getState(gameId, "map");
-          socket.broadcast.to(gameId).emit("map", state);
+          this.broadcastCanvas(socket, gameId, "map", state);
         } catch (error) {
           console.error("MAP_ERROR", error);
         }
@@ -395,7 +435,7 @@ export default class GameServer {
           }
           this.gameRepo.setState(gameId, "mapState", mapState);
           const state = this.gameRepo.getState(gameId, "mapState");
-          socket.broadcast.to(gameId).emit("map_state", state);
+          this.broadcastCanvas(socket, gameId, "map_state", state);
         } catch (error) {
           console.error("MAP_STATE_ERROR", error);
         }
@@ -423,7 +463,7 @@ export default class GameServer {
             return;
           }
           if (await gameState.updateState(gameId, "mapState", update)) {
-            socket.to(gameId).emit("map_state_update", update);
+            this.broadcastCanvas(socket, gameId, "map_state_update", update);
           }
         } catch (error) {
           console.error("MAP_STATE_UPDATE_ERROR", error);
@@ -474,7 +514,7 @@ export default class GameServer {
           }
           this.gameRepo.setState(gameId, "manifest", manifest);
           const state = this.gameRepo.getState(gameId, "manifest");
-          socket.broadcast.to(gameId).emit("manifest", state);
+          this.broadcastCanvas(socket, gameId, "manifest", state);
         } catch (error) {
           console.error("MANIFEST_ERROR", error);
         }
@@ -505,7 +545,7 @@ export default class GameServer {
             }
           }
           if (await gameState.updateState(gameId, "manifest", update)) {
-            socket.to(gameId).emit("manifest_update", update);
+            this.broadcastCanvas(socket, gameId, "manifest_update", update);
           }
         } catch (error) {
           console.error("MANIFEST_UPDATE_ERROR", error);
@@ -527,7 +567,7 @@ export default class GameServer {
             }
           }
 
-          socket.to(gameId).emit("player_pointer", playerPointer);
+          this.broadcastCanvas(socket, gameId, "player_pointer", playerPointer);
         } catch (error) {
           console.error("POINTER_ERROR", error);
         }

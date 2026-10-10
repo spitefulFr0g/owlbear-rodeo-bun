@@ -71,16 +71,17 @@ export async function startTestServer(prepare?: (dataDir: string) => Promise<voi
   // Both helpers join rooms already created through POST /api/rooms.
   const joinConnection = async (roomId: string, credential: string, event: "join_game" | "join_display", cookie?: string) => {
     const socket = connect(cookie);
-    const map = nextMessage(socket, "map");
-    const mapState = nextMessage(socket, "map_state");
-    const manifest = nextMessage(socket, "manifest");
+    const saved: any = {};
+    socket.on("map", value => { saved.map = value; });
+    socket.on("map_state", value => { saved.mapState = value; });
+    socket.on("manifest", value => { saved.manifest = value; });
     const party = nextMessage(socket, "party_state");
     const joined = nextMessage(socket, event === "join_game" ? "joined_game" : "joined_display");
     const frozen = nextMessage(socket, "display_frozen");
     socket.emit(event, roomId, credential);
     const [[, token, info], [displayFrozen]] = await Promise.all([joined, frozen]);
-    const [[savedMap], [savedState], [savedManifest], [partyState]] = await Promise.all([map, mapState, manifest, party]);
-    return { socket, info, token: token as string, state: { map: savedMap, mapState: savedState, manifest: savedManifest, partyState }, displayFrozen };
+    const [partyState] = await party;
+    return { socket, info, token: token as string, state: { ...saved, partyState }, displayFrozen };
   };
   return {
     clock,

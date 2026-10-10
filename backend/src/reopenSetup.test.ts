@@ -54,6 +54,7 @@ test("reopened setup preserves accounts, signed-in browsers, rooms and images wh
     const original = await setupAdministrator(server);
     const room = await createRoom(server, original.cookie, "Kept room", "room-password");
     const owner = await server.joinRoomAsGM(room.id, original.cookie);
+    await new Promise(resolve => owner.socket.emit("session", true, resolve));
     const observer = await server.joinRoom(room.id, "room-password");
     const map = { id: "kept-map", owner: "gm", type: "file", file: "kept-image" };
     const received = nextMessage(observer.socket, "map");
@@ -65,7 +66,7 @@ test("reopened setup preserves accounts, signed-in browsers, rooms and images wh
     await server.restart({ reopenSetup: true });
     expect(await (await fetch(`${server.address}/api/status`, { headers: { Cookie: original.cookie } })).json()).toEqual({ setup: "open", account: original.account });
     expect((await signIn(server, "administrator", "test-password")).account).toEqual(original.account);
-    const joined = await server.joinRoom(room.id, "room-password");
+    const joined = await server.joinRoomAsGM(room.id, original.cookie);
     expect(joined.state.map).toEqual(map);
     const download = await fetch(`${server.address}/assets/kept-image`, { headers: { Authorization: `Bearer ${joined.token}` } });
     expect(download.status).toBe(200);
@@ -74,7 +75,7 @@ test("reopened setup preserves accounts, signed-in browsers, rooms and images wh
     await server.restart();
     expect((await signIn(server, "Administrator", "test-password")).account).toEqual(original.account);
     expect((await signIn(server, "Recovered", "test-password")).account.administrator).toBe(true);
-    const kept = await server.joinRoom(room.id, "room-password");
+    const kept = await server.joinRoomAsGM(room.id, original.cookie);
     expect(kept.state.map).toEqual(map);
     expect(new Uint8Array(await (await fetch(`${server.address}/assets/kept-image`, { headers: { Authorization: `Bearer ${kept.token}` } })).arrayBuffer())).toEqual(image);
   } finally { await server.dispose(); }

@@ -50,6 +50,7 @@ test("removing an account ends every HTTP sign-in and passes loaded and unloaded
     const unloaded = await createRoom(server, other.cookie, "Unloaded");
     await server.restart();
     const owner = await server.joinRoomAsGM(loaded.id, other.cookie);
+    await new Promise(resolve => owner.socket.emit("session", true, resolve));
     const observer = await server.joinRoom(loaded.id, "room-password");
     const displayToken = await new Promise<string>(resolve => owner.socket.emit("get_display_token", resolve));
     const state = { mapId: "map", notes: { door: "Secret door" } };
@@ -84,9 +85,11 @@ test("removing an account ends every HTTP sign-in and passes loaded and unloaded
     expect(await rooms()).toEqual(expected);
     expect((await request(server.address, "rooms", "GET", other.cookie)).status).toBe(401);
     const rejoined = await server.joinRoom(loaded.id, "room-password");
-    expect(rejoined.state.mapState).toEqual(state);
+    expect(rejoined.state.mapState).toBeUndefined();
     expect(await new Promise<string | null>(resolve => rejoined.socket.emit("get_display_token", resolve))).toBeNull();
     const newGM = await server.joinRoomAsGM(loaded.id, admin.cookie);
+    await new Promise(resolve => newGM.socket.emit("session", true, resolve));
+    expect(newGM.state.mapState).toEqual(state);
     expect(await new Promise<string>(resolve => newGM.socket.emit("get_display_token", resolve))).toBe(displayToken);
     const image = await fetch(`${server.address}/assets/image`, { headers: { Authorization: `Bearer ${rejoined.token}` } });
     expect(new Uint8Array(await image.arrayBuffer())).toEqual(png);

@@ -49,7 +49,8 @@ test("joining carries the name and renaming reaches players and cast displays wi
     const player = server.connect(cookie);
     const joined = nextMessage(player, "joined_game");
     player.emit("join_game", room.id, "");
-    expect((await joined)[2]).toEqual({ role: "gm", color: "blue", room: { name: "Before", switches: { tokens: true, drawing: true, notes: true, fog: false, uploads: false } } });
+    expect((await joined)[2]).toEqual({ role: "gm", color: "blue", room: { name: "Before", session: false, switches: { tokens: true, drawing: true, notes: true, fog: false, uploads: false } } });
+    await new Promise(resolve => player.emit("session", true, resolve));
     const peer = await server.joinRoom(room.id);
     const party = nextMessage(peer.socket, "party_state");
     player.emit("player_state", { userId: "gm" });
@@ -61,12 +62,12 @@ test("joining carries the name and renaming reaches players and cast displays wi
     const display = server.connect();
     const displayJoined = nextMessage(display, "joined_display");
     display.emit("join_display", room.id, displayToken);
-    expect((await displayJoined)[2]).toEqual({ room: { name: "Before", switches: { tokens: true, drawing: true, notes: true, fog: false, uploads: false } } });
+    expect((await displayJoined)[2]).toEqual({ room: { name: "Before", session: true, switches: { tokens: true, drawing: true, notes: true, fog: false, uploads: false } } });
     const notifications = [player, peer.socket, display].map(socket => nextMessage(socket, "room_state"));
     const response = await request(server, "PATCH", `/api/rooms/${room.id}`, cookie, { name: "  After  " });
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ room: { ...room, name: "After", sizeBytes: 33 } });
-    for (const notification of notifications) expect(await notification).toEqual([{ name: "After", switches: { tokens: true, drawing: true, notes: true, fog: false, uploads: false } }]);
+    for (const notification of notifications) expect(await notification).toEqual([{ name: "After", session: true, switches: { tokens: true, drawing: true, notes: true, fog: false, uploads: false } }]);
     expect(await (await request(server, "GET", undefined, cookie)).json()).toEqual({ rooms: [{ ...room, name: "After", sizeBytes: 33 }] });
     await server.joinRoom(room.id);
   } finally { await server.dispose(); }
@@ -100,6 +101,7 @@ test("renamed rooms keep their GM, name, document and link across restart and im
     const { cookie } = await setupAdministrator(server);
     const room = await createRoom(server, cookie, "Before");
     const player = await server.joinRoomAsGM(room.id, cookie);
+    await new Promise(resolve => player.socket.emit("session", true, resolve));
     player.socket.emit("map", { id: "saved", owner: "gm" });
     const peer = await server.joinRoom(room.id);
     expect(peer.state.map).toEqual({ id: "saved", owner: "gm" });
@@ -107,12 +109,12 @@ test("renamed rooms keep their GM, name, document and link across restart and im
     const copy = await server.durableCopy();
     try {
       expect(await (await request(copy, "GET", undefined, cookie)).json()).toEqual({ rooms: [{ ...room, name: "After", sizeBytes: 35 }] });
-      expect((await copy.joinRoom(room.id)).state.map).toEqual({ id: "saved", owner: "gm" });
+      expect((await copy.joinRoomAsGM(room.id, cookie)).state.map).toEqual({ id: "saved", owner: "gm" });
     } finally { await copy.dispose(); }
     await server.restart();
     expect(await (await request(server, "GET", undefined, cookie)).json()).toEqual({ rooms: [{ ...room, name: "After", sizeBytes: 35 }] });
     expect((await request(server, "PATCH", `/api/rooms/${room.id}`, cookie, { name: "Again" })).status).toBe(200);
-    expect((await server.joinRoom(room.id)).state.map).toEqual({ id: "saved", owner: "gm" });
+    expect((await server.joinRoomAsGM(room.id, cookie)).state.map).toEqual({ id: "saved", owner: "gm" });
   } finally { await server.dispose(); }
 });
 
