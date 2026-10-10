@@ -21,7 +21,7 @@ const roomName: RequestHandler = (req, res, next) => {
 export interface Room { id: string; name: string; hasPassword: boolean; sizeBytes: number }
 
 export default class RoomController {
-  constructor(private readonly accounts: Accounts, private readonly database: OwlbearDatabase, private readonly rooms: GameRepository, private readonly renamed: (id: string, name: string) => void) {}
+  constructor(private readonly accounts: Accounts, private readonly database: OwlbearDatabase, private readonly rooms: GameRepository, private readonly renamed: (id: string, name: string) => void, private readonly deleteRoom: (id: string) => Promise<void>) {}
 
   setRoutes(): Router {
     const router = Router();
@@ -69,6 +69,20 @@ export default class RoomController {
       this.rooms.save(game.gameId);
       this.renamed(game.gameId, game.name);
       res.json({ room: { id: game.gameId, name: game.name, hasPassword: game.hasPassword, sizeBytes: this.database.roomSizeBytes(game.gameId) } });
+    });
+    router.delete("/rooms/:id", async (req, res, next) => {
+      if (!this.rooms.isGameCreated(req.params.id)) {
+        res.status(404).json({ error: "room_not_found", message: "That room does not exist." });
+        return;
+      }
+      if (this.rooms.games[req.params.id].gmAccountId !== res.locals.account.id) {
+        res.status(403).json({ error: "not_room_gm", message: "Only the room's GM can delete it." });
+        return;
+      }
+      try {
+        await this.deleteRoom(req.params.id);
+        res.sendStatus(204);
+      } catch (error) { next(error); }
     });
     return router;
   }
