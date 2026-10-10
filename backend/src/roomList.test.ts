@@ -49,7 +49,7 @@ test("joining carries the name and renaming reaches players and cast displays wi
     const player = server.connect(cookie);
     const joined = nextMessage(player, "joined_game");
     player.emit("join_game", room.id, "");
-    expect((await joined)[2]).toEqual({ role: "gm", room: { name: "Before", switches: { tokens: true, drawing: true, notes: true, fog: false, uploads: false } } });
+    expect((await joined)[2]).toEqual({ role: "gm", color: "blue", room: { name: "Before", switches: { tokens: true, drawing: true, notes: true, fog: false, uploads: false } } });
     const peer = await server.joinRoom(room.id);
     const party = nextMessage(peer.socket, "party_state");
     player.emit("player_state", { userId: "gm" });

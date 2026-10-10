@@ -17,6 +17,7 @@ import { applyChanges, Update } from "../helpers/diff";
 import { Map } from "../types/Map";
 import { MapState } from "../types/MapState";
 import { PlayerState } from "../types/PlayerState";
+import { playerColours, isPlayerColour } from "../types/PlayerColour";
 import { Manifest } from "../types/Manifest";
 import { Pointer } from "../types/Pointer";
 
@@ -148,7 +149,7 @@ export default class GameServer {
         }
       });
 
-      socket.on("join_game", async (gameId: string, password: string, _version?: unknown, me?: { playerId?: string }) => {
+      socket.on("join_game", async (gameId: string, password: string, _version?: unknown, me?: { playerId?: string; color?: unknown }) => {
         if (joining || socket.data.castDisplay || gameState.getGameId()) return;
         joining = true;
         const auth = new Auth();
@@ -190,11 +191,15 @@ export default class GameServer {
           }
           socket.data.playerId = typeof me?.playerId === "string" && me.playerId.length > 0 ? me.playerId : undefined;
           socket.data.role = role;
+          const usedColours = new Set([...this.io.sockets.adapter.rooms.get(gameId) || []]
+            .map(id => this.io.sockets.sockets.get(id)?.data.color));
+          socket.data.color = isPlayerColour(me?.color) ? me.color :
+            playerColours.find(color => !usedColours.has(color)) ?? playerColours[0];
           await gameState.joinGame(gameId);
           _gameId = gameId;
           // Only the player who joined gets the token for the asset routes
           const token = this.joinTokens.issue(socket.id, gameId, role);
-          socket.emit("joined_game", socket.id, token, { role: this.playerRole(socket, gameId), room: this.gameRepo.roomState(gameId) });
+          socket.emit("joined_game", socket.id, token, { role: this.playerRole(socket, gameId), color: socket.data.color, room: this.gameRepo.roomState(gameId) });
           socket.emit("display_frozen", this.gameRepo.games[gameId].displayFrozen);
           socket.to(gameId).emit("joined_game", socket.id);
         } catch (error) {
@@ -440,7 +445,8 @@ export default class GameServer {
             }
           }
 
-          this.gameRepo.setPlayerState(gameId, { ...playerState, userId: socket.data.playerId, role: this.playerRole(socket, gameId) }, socket.id);
+          if (isPlayerColour(playerState?.color)) socket.data.color = playerState.color;
+          this.gameRepo.setPlayerState(gameId, { ...playerState, color: socket.data.color, userId: socket.data.playerId, role: this.playerRole(socket, gameId) }, socket.id);
           await gameState.broadcastPlayerState(gameId, socket, "party_state");
         } catch (error) {
           console.error("PLAYER_STATE_ERROR", error);
