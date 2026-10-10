@@ -5,6 +5,7 @@ import Session from "./Session";
 
 import { useParty } from "../contexts/PartyContext";
 
+import SessionButton from "../components/SessionButton";
 import RoomSettingsButton from "../components/RoomSettingsButton";
 import Party from "../components/party/Party";
 
@@ -68,7 +69,7 @@ function NetworkedParty({ gameId, session }: NetworkedPartyProps) {
           }
         });
       }}
-      roomSettings={<RoomSettingsButton session={session} />}
+      roomSettings={<><SessionButton session={session} /><RoomSettingsButton session={session} /></>}
     />
   );
 }

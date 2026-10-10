@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useContext } from "react";
 import { Group } from "react-konva";
 
 import { useUserId } from "../contexts/UserIdContext";
@@ -7,7 +7,7 @@ import PointerTool from "../components/tools/PointerTool";
 import { isEmpty } from "../helpers/shared";
 import Vector2 from "../helpers/Vector2";
 
-import { usePlayerState } from "../contexts/PlayerContext";
+import { PlayerStateContext } from "../contexts/PlayerContext";
 import { useParty } from "../contexts/PartyContext";
 import Session from "./Session";
 import { PointerState } from "../types/Pointer";
@@ -33,9 +33,9 @@ function NetworkedMapPointer({ session, active }: NetworkedMapPointerProps) {
   const [localPointerState, setLocalPointerState] = useState<
     Record<string, PointerState>
   >({});
-  const player = usePlayerState();
+  const player = useContext(PlayerStateContext);
   const party = useParty();
-  const pointerColor = player.color || "blue";
+  const pointerColor = player?.color || "blue";
 
   const sessionRef = useRef(session);
   useEffect(() => {

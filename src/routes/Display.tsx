@@ -9,6 +9,7 @@ import OfflineBanner from "../components/banner/OfflineBanner";
 import LoadingOverlay from "../components/LoadingOverlay";
 import MapLoadingOverlay from "../components/map/MapLoadingOverlay";
 
+import { RoomProvider } from "../contexts/RoomContext";
 import { MapStageProvider } from "../contexts/MapStageContext";
 import { useDatabase } from "../contexts/DatabaseContext";
 import { PartyProvider } from "../contexts/PartyContext";
@@ -122,6 +123,7 @@ function Display() {
   }
 
   return (
+    <RoomProvider session={session}>
     <AssetsProvider>
       <AssetURLsProvider>
         <MapLoadingProvider>
@@ -148,6 +150,7 @@ function Display() {
         </MapLoadingProvider>
       </AssetURLsProvider>
     </AssetsProvider>
+    </RoomProvider>
   );
 }
 

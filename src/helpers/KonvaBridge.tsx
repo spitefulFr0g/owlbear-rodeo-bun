@@ -45,6 +45,8 @@ import {
   GridCellPixelOffsetContext,
   GridSnappingSensitivityContext,
 } from "../contexts/GridContext";
+import { PlayerStateContext } from "../contexts/PlayerContext";
+import PartyContext from "../contexts/PartyContext";
 import DatabaseContext, { useDatabase } from "../contexts/DatabaseContext";
 import { RoleContext, useRole } from "../contexts/RoomContext";
 
@@ -90,8 +92,12 @@ function KonvaBridge({
 
   const database = useDatabase();
   const role = useRole();
+  const player = useContext(PlayerStateContext);
+  const party = useContext(PartyContext);
 
   return stageRender(
+    <PlayerStateContext.Provider value={player}>
+    <PartyContext.Provider value={party}>
     <DatabaseContext.Provider value={database}>
       <RoleContext.Provider value={role}>
         <UserIdContext.Provider value={userId}>
@@ -167,6 +173,8 @@ function KonvaBridge({
         </UserIdContext.Provider>
       </RoleContext.Provider>
     </DatabaseContext.Provider>
+    </PartyContext.Provider>
+    </PlayerStateContext.Provider>
   );
 }
 
