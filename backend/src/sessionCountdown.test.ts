@@ -1,5 +1,6 @@
+import { tokenItem } from "./testing/sceneFixtures";
 import { expect, test } from "bun:test";
-import { createRoom, nextMessage, setupAdministrator, startTestServer } from "./testing/serverHelpers";
+import { sendBatch, createRoom, nextMessage, setupAdministrator, startTestServer } from "./testing/serverHelpers";
 import type { Socket } from "socket.io-client";
 
 const session = (socket: Socket, running: boolean) => new Promise(resolve => socket.emit("session", running, resolve));
@@ -15,17 +16,16 @@ test("players keep changing the scene until five minutes after the last GM leave
     const { cookie } = await setupAdministrator(server);
     const room = await createRoom(server, cookie, "Table");
     const gm = await server.joinRoomAsGM(room.id, cookie);
-    const player = await server.joinRoom(room.id);
+    const player = await server.joinRoom(room.id, "", "player");
     const token = await new Promise<string>(resolve => gm.socket.emit("get_display_token", resolve));
     const display = await server.joinDisplay(room.id, token);
-    gm.socket.emit("map_state", { mapId: "scene", tokens: {} });
     await session(gm.socket, true);
     await leave(gm.socket, player.socket);
     await server.clock.advance(299999);
     const active = await server.joinRoom(room.id);
     expect(active.info.room.session).toBe(true);
-    const update = nextMessage(active.socket, "map_state_update");
-    player.socket.emit("map_state_update", { id: "scene", changes: [{ kind: "N", path: ["tokens", "allowed"], rhs: true }] });
+    const update = nextMessage(active.socket, "scene_changes");
+    expect((await sendBatch(player.socket, { id: "allowed", sceneId: active.snapshot!.scene.id, changes: [{ type: "add", item: tokenItem }] })).applied).toHaveLength(1);
     await update;
     const ended = [player.socket, display.socket].map(socket => nextMessage(socket, "room_state"));
     await server.clock.advance(1);
@@ -40,7 +40,7 @@ test("a returning GM cancels the countdown without ending a later session early"
     const { cookie } = await setupAdministrator(server);
     const room = await createRoom(server, cookie, "Table");
     const gm = await server.joinRoomAsGM(room.id, cookie);
-    const player = await server.joinRoom(room.id);
+    const player = await server.joinRoom(room.id, "", "player");
     await session(gm.socket, true);
     await leave(gm.socket, player.socket);
     await server.clock.advance(240000);
@@ -66,7 +66,7 @@ test("one of two GM connections leaving starts no countdown, but the last leavin
     const room = await createRoom(server, cookie, "Table");
     const first = await server.joinRoomAsGM(room.id, cookie);
     const second = await server.joinRoomAsGM(room.id, cookie);
-    const player = await server.joinRoom(room.id);
+    const player = await server.joinRoom(room.id, "", "player");
     await session(first.socket, true);
     await leave(first.socket, player.socket);
     await server.clock.advance(600000);
@@ -86,7 +86,7 @@ test("deleting a room or stopping the server clears a pending session countdown"
     const { cookie } = await setupAdministrator(server);
     const room = await createRoom(server, cookie, "Table");
     const gm = await server.joinRoomAsGM(room.id, cookie);
-    const player = await server.joinRoom(room.id);
+    const player = await server.joinRoom(room.id, "", "player");
     await session(gm.socket, true);
     await leave(gm.socket, player.socket);
     expect((await fetch(`${server.address}/api/rooms/${room.id}`, { method: "DELETE", headers: { Cookie: cookie } })).status).toBe(204);

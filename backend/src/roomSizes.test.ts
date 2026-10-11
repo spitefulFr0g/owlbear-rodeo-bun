@@ -1,21 +1,22 @@
+import { tokenItem } from "./testing/sceneFixtures";
 import { expect, test } from "bun:test";
 import { mkdir, writeFile } from "fs/promises";
 import { join } from "path";
 import { createHash } from "crypto";
-import { nextMessage, createRoom, setupAdministrator, startTestServer } from "./testing/serverHelpers";
+import { sendBatch, nextMessage, createRoom, setupAdministrator, startTestServer } from "./testing/serverHelpers";
 
 test("room creation, listing and renaming answer the saved document size", async () => {
   const server = await startTestServer();
   try {
     const { cookie } = await setupAdministrator(server);
     const room = await createRoom(server, cookie, "Room");
-    expect(room.sizeBytes).toBe(279); // The initial version 2 document includes an empty scene and legacy state.
+    expect(room.sizeBytes).toBe(267); // The version 2 document contains only the scene envelope.
     const list = await fetch(`${server.address}/api/rooms`, { headers: { Cookie: cookie } });
-    expect((await list.json() as any).rooms[0].sizeBytes).toBe(279);
+    expect((await list.json() as any).rooms[0].sizeBytes).toBe(267);
     const renamed = await fetch(`${server.address}/api/rooms/${room.id}`, {
       method: "PATCH", headers: { Cookie: cookie, "Content-Type": "application/json" }, body: JSON.stringify({ name: "Renamed" }),
     });
-    expect((await renamed.json() as any).room.sizeBytes).toBe(279);
+    expect((await renamed.json() as any).room.sizeBytes).toBe(267);
   } finally { await server.dispose(); }
 });
 
@@ -35,16 +36,16 @@ for (const method of ["PUT", "HEAD", "GET"] as const) {
       expect(upload.status).toBe(201);
       await upload.text();
       const sizes = async () => (await (await fetch(`${server.address}/api/rooms`, { headers: { Cookie: cookie } })).json() as any).rooms.map((room: any) => room.sizeBytes);
-      expect(await sizes()).toEqual([287, 279]);
+      expect(await sizes()).toEqual([275, 267]);
       for (let repeat = 0; repeat < 2; repeat++) {
         const response = await fetch(`${server.address}/assets/image`, { method, headers: imageHeaders(reader.token), ...(method === "PUT" ? { body: "ignored" } : {}) });
         expect(response.status).toBe(method === "PUT" ? 409 : 200);
         if (method === "GET") expect(await response.text()).toBe("12345678");
         else await response.text();
       }
-      expect(await sizes()).toEqual([287, 287]);
+      expect(await sizes()).toEqual([275, 275]);
       await server.restart();
-      expect(await sizes()).toEqual([287, 287]);
+      expect(await sizes()).toEqual([275, 275]);
     } finally { await server.dispose(); }
   });
 }
@@ -65,17 +66,13 @@ test("cast display downloads do not record legacy images as used by the room", a
   try {
     const { cookie } = await setupAdministrator(server);
     const room = await createRoom(server, cookie, "Room");
-    expect(room.sizeBytes).toBe(279);
+    expect(room.sizeBytes).toBe(267);
     const player = await server.joinRoomAsGM(room.id, cookie);
     await new Promise(resolve => player.socket.emit("session", true, resolve));
     const observer = await server.joinRoom(room.id);
     const party = nextMessage(observer.socket, "party_state");
     player.socket.emit("player_state", { userId: "gm" });
     await party;
-    const map = nextMessage(observer.socket, "map");
-    player.socket.emit("map", { owner: "gm" });
-    await map;
-    await server.clock.advance(3000);
     const displayToken = await new Promise<string>(resolve => player.socket.emit("get_display_token", resolve));
     const display = server.connect();
     const joined = nextMessage(display, "joined_display");
@@ -88,7 +85,7 @@ test("cast display downloads do not record legacy images as used by the room", a
     expect(await response.text()).toBe(bytes);
     await server.restart();
     const list = await fetch(`${server.address}/api/rooms`, { headers: { Cookie: cookie } });
-    expect((await list.json() as any).rooms[0].sizeBytes).toBe(299); // Version 2 envelope and legacy map (22 bytes), without the image.
+    expect((await list.json() as any).rooms[0].sizeBytes).toBe(267); // The display fetch does not add image usage.
   } finally { await server.dispose(); }
 });
 
@@ -100,15 +97,17 @@ test("room size counts saved document UTF-8 bytes and changes only after saving"
     const writer = await server.joinRoomAsGM(room.id, cookie);
     await new Promise(resolve => writer.socket.emit("session", true, resolve));
     const observer = await server.joinRoom(room.id);
-    const received = nextMessage(observer.socket, "map");
-    writer.socket.emit("map", { name: "é" });
+    const sceneId = writer.snapshot!.scene.id;
+    const received = nextMessage(observer.socket, "scene_changes");
+    await sendBatch(writer.socket, { id: "utf8", sceneId, changes: [{ type: "add", item: { ...tokenItem, label: "é" } }] });
     await received;
     const size = async () => (await (await fetch(`${server.address}/api/rooms`, { headers: { Cookie: cookie } })).json() as any).rooms[0].sizeBytes;
-    expect(await size()).toBe(279);
+    expect(await size()).toBe(267);
     await server.clock.advance(3000);
-    // The legacy map adds 19 UTF-8 bytes to the empty document.
-    expect(await size()).toBe(298);
+    const scene = (await server.joinRoomAsGM(room.id, cookie)).snapshot!.scene;
+    const expected = Buffer.byteLength(JSON.stringify({ openSceneId: sceneId, scenes: { [sceneId]: scene } }));
+    expect(await size()).toBe(expected);
     await server.restart();
-    expect(await size()).toBe(298);
+    expect(await size()).toBe(expected);
   } finally { await server.dispose(); }
 });

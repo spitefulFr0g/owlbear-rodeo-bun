@@ -1,5 +1,6 @@
+import { tokenItem } from "./testing/sceneFixtures";
 import { expect, test } from "bun:test";
-import { createRoom, nextMessage, setupAdministrator, startTestServer } from "./testing/serverHelpers";
+import { sendBatch, createRoom, nextMessage, setupAdministrator, startTestServer } from "./testing/serverHelpers";
 
 async function startRoomServer() {
   const server = await startTestServer();
@@ -14,66 +15,20 @@ async function change(server: Awaited<ReturnType<typeof startRoomServer>>, room 
   const owner = await server.joinRoomAsGM(room, server.cookie);
   await new Promise(resolve => owner.socket.emit("session", true, resolve));
   const observer = await server.joinRoom(room);
-  const map = { id: "map-one", owner: "gm", type: "file", file: "image" };
-  const state = { mapId: "map-one", tokens: { hero: { x: 12, y: 34 } },
-    drawings: { path: [1, 2, 3] }, fogs: { hidden: [4, 5] }, notes: { note: "Remember the door" } };
-  const manifest = { mapId: "map-one", assets: { image: { id: "image", owner: "gm" } } };
-  for (const [event, value] of [["map", map], ["map_state", state], ["manifest", manifest]] as const) {
-    const received = nextMessage(observer.socket, event);
-    owner.socket.emit(event, value);
-    await received;
-  }
-  return { owner, observer, map, state, manifest };
+  const sceneId = owner.snapshot!.scene.id;
+  await sendBatch(owner.socket, { id: "seed", sceneId, changes: [{ type: "add", item: tokenItem }] });
+  return { owner, observer, sceneId };
 }
 
-test("a clean stop keeps every room's map, placed state and image list", async () => {
+test("a clean stop keeps every room's scene", async () => {
   const server = await startRoomServer();
   try {
-    const expected = await change(server);
+    await change(server);
     await change(server, server.secondRoomId);
     await server.restart();
     for (const room of [server.roomId, server.secondRoomId]) {
-      const joined = await server.joinRoomAsGM(room, server.cookie);
-      expect(joined.state.map).toEqual(expected.map);
-      expect(joined.state.mapState).toEqual(expected.state);
-      expect(joined.state.manifest).toEqual(expected.manifest);
+      expect((await server.joinRoomAsGM(room, server.cookie)).snapshot!.scene.items.hero).toEqual(tokenItem);
     }
-  } finally { await server.dispose(); }
-});
-
-test("a room change is saved three seconds after the last change", async () => {
-  const server = await startRoomServer();
-  try {
-    const { owner, observer, map } = await change(server);
-    await server.clock.advance(2000);
-    const received = nextMessage(observer.socket, "map");
-    owner.socket.emit("map", { ...map, name: "Latest map" });
-    await received;
-    await server.clock.advance(2999);
-    const before = await server.durableCopy();
-    try { expect((await before.joinRoomAsGM(server.roomId, server.cookie)).state.map).toBeUndefined(); }
-    finally { await before.dispose(); }
-    await server.clock.advance(1);
-    const after = await server.durableCopy();
-    try { expect((await after.joinRoomAsGM(server.roomId, server.cookie)).state.map.name).toBe("Latest map"); }
-    finally { await after.dispose(); }
-  } finally { await server.dispose(); }
-});
-
-test("steady room changes are saved within eight seconds", async () => {
-  const server = await startRoomServer();
-  try {
-    const { owner, observer, map } = await change(server);
-    for (let second = 1; second <= 7; second++) {
-      await server.clock.advance(1000);
-      const received = nextMessage(observer.socket, "map");
-      owner.socket.emit("map", { ...map, name: `Revision ${second}` });
-      await received;
-    }
-    await server.clock.advance(1000);
-    const copy = await server.durableCopy();
-    try { expect((await copy.joinRoomAsGM(server.roomId, server.cookie)).state.map.name).toBe("Revision 7"); }
-    finally { await copy.dispose(); }
   } finally { await server.dispose(); }
 });
 
@@ -135,23 +90,18 @@ test("saved image references remain downloadable and incremental edits survive r
     expect(uploaded.status).toBe(201);
     await uploaded.text();
     await server.clock.advance(3000);
-    for (const [event, changes] of [
-      ["map_state_update", [{ kind: "E", path: ["notes", "note"], lhs: "Remember the door", rhs: "The door is open" }]],
-      ["manifest_update", [{ kind: "N", path: ["assets", "token"], rhs: { id: "image", owner: "gm" } }]],
-    ] as const) {
-      const received = nextMessage(observer.socket, event);
-      owner.socket.emit(event, { id: "map-one", changes });
-      await received;
-    }
+    await sendBatch(owner.socket, { id: "image", sceneId: owner.snapshot!.scene.id, changes: [
+      { type: "update", id: "hero", fields: { image: { type: "file", file: "image" }, label: "The door is open" } },
+    ] });
     owner.socket.disconnect();
     observer.socket.disconnect();
     await server.restart();
     const joined = await server.joinRoomAsGM(server.roomId, server.cookie);
-    expect(joined.state.mapState.notes.note).toBe("The door is open");
-    expect(joined.state.manifest.assets.token).toEqual({ id: "image", owner: "gm" });
-    for (const asset of Object.values(joined.state.manifest.assets) as { id: string }[]) {
-      const response = await fetch(`${server.address}/assets/${asset.id}`, {
-        headers: { Authorization: `Bearer ${joined.token}` },
+    const item = joined.snapshot!.scene.items.hero;
+    expect(item).toEqual({ ...tokenItem, image: { type: "file", file: "image" }, label: "The door is open" });
+    for (const token of [joined.token, (await server.joinRoom(server.roomId)).token]) {
+      const response = await fetch(`${server.address}/assets/image`, {
+        headers: { Authorization: `Bearer ${token}` },
       });
       expect(response.status).toBe(200);
       expect(new Uint8Array(await response.arrayBuffer())).toEqual(image);
@@ -162,14 +112,52 @@ test("saved image references remain downloadable and incremental edits survive r
 test("a room that disconnects before its save delay still reaches durable storage", async () => {
   const server = await startRoomServer();
   try {
-    const { owner, observer, state } = await change(server);
+    const { owner, observer } = await change(server);
     const left = nextMessage(observer.socket, "player_left");
     owner.socket.disconnect();
     await left;
     observer.socket.disconnect();
     await server.clock.advance(3000);
     const copy = await server.durableCopy();
-    try { expect((await copy.joinRoomAsGM(server.roomId, server.cookie)).state.mapState).toEqual(state); }
+    try { expect((await copy.joinRoomAsGM(server.roomId, server.cookie)).snapshot!.scene.items.hero).toEqual(tokenItem); }
     finally { await copy.dispose(); }
+  } finally { await server.dispose(); }
+});
+
+test("another item change resets the three-second save delay", async () => {
+  const server = await startRoomServer();
+  try {
+    const { owner, sceneId } = await change(server);
+    await server.clock.advance(2000);
+    await sendBatch(owner.socket, { id: "latest", sceneId, changes: [{ type: "update", id: "hero", fields: { label: "Latest" } }] });
+    await server.clock.advance(2999);
+    const before = await server.durableCopy();
+    try { expect((await before.joinRoomAsGM(server.roomId, server.cookie)).snapshot!.scene.items).toEqual({}); }
+    finally { await before.dispose(); }
+    await server.clock.advance(1);
+    const after = await server.durableCopy();
+    try { expect((await after.joinRoomAsGM(server.roomId, server.cookie)).snapshot!.scene.items.hero).toEqual({ ...tokenItem, label: "Latest" }); }
+    finally { await after.dispose(); }
+  } finally { await server.dispose(); }
+});
+
+test("obsolete canvas messages neither relay nor change the saved scene document", async () => {
+  const server = await startRoomServer();
+  try {
+    const { owner, observer } = await change(server);
+    const obsolete = ["map", "map_state", "map_state_update", "manifest", "manifest_update"];
+    const events: string[] = [];
+    for (const peer of [owner.socket, observer.socket]) {
+      for (const event of obsolete) peer.on(event, () => events.push(event));
+      for (const event of obsolete) peer.emit(event, { id: "obsolete", mapId: "obsolete", assets: {}, changes: [] });
+      await new Promise(resolve => peer.emit("get_display_token", resolve));
+    }
+    expect(events).toEqual([]);
+    await server.restart();
+    const scene = (await server.joinRoomAsGM(server.roomId, server.cookie)).snapshot!.scene;
+    expect(scene.items).toEqual({ hero: tokenItem });
+    const list = await fetch(`${server.address}/api/rooms`, { headers: { Cookie: server.cookie } });
+    const rooms = (await list.json() as { rooms: { id: string; sizeBytes: number }[] }).rooms;
+    expect(rooms.find(room => room.id === server.roomId)?.sizeBytes).toBe(Buffer.byteLength(JSON.stringify({ openSceneId: scene.id, scenes: { [scene.id]: scene } })));
   } finally { await server.dispose(); }
 });
