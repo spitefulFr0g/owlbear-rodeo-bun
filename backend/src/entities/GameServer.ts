@@ -1,4 +1,4 @@
-import { applyChange, checkChange, readBatch, topOrder, gmOwner, Change, SceneGrid } from "../../../src/sceneRules";
+import { applyChange, mayChange, Person, checkChange, readBatch, topOrder, gmOwner, Change, SceneGrid } from "../../../src/sceneRules";
 import { allowsLegacyMapStateUpdateV1 } from "../helpers/roomSwitches";
 import { randomBytes } from "crypto";
 import Accounts from "../accounts/Accounts";
@@ -298,12 +298,17 @@ export default class GameServer {
         const gameId = gameState.getGameId();
         if (!batch || !gameId || socket.data.castDisplay) return;
         const game = this.gameRepo.games[gameId];
+        const person: Person = { role: this.playerRole(socket, gameId),
+          id: socket.data.role === "gm" ? gmOwner : socket.data.playerId };
         const applied: Change[] = [];
         const refused: { id: string; item: import("../../../src/sceneRules").Item | null }[] = [];
         for (const change of batch.changes) {
           const id = change.type === "add" ? change.item.id : change.id;
           if (batch.sceneId !== game.scene.id || (socket.data.role !== "gm" && !game.session) ||
               checkChange(game.scene, change) ||
+              !mayChange(person, { switches: game.switches },
+                change.type === "add" ? undefined :
+                  Object.hasOwn(game.scene.items, id) ? game.scene.items[id] : undefined, change) ||
               (socket.data.role !== "gm" && !socket.data.playerId)) {
             refused.push({ id, item: Object.hasOwn(game.scene.items, id) ? game.scene.items[id] : null });
             continue;

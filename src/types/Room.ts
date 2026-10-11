@@ -3,14 +3,8 @@ import { PlayerColour } from "../helpers/playerColour";
 /** What a connection may do in a room, decided by the server */
 export type Role = "gm" | "trusted" | "player";
 
-/** The tools a GM can switch on or off for players */
-export type RoomSwitches = {
-  tokens: boolean;
-  drawing: boolean;
-  notes: boolean;
-  fog: boolean;
-  uploads: boolean;
-};
+export type { RoomSwitches } from "../sceneRules";
+import { RoomSwitches } from "../sceneRules";
 
 /** What everyone in a room is told about it, kept current by the server */
 export type RoomState = {
