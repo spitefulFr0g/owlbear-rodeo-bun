@@ -170,5 +170,6 @@ export type RoomSwitches = {
 export type RoomRules = {
   switches: RoomSwitches;
   viewOnly?: boolean;
+  welcomeScreen?: boolean; // the scene is serving as the welcome screen outside a session
   knownImage?: (image: ImageSource) => boolean;
 };

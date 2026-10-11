@@ -33,7 +33,7 @@ test("Show to players moves the table with its view, leaves other GMs and saves 
     for (const events of arrivals) expect(events).toEqual([["snapshot", sceneId], ["view", { sceneId, ...view }]]);
     expect(otherSnapshots).toEqual([]);
     const copy = await server.durableCopy();
-    try { expect((await copy.joinRoomAsGM(room.id, cookie)).snapshot!.scene.id).toBe(sceneId); }
+    try { expect((await copy.joinRoomAsGM(room.id, cookie)).snapshot!.scene!.id).toBe(sceneId); }
     finally { await copy.dispose(); }
     for (const events of arrivals) events.length = 0;
     expect(await action(gm.socket, "scene_show", { sceneId, view })).toEqual({ ok: true });
@@ -48,7 +48,7 @@ test("Show to players refuses invalid and unauthorized actions and outside a ses
     const { cookie } = await setupAdministrator(server);
     const room = await createRoom(server, cookie, "Room");
     const gm = await server.joinRoomAsGM(room.id, cookie);
-    const openSceneId = gm.snapshot!.scene.id;
+    const openSceneId = gm.snapshot!.scene!.id;
     const player = await server.joinRoom(room.id, "", "player");
     const trusted = await server.joinRoom(room.id, "", "trusted");
     await new Promise(resolve => gm.socket.emit("room_trust", "trusted", true, resolve));
@@ -79,7 +79,7 @@ test("Show to players refuses invalid and unauthorized actions and outside a ses
     await new Promise(resolve => display.socket.emit("get_display_token", resolve));
     expect(events.filter(event => ["player_view", "display_view"].includes((event as string[])[0]))).toEqual([]);
     await server.restart();
-    expect((await server.joinRoomAsGM(room.id, cookie)).snapshot!.scene.id).toBe(sceneId);
+    expect((await server.joinRoomAsGM(room.id, cookie)).snapshot!.scene!.id).toBe(sceneId);
   } finally { await server.dispose(); }
 });
 
@@ -89,7 +89,7 @@ test("cast displays hold while the GM prepares and frozen displays switch with t
     const { cookie } = await setupAdministrator(server);
     const room = await createRoom(server, cookie, "Room");
     const gm = await server.joinRoomAsGM(room.id, cookie);
-    const openSceneId = gm.snapshot!.scene.id;
+    const openSceneId = gm.snapshot!.scene!.id;
     await action(gm.socket, "session", true);
     const token = await new Promise<string>(resolve => gm.socket.emit("get_display_token", resolve));
     const display = await server.joinDisplay(room.id, token);

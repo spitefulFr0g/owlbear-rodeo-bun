@@ -50,7 +50,7 @@ test("waiting players and cast displays receive party data and no pointers or di
     });
     expect(player.state.partyState[gm.socket.id!].name).toBe("Keeper");
     gm.socket.emit("player_pointer", { x: 1, y: 2 });
-    gm.socket.emit("display_view", { sceneId: gm.snapshot!.scene.id, x: 0, y: 0, width: 10, height: 10 });
+    gm.socket.emit("display_view", { sceneId: gm.snapshot!.scene!.id, x: 0, y: 0, width: 10, height: 10 });
     await gmPointers;
     for (const peer of peers) {
       peer.emit("player_pointer", { x: 3, y: 4 });

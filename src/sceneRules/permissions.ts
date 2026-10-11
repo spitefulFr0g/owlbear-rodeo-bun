@@ -18,6 +18,7 @@ export function mayChange(
 ): boolean {
   if (mayChangeNothing(person.role, rules)) return false;
   if (person.role === "gm") return true;
+  if (rules.welcomeScreen) return false;
   const target = change.type === "add" ? change.item : item;
   if (!target || target.layer === "map") return false;
   if (change.type !== "add" && target.hidden && target.owner !== person.id) return false;

@@ -56,7 +56,7 @@ test("invalid map imports create no scene and send no scene state", async () => 
       const socket = copy.connect(cookie);
       const list = nextMessage(socket, "scene_list");
       socket.emit("join_game", room.id, "");
-      expect((await list)[0].scenes).toEqual([{ id: gm.snapshot!.scene.id, name: "Scene 1", viewOnly: false }]);
+      expect((await list)[0].scenes).toEqual([{ id: gm.snapshot!.scene!.id, name: "Scene 1", viewOnly: false }]);
     } finally { await copy.dispose(); }
   } finally { await server.dispose(); }
 });

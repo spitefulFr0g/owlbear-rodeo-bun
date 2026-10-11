@@ -1,10 +1,6 @@
 import { useEffect, useRef } from "react";
 
 import { useMapStage } from "../contexts/MapStageContext";
-import {
-  useStageHeight,
-  useStageWidth,
-} from "../contexts/MapInteractionContext";
 
 import {
   DisplayView,
@@ -12,7 +8,7 @@ import {
 } from "../helpers/displayView";
 
 import Session from "./Session";
-import { worldNodeId } from "../scene/worldPosition";
+import { visibleWorldRect } from "../scene/worldPosition";
 
 // Send view updates every 50ms (20fps), as the pointer does
 const sendTickRate = 50;
@@ -31,14 +27,6 @@ type NetworkedDisplayViewProps = {
  */
 function NetworkedDisplayView({ session, sceneId }: NetworkedDisplayViewProps) {
   const mapStageRef = useMapStage();
-  const stageWidth = useStageWidth();
-  const stageHeight = useStageHeight();
-
-  const frameRef = useRef({ stageWidth, stageHeight });
-  useEffect(() => {
-    frameRef.current = { stageWidth, stageHeight };
-  });
-
   const sentViewRef = useRef<DisplayView | null>(null);
   const sentTimeRef = useRef(0);
 
@@ -70,15 +58,8 @@ function NetworkedDisplayView({ session, sceneId }: NetworkedDisplayViewProps) {
       counter = 0;
 
       const stage = mapStageRef.current;
-      const world = stage?.findOne(`#${worldNodeId}`);
-      if (!stage || !world || !session.socket?.connected) {
-        return;
-      }
-      const inverse = world.getAbsoluteTransform().copy().invert();
-      const topLeft = inverse.point({ x: 0, y: 0 });
-      const bottomRight = inverse.point({ x: frameRef.current.stageWidth, y: frameRef.current.stageHeight });
-      const rect = { ...topLeft, width: bottomRight.x - topLeft.x, height: bottomRight.y - topLeft.y };
-      if (!Object.values(rect).every(Number.isFinite)) {
+      const rect = stage && visibleWorldRect(stage);
+      if (!rect || !session.socket?.connected) {
         return;
       }
       const sent = sentViewRef.current;
