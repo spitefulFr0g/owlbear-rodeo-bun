@@ -1,4 +1,4 @@
-import { applyChange, visibleTo, changeFor, Item, Scene, mayChange, Person, checkChange, readBatch, topOrder, gmOwner, Change, SceneGrid, checkGrid } from "../../../src/sceneRules";
+import { applyChange, visibleTo, changeFor, Item, Scene, mayChange, Person, checkChange, readBatch, topOrder, gmOwner, Change, SceneGrid, checkGrid, defaultSceneGrid } from "../../../src/sceneRules";
 import { randomBytes } from "crypto";
 import Accounts from "../accounts/Accounts";
 import { clientAddress } from "../clientRequest";
@@ -48,15 +48,28 @@ export default class GameServer {
   }
 
   private sceneFor(socket: Socket, gameId: string): Scene {
-    const scene = this.gameRepo.games[gameId].scene;
+    const scene = this.gameRepo.games[gameId].scenes[socket.data.viewedSceneId];
     const person = this.person(socket, gameId);
     return { id: scene.id, grid: scene.grid, fogFill: scene.fogFill, viewOnly: scene.viewOnly, items: Object.fromEntries(Object.entries(scene.items).filter(([, item]) => visibleTo(person, item))) };
+  }
+
+  private sceneList(gameId: string) {
+    const game = this.gameRepo.games[gameId];
+    return { scenes: Object.values(game.scenes).map(({ id, name, viewOnly }) => ({ id, name, viewOnly })),
+      openSceneId: game.openSceneId, welcomeSceneId: game.welcomeSceneId };
+  }
+
+  private broadcastSceneList(gameId: string): void {
+    for (const id of this.io.sockets.adapter.rooms.get(gameId) || []) {
+      const peer = this.io.sockets.sockets.get(id);
+      if (peer?.data.role === "gm") peer.emit("scene_list", this.sceneList(gameId));
+    }
   }
 
   private broadcastCanvas(sender: Socket, gameId: string, event: string, value: unknown): void {
     for (const id of this.io.sockets.adapter.rooms.get(gameId) || []) {
       const peer = this.io.sockets.sockets.get(id);
-      if (peer && peer.id !== sender.id && (this.gameRepo.games[gameId].session || peer.data.role === "gm")) {
+      if (peer && peer.id !== sender.id && peer.data.viewedSceneId === sender.data.viewedSceneId && (this.gameRepo.games[gameId].session || peer.data.role === "gm")) {
         peer.emit(event, value);
       }
     }
@@ -113,7 +126,7 @@ export default class GameServer {
         if (roomId && !this.gameRepo.games[roomId].session && socket.data.role !== "gm" &&
           event === "player_pointer") return;
         if (
-          socket.data.castDisplay && !["get_display_token", "join_display", "scene_grid", "room_switches", "room_trust", "room_password", "new_display_link", "session"].includes(event)
+          socket.data.castDisplay && !["get_display_token", "join_display", "scene_grid", "room_switches", "room_trust", "room_password", "new_display_link", "session", "scene_create", "scene_view"].includes(event)
         ) {
           return;
         }
@@ -146,6 +159,7 @@ export default class GameServer {
         const token = this.joinTokens.issue(socket.id, gameId, "display");
         socket.emit("joined_display", socket.id, token, { room: this.gameRepo.roomState(gameId) });
         const game = this.gameRepo.games[gameId];
+        socket.data.viewedSceneId = game.openSceneId;
         if (game.session) socket.emit("scene_snapshot", { scene: this.sceneFor(socket, gameId) });
         socket.emit("display_frozen", game.displayFrozen);
         if (game.session && game.shownDisplayView) socket.emit("display_view", game.shownDisplayView);
@@ -245,6 +259,8 @@ export default class GameServer {
           // Only the player who joined gets the token for the asset routes
           const token = this.joinTokens.issue(socket.id, gameId, role);
           socket.emit("joined_game", socket.id, token, { role: this.playerRole(socket, gameId), color: socket.data.color, room: this.gameRepo.roomState(gameId) });
+          socket.data.viewedSceneId = game.openSceneId;
+          if (role === "gm") socket.emit("scene_list", this.sceneList(gameId));
           if (role === "gm" || game.session) socket.emit("scene_snapshot", { scene: this.sceneFor(socket, gameId) });
           socket.emit("display_frozen", this.gameRepo.games[gameId].displayFrozen);
           socket.to(gameId).emit("joined_game", socket.id);
@@ -255,6 +271,51 @@ export default class GameServer {
         }
       });
 
+      socket.on("scene_create", (value: unknown, answer?: (result: { ok: boolean; error?: string; sceneId?: string }) => void) => {
+        const gameId = gameState.getGameId();
+        if (!gameId || socket.data.castDisplay || socket.data.role !== "gm") {
+          if (typeof answer === "function") answer({ ok: false, error: "not_room_gm" });
+          return;
+        }
+        const payload = value as { name?: unknown } | null;
+        if (!payload || typeof payload !== "object" || Array.isArray(payload) ||
+          Object.keys(payload).some(key => key !== "name") || typeof payload.name !== "string" ||
+          !payload.name.trim().length || payload.name.trim().length > 100) {
+          if (typeof answer === "function") answer({ ok: false, error: "invalid" });
+          return;
+        }
+        const game = this.gameRepo.games[gameId];
+        const sceneId = randomBytes(16).toString("hex");
+        game.scenes[sceneId] = { id: sceneId, name: payload.name.trim(), grid: { ...defaultSceneGrid },
+          fogFill: false, viewOnly: false, items: {} };
+        socket.data.viewedSceneId = sceneId;
+        this.gameRepo.save(gameId);
+        socket.emit("scene_snapshot", { scene: this.sceneFor(socket, gameId) });
+        this.broadcastSceneList(gameId);
+        if (typeof answer === "function") answer({ ok: true, sceneId });
+      });
+
+      socket.on("scene_view", (value: unknown, answer?: (result: { ok: boolean; error?: string }) => void) => {
+        const gameId = gameState.getGameId();
+        if (!gameId || socket.data.castDisplay || socket.data.role !== "gm") {
+          if (typeof answer === "function") answer({ ok: false, error: "not_room_gm" });
+          return;
+        }
+        const payload = value as { sceneId?: unknown } | null;
+        if (!payload || typeof payload !== "object" || Array.isArray(payload) ||
+          Object.keys(payload).some(key => key !== "sceneId") || typeof payload.sceneId !== "string") {
+          if (typeof answer === "function") answer({ ok: false, error: "invalid" });
+          return;
+        }
+        if (!Object.hasOwn(this.gameRepo.games[gameId].scenes, payload.sceneId)) {
+          if (typeof answer === "function") answer({ ok: false, error: "not_found" });
+          return;
+        }
+        socket.data.viewedSceneId = payload.sceneId;
+        socket.emit("scene_snapshot", { scene: this.sceneFor(socket, gameId) });
+        if (typeof answer === "function") answer({ ok: true });
+      });
+
       socket.on("scene_grid", (value: unknown, answer?: (result: { ok: boolean; error?: string }) => void) => {
         const gameId = gameState.getGameId();
         if (!gameId || socket.data.castDisplay || socket.data.role !== "gm") {
@@ -262,18 +323,20 @@ export default class GameServer {
           return;
         }
         const game = this.gameRepo.games[gameId];
+        let scene = game.scenes[socket.data.viewedSceneId];
         const payload = value as { sceneId?: unknown; grid?: SceneGrid } | null;
         const grid = payload?.grid;
         if (!payload || typeof payload !== "object" || Array.isArray(payload) ||
             Object.keys(payload).some(key => !["sceneId", "grid"].includes(key)) ||
-            payload.sceneId !== game.scene.id || !checkGrid(grid)) {
+            payload.sceneId !== scene.id || !checkGrid(grid)) {
           if (typeof answer === "function") answer({ ok: false, error: "invalid" });
           return;
         }
-        game.scene = { ...game.scene, grid };
+        scene = { ...scene, grid };
+        game.scenes[scene.id] = scene;
         this.gameRepo.changed(gameId);
-        socket.emit("scene_grid", { sceneId: game.scene.id, grid });
-        this.broadcastCanvas(socket, gameId, "scene_grid", { sceneId: game.scene.id, grid });
+        socket.emit("scene_grid", { sceneId: scene.id, grid });
+        this.broadcastCanvas(socket, gameId, "scene_grid", { sceneId: scene.id, grid });
         if (typeof answer === "function") answer({ ok: true });
       });
 
@@ -282,16 +345,22 @@ export default class GameServer {
         const gameId = gameState.getGameId();
         if (!batch || !gameId || socket.data.castDisplay) return;
         const game = this.gameRepo.games[gameId];
+        let scene = game.scenes[socket.data.viewedSceneId];
         const person = this.person(socket, gameId);
+        if (batch.sceneId !== scene.id) {
+          socket.emit("scene_answer", { batchId: batch.id, sceneId: batch.sceneId, applied: [],
+            refused: batch.changes.map(change => ({ id: change.type === "add" ? change.item.id : change.id, item: null })) });
+          return;
+        }
         const applied: Change[] = [];
         const transitions: { before: Item | undefined; after: Item | undefined; change: Change }[] = [];
         const refused: { id: string; item: Item | null }[] = [];
         for (const change of batch.changes) {
           const id = change.type === "add" ? change.item.id : change.id;
-          const before = Object.hasOwn(game.scene.items, id) ? game.scene.items[id] : undefined;
+          const before = Object.hasOwn(scene.items, id) ? scene.items[id] : undefined;
           const refusedItem = before && visibleTo(person, before) ? before : null;
-          if (batch.sceneId !== game.scene.id || (socket.data.role !== "gm" && !game.session) ||
-              checkChange(game.scene, change) ||
+          if ((socket.data.role !== "gm" && !game.session) ||
+              checkChange(scene, change) ||
               !mayChange(person, { switches: game.switches, knownImage: image =>
                 image.type === "default" || [image.file, image.thumbnail, ...Object.values(image.resolutions ?? {})]
                   .filter((id): id is string => id !== undefined)
@@ -305,36 +374,37 @@ export default class GameServer {
           if (change.type === "add") {
             actual = { type: "add", item: { ...change.item,
               owner: socket.data.role === "gm" ? gmOwner : socket.data.playerId,
-              order: topOrder(game.scene, change.item.layer) } };
+              order: topOrder(scene, change.item.layer) } };
           } else if (change.type === "update") {
-            const item = game.scene.items[change.id];
+            const item = scene.items[change.id];
             if (item && (change.fields.layer !== undefined ||
                 (change.fields.position !== undefined && item.kind === "image" && item.layer !== "map"))) {
-              const fields = { ...change.fields, order: topOrder(game.scene, change.fields.layer ?? item.layer) };
+              const fields = { ...change.fields, order: topOrder(scene, change.fields.layer ?? item.layer) };
               actual = { ...change, fields };
             }
           }
-          const result = applyChange(game.scene, actual);
+          const result = applyChange(scene, actual);
           if (!result.applied) {
             refused.push({ id, item: refusedItem });
             continue;
           }
-          game.scene = result.scene;
+          scene = { ...result.scene, name: scene.name };
+          game.scenes[scene.id] = scene;
           applied.push(actual);
-          transitions.push({ before, after: Object.hasOwn(game.scene.items, id) ? game.scene.items[id] : undefined, change: actual });
+          transitions.push({ before, after: Object.hasOwn(scene.items, id) ? scene.items[id] : undefined, change: actual });
         }
         if (applied.length) this.gameRepo.changed(gameId);
         socket.emit("scene_answer", { batchId: batch.id, sceneId: batch.sceneId, applied, refused });
         if (applied.length) {
           for (const id of this.io.sockets.adapter.rooms.get(gameId) || []) {
             const peer = this.io.sockets.sockets.get(id);
-            if (!peer || peer.id === socket.id || (!game.session && peer.data.role !== "gm")) continue;
+            if (!peer || peer.id === socket.id || peer.data.viewedSceneId !== scene.id || (!game.session && peer.data.role !== "gm")) continue;
             const viewer = this.person(peer, gameId);
             const changes = transitions.flatMap(({ before, after, change }) => {
               const visibleChange = changeFor(viewer, before, after, change);
               return visibleChange ? [visibleChange] : [];
             });
-            if (changes.length) peer.emit("scene_changes", { sceneId: game.scene.id, changes });
+            if (changes.length) peer.emit("scene_changes", { sceneId: scene.id, changes });
           }
         }
       });
