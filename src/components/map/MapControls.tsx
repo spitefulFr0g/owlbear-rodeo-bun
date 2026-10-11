@@ -40,6 +40,7 @@ import shortcuts from "../../shortcuts";
 import { useToolPermissions, useRole } from "../../contexts/RoomContext";
 import { getRoleControls } from "../../helpers/roomControls";
 import { useScene } from "../../scene/SceneContext";
+import { fogItems } from "../../scene/fogItem";
 import { drawingsInOrder } from "../../scene/drawingItem";
 import { MapActions } from "../../hooks/useMapActions";
 
@@ -78,7 +79,7 @@ function MapContols({
   const [fullScreen, setFullScreen] = useSetting("map.fullScreen");
 
   const permissions = useToolPermissions();
-  const { scene, readOnly } = useScene();
+  const { scene, readOnly, canChange } = useScene();
   const isGM = getRoleControls(useRole()).hidden;
 
   const disabledControls = useMemo(() => {
@@ -89,9 +90,6 @@ function MapContols({
     const disabled: MapToolId[] = [];
     if (!allowMapChange) {
       disabled.push("map");
-    }
-    if (!map) {
-      disabled.push("pointer");
     }
     if (readOnly) disabled.push("select");
     if (readOnly || !allowMapDrawing) {
@@ -138,12 +136,18 @@ function MapContols({
   const disabledSettings = useMemo(() => {
     const disabled: Partial<Record<keyof Settings, string[]>> = {
       drawing: [],
+      fog: [],
     };
-    if (!scene || drawingsInOrder(scene).length === 0) {
+    if (!scene || !drawingsInOrder(scene).some(item => canChange({ type: "delete", id: item.id }))) {
       disabled.drawing?.push("erase");
     }
+    const fog = scene ? fogItems(scene) : [];
+    if (!fog.some(item => canChange({ type: "delete", id: item.id })))
+      disabled.fog?.push("remove");
+    if (!fog.some(item => canChange({ type: "update", id: item.id, fields: { hidden: !item.hidden } })))
+      disabled.fog?.push("toggle");
     return disabled;
-  }, [scene]);
+  }, [scene, canChange]);
 
   const toolsById: Record<string, MapTool> = {
     move: {

@@ -19,7 +19,7 @@ export default function SceneItemMenu({
   position: { x: number; y: number } | null;
   close: () => void;
 }) {
-  const { scene, selection, act, readOnly, setSelection } = useScene();
+  const { scene, selection, act, readOnly, setSelection, canChange } = useScene();
   const items = selection
     .map((id) => scene?.items[id])
     .filter((item): item is Item => !!item);
@@ -30,6 +30,8 @@ export default function SceneItemMenu({
       item.kind === "image" &&
       ["character", "mount", "prop", "attachment"].includes(item.layer)
   );
+  const mayUpdate = (fields: ItemFields) => all(item =>
+    canChange({ type: "update", id: item.id, fields }));
   function update(fields: ItemFields) {
     act(items.map((item) => ({ type: "update", id: item.id, fields })));
   }
@@ -57,6 +59,7 @@ export default function SceneItemMenu({
               Label
               <Input
                 aria-label="Item label"
+                disabled={!mayUpdate({ label: "" })}
                 maxLength={10000}
                 value={items[0].kind === "image" ? items[0].label : ""}
                 onChange={(event) => update({ label: event.target.value })}
@@ -66,6 +69,7 @@ export default function SceneItemMenu({
               Size (cells)
               <Input
                 aria-label="Token size"
+                disabled={!mayUpdate({ scale: { x: 1, y: 1 } })}
                 type="number"
                 min="0.1"
                 step="0.5"
@@ -110,6 +114,7 @@ export default function SceneItemMenu({
                   <Button
                     key={color}
                     aria-label={`Status ring ${color}`}
+                disabled={!mayUpdate({ metadata: { [statusRingsKey]: [] } })}
                     title={color}
                     sx={{
                       backgroundColor: colors[color],
@@ -154,6 +159,7 @@ export default function SceneItemMenu({
             Colour
             <Select
               aria-label="Item colour"
+                disabled={!mayUpdate({ color: "red" })}
               value={"color" in items[0] ? items[0].color : ""}
               onChange={(event) => update({ color: event.target.value })}
             >
@@ -170,6 +176,7 @@ export default function SceneItemMenu({
             Text
             <Textarea
               aria-label="Item text"
+                disabled={!mayUpdate({ text: "" })}
               maxLength={10000}
               value={items[0].kind === "text" ? items[0].text : ""}
               onChange={(event) => update({ text: event.target.value })}
@@ -180,6 +187,7 @@ export default function SceneItemMenu({
           Layer
           <Select
             aria-label="Item layer"
+                disabled={!layers.some(layer => layer !== "grid" && layer !== "ruler" && mayUpdate({ layer }))}
             value={
               items.every((item) => item.layer === items[0].layer)
                 ? items[0]?.layer
@@ -193,7 +201,7 @@ export default function SceneItemMenu({
             {layers
               .filter((layer) => layer !== "grid" && layer !== "ruler")
               .map((layer) => (
-                <option key={layer} value={layer}>
+                <option key={layer} value={layer} disabled={!mayUpdate({ layer })}>
                   {layer[0].toUpperCase() + layer.slice(1)}
                 </option>
               ))}
@@ -205,6 +213,7 @@ export default function SceneItemMenu({
             (item.kind === "shape" || item.kind === "curve")
         ) && (
           <Button
+            disabled={!mayUpdate({ cut: !items.every(item => "cut" in item && item.cut) })}
             onClick={() =>
               update({ cut: !items.every((item) => "cut" in item && item.cut) })
             }
@@ -214,6 +223,7 @@ export default function SceneItemMenu({
         )}
         <Flex mt={2}>
           <Button
+            disabled={!all(item => canChange({ type: "add", item }))}
             onClick={() => {
               if (!scene) return;
               const copies = copySelection(
@@ -232,6 +242,7 @@ export default function SceneItemMenu({
             Duplicate
           </Button>
           <Button
+            disabled={!all(item => canChange({ type: "delete", id: item.id }))}
             onClick={() => {
               act(items.map((item) => ({ type: "delete", id: item.id })));
               setSelection([]);

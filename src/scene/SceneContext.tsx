@@ -27,6 +27,8 @@ import {
   Batch,
   Change,
   gmOwner,
+  Item,
+  mayChange,
   Scene,
   SceneGrid,
   Vector2,
@@ -70,6 +72,8 @@ type SceneStore = {
    * one batch. False when nothing was sent, as the canvas is read-only.
    */
   act: (changes: Change[]) => boolean;
+  canChange: (change: Change) => boolean;
+  canSelect: (item: Item) => boolean;
   /**
    * Changes the scene's grid for everyone viewing it. It shows once the
    * server has accepted it, which it does from a GM only.
@@ -117,14 +121,6 @@ export function SceneProvider({
     () => shownScene(held.server, held.unconfirmed),
     [held]
   );
-
-  useEffect(() => {
-    setSelection((previous) =>
-      previous.some((id) => !scene?.items[id])
-        ? previous.filter((id) => !!scene?.items[id])
-        : previous
-    );
-  }, [scene]);
 
   const [connected, setConnected] = useState(!!session.joinToken);
   useEffect(() => {
@@ -209,6 +205,29 @@ export function SceneProvider({
 
   const readOnly = !connected || !scene;
 
+  const person = useMemo<Person>(() => {
+    if (display) return { role: "display", id: "" };
+    if (role === "gm") return { role: "gm", id: gmOwner };
+    return { role, id: userId || "" };
+  }, [display, role, userId]);
+
+  const switches = room.switches || defaultRoomSwitches;
+
+  // Image availability is handled by the token bar; this gate covers item actions.
+  const canChange = useCallback((change: Change) =>
+    !readOnly && mayChange(person, { switches, knownImage: () => true },
+      change.type === "add" ? undefined : scene?.items[change.id], change),
+    [readOnly, person, switches, scene]);
+  const canSelect = useCallback((item: Item) => canChange({
+    type: "update", id: item.id, fields: { position: item.position },
+  }), [canChange]);
+  useEffect(() => {
+    setSelection(previous => {
+      const allowed = previous.filter(id => !!scene?.items[id] && canSelect(scene.items[id]));
+      return allowed.length === previous.length ? previous : allowed;
+    });
+  }, [scene, canSelect]);
+
   const act = useCallback(
     (changes: Change[]) => {
       const scene = sceneRef.current;
@@ -216,8 +235,9 @@ export function SceneProvider({
       if (!scene || !session.socket?.connected || !session.joinToken) {
         return false;
       }
+      changes = changes.filter(canChange);
       if (changes.length === 0) {
-        return true;
+        return false;
       }
       const batch: Batch = { id: uuid(), sceneId: scene.id, changes };
       setHeld((held) => ({
@@ -227,7 +247,7 @@ export function SceneProvider({
       session.socket.emit("scene_changes", batch);
       return true;
     },
-    [session]
+    [session, canChange]
   );
 
   const setGrid = useCallback(
@@ -272,14 +292,6 @@ export function SceneProvider({
     [session, getAsset]
   );
 
-  const person = useMemo<Person>(() => {
-    if (display) return { role: "display", id: "" };
-    if (role === "gm") return { role: "gm", id: gmOwner };
-    return { role, id: userId || "" };
-  }, [display, role, userId]);
-
-  const switches = room.switches || defaultRoomSwitches;
-
   const store = useMemo(
     () => ({
       scene,
@@ -289,10 +301,12 @@ export function SceneProvider({
       switches,
       readOnly,
       act,
+      canChange,
+      canSelect,
       setGrid,
       share,
     }),
-    [scene, selection, person, switches, readOnly, act, setGrid, share]
+    [scene, selection, person, switches, readOnly, act, canChange, canSelect, setGrid, share]
   );
 
   return (
