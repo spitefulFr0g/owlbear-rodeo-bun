@@ -278,17 +278,29 @@ export default class GameServer {
           if (typeof answer === "function") answer({ ok: false, error: "not_room_gm" });
           return;
         }
-        const payload = value as { name?: unknown } | null;
+        const payload = value as { name?: unknown; grid?: SceneGrid; fogFill?: boolean; map?: Item } | null;
         if (!payload || typeof payload !== "object" || Array.isArray(payload) ||
-          Object.keys(payload).some(key => key !== "name") || typeof payload.name !== "string" ||
+          Object.keys(payload).some(key => !["name", "grid", "fogFill", "map"].includes(key)) || typeof payload.name !== "string" ||
           !payload.name.trim().length || payload.name.trim().length > 100) {
           if (typeof answer === "function") answer({ ok: false, error: "invalid" });
           return;
         }
         const game = this.gameRepo.games[gameId];
         const sceneId = randomBytes(16).toString("hex");
-        game.scenes[sceneId] = { id: sceneId, name: payload.name.trim(), grid: { ...defaultSceneGrid },
-          fogFill: false, viewOnly: false, items: {} };
+        let scene = { id: sceneId, name: payload.name.trim(), grid: payload.grid ?? { ...defaultSceneGrid },
+          fogFill: payload.fogFill ?? false, viewOnly: false, items: {} };
+        if ((Object.hasOwn(payload, "grid") && !checkGrid(payload.grid)) ||
+            (Object.hasOwn(payload, "fogFill") && typeof payload.fogFill !== "boolean") ||
+            (Object.hasOwn(payload, "map") && (!payload.map || payload.map.kind !== "image" ||
+              payload.map.layer !== "map" || checkChange(scene, { type: "add", item: payload.map })))) {
+          if (typeof answer === "function") answer({ ok: false, error: "invalid" });
+          return;
+        }
+        if (payload.map) {
+          const item = { ...payload.map, owner: gmOwner, locked: true, order: topOrder(scene, "map") };
+          scene = { ...scene, items: { [item.id]: item } };
+        }
+        game.scenes[sceneId] = scene;
         socket.data.viewedSceneId = sceneId;
         this.gameRepo.save(gameId);
         socket.emit("scene_snapshot", { scene: this.sceneFor(socket, gameId) });
