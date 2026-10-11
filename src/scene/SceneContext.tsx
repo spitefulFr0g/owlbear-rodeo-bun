@@ -109,7 +109,7 @@ type SceneStore = {
    */
   createScene: (
     name: string,
-    from?: { grid: SceneGrid; map: Item }
+    from?: { grid: SceneGrid; map: Item; fogFill?: boolean }
   ) => Promise<SceneAnswer>;
   /** Sets a scene's name. The scene list shows it once the server has */
   renameScene: (sceneId: string, name: string) => Promise<SceneAnswer>;
@@ -418,7 +418,7 @@ export function SceneProvider({
     [askForScene]
   );
   const createScene = useCallback(
-    (name: string, from?: { grid: SceneGrid; map: Item }) =>
+    (name: string, from?: { grid: SceneGrid; map: Item; fogFill?: boolean }) =>
       askForScene("scene_create", { name, ...from }),
     [askForScene]
   );

@@ -51,7 +51,7 @@ function SceneEditor({ scene: listed, onCancel, onSaved, refusal }: SceneEditorP
   const map = mapId ? mapsById[mapId] : undefined;
   const keepsUnknownMap = chosenMapId === undefined && !!placed && !map;
 
-  async function handleSave(saved: Map | undefined, name: string) {
+  async function handleSave(saved: Map | undefined, name: string, fogFill: boolean) {
     const opened = latest.current;
     if (!opened.scene || opened.scene.id !== listed.id || opened.readOnly) {
       return notHere;
@@ -80,6 +80,7 @@ function SceneEditor({ scene: listed, onCancel, onSaved, refusal }: SceneEditorP
       }
       if (edit.grid) setSettings({ grid: edit.grid });
     }
+    if (scene.fogFill !== fogFill) setSettings({ fogFill });
     onSaved();
   }
 
@@ -105,6 +106,7 @@ function SceneEditor({ scene: listed, onCancel, onSaved, refusal }: SceneEditorP
             : "This scene has no map."
         }
         startName={listed.name}
+        startFogFill={store.scene?.fogFill}
         confirmText="Save"
         pickText={map || keepsUnknownMap ? "Replace map" : "Choose a map"}
         onPickAnother={() => setIsPicking(true)}

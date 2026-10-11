@@ -28,7 +28,7 @@ function SceneImporter({ onCancel, onCreated, refusal }: SceneImporterProps) {
   const map = mapId ? mapsById[mapId] : undefined;
   const { createScene, share } = useScene();
 
-  async function handleCreate(saved: Map | undefined, name: string) {
+  async function handleCreate(saved: Map | undefined, name: string, fogFill: boolean) {
     if (!saved) return "That map is no longer in the browser library.";
     const create = sceneFromMap(saved, name, uuid());
     try {
@@ -39,6 +39,7 @@ function SceneImporter({ onCancel, onCreated, refusal }: SceneImporterProps) {
       return "The map's images could not be sent to the room.";
     }
     const answer = await createScene(create.name, {
+      fogFill,
       grid: create.grid,
       map: create.map,
     });
