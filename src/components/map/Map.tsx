@@ -4,7 +4,7 @@ import { useToasts } from "react-toast-notifications";
 
 import MapControls from "./MapControls";
 import MapInteraction from "./MapInteraction";
-import useSceneGrid from "../../hooks/useSceneGrid";
+import SceneGrid from "../scene/SceneGrid";
 
 import { useScene } from "../../scene/SceneContext";
 import { drawingsInOrder, deleteDrawings } from "../../scene/drawingItem";
@@ -70,7 +70,6 @@ function Map({ session }: MapProps) {
       !settings.fog.preview);
   const selecting =
     grabbing || selectedToolId === "move" || selectedToolId === "select";
-  const sceneGrid = useSceneGrid();
 
   return (
     <Box sx={{ flexGrow: 1 }}>
@@ -96,7 +95,7 @@ function Map({ session }: MapProps) {
         onSelectedToolChange={setSelectedToolId}
       >
         <SceneItems placement="belowGrid" />
-        {sceneGrid}
+        <SceneGrid />
         <DrawingTool
           visible={!selecting}
           renderItems={

@@ -4,7 +4,7 @@ import { IconButton, Flex, Box } from "theme-ui";
 
 import RadioIconButton from "../RadioIconButton";
 import Divider from "../Divider";
-import SceneGridControls from "../scene/SceneGridControls";
+import SceneControls from "../scene/SceneControls";
 
 import ScenesButton from "../scene/ScenesButton";
 
@@ -86,7 +86,7 @@ function MapContols({
       id: "map",
       component: <ScenesButton />,
     },
-    { id: "grid", component: <SceneGridControls /> },
+    { id: "scene", component: <SceneControls /> },
     {
       id: "tools",
       component: tools.map((tool) => (
