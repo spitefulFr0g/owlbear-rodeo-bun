@@ -46,6 +46,9 @@ export function defaultDisplayView(scene: Scene | null): MapRect {
   const y = Math.min(...bounds.map((rect) => rect.y));
   const width = Math.max(...bounds.map((rect) => rect.x + rect.width)) - x;
   const height = Math.max(...bounds.map((rect) => rect.y + rect.height)) - y;
-  return { x: x - (width === 0 ? cell / 2 : 0), y: y - (height === 0 ? cell / 2 : 0),
-    width: width || cell, height: height || cell };
+  // Leave half a cell around non-map items for strokes and token labels.
+  const margin = maps.length ? 0 : cell / 2;
+  return { x: x - (width === 0 ? cell / 2 : 0) - margin,
+    y: y - (height === 0 ? cell / 2 : 0) - margin,
+    width: (width || cell) + margin * 2, height: (height || cell) + margin * 2 };
 }
