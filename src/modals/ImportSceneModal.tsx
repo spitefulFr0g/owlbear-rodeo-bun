@@ -1,5 +1,5 @@
 import { ChangeEvent, FormEvent, useState } from "react";
-import { Box, Button, Flex, Input, Label, Text, useThemeUI } from "theme-ui";
+import { Box, Button, Flex, Checkbox, Input, Label, Text, useThemeUI } from "theme-ui";
 import SimpleBar from "simplebar-react";
 
 import Modal from "../components/Modal";
@@ -26,6 +26,7 @@ type ImportSceneProps = {
   noMapText?: string;
   /** The name to start from. Without one the scene is named after the map until the GM types */
   startName?: string;
+  startFogFill?: boolean;
   confirmText: string;
   pickText: string;
   /** To the map picker */
@@ -37,7 +38,7 @@ type ImportSceneProps = {
    * Given the map as it is now saved and the scene's name. Resolves with
    * nothing once done, or with what to tell the GM went wrong.
    */
-  onConfirm: (map: Map | undefined, name: string) => Promise<string | undefined>;
+  onConfirm: (map: Map | undefined, name: string, fogFill: boolean) => Promise<string | undefined>;
 };
 
 /**
@@ -51,6 +52,7 @@ function ImportSceneModal({
   map,
   noMapText,
   startName,
+  startFogFill = false,
   confirmText,
   pickText,
   onPickAnother,
@@ -67,6 +69,7 @@ function ImportSceneModal({
   const name = edited
     ? importedSceneName(edited, typedName)
     : (typedName || "").trim();
+  const [fogFill, setFogFill] = useState(startFogFill);
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState<string>();
 
@@ -74,7 +77,7 @@ function ImportSceneModal({
     event.preventDefault();
     setIsSending(true);
     setError(undefined);
-    const failure = await onConfirm(await save(), name);
+    const failure = await onConfirm(await save(), name, fogFill);
     // Done, whoever opened the importer has closed it
     if (failure === undefined) return;
     setIsSending(false);
@@ -139,6 +142,7 @@ function ImportSceneModal({
             autoComplete="off"
             my={1}
           />
+          <Label><Checkbox checked={fogFill} disabled={isSending} onChange={(event) => setFogFill(event.target.checked)} />Fog Fill</Label>
           {error && (
             <Text as="p" variant="caption" sx={{ color: "highlight" }} my={1}>
               {error}
