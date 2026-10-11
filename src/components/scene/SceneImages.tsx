@@ -18,6 +18,7 @@ import { worldNodeId } from "../../scene/worldPosition";
 
 import { ImageItem } from "../../sceneRules";
 
+import { mapSources } from "../../maps";
 import { tokenSources } from "../../tokens";
 
 import World from "./World";
@@ -39,7 +40,14 @@ function SceneImage({
   onDragStart,
   onDragEnd,
 }: SceneImageProps) {
-  const url = useDataURL(item.image, tokenSources);
+  const savedQuality = item.metadata.mapQuality;
+  const quality = item.image.type === "file" && typeof savedQuality === "string" &&
+    item.image.resolutions?.[savedQuality as "low" | "medium" | "high" | "ultra"]
+    ? savedQuality : "original";
+  const url = useDataURL(
+    item.image.type === "file" ? { ...item.image, quality } : item.image,
+    { ...mapSources, ...tokenSources }
+  );
   const [image] = useImage(url || "");
 
   const setPreventMapInteraction = useSetPreventMapInteraction();

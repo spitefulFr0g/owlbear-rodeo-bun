@@ -17,6 +17,7 @@ import useMapActions, { MapAction } from "../hooks/useMapActions";
 import useAssetTransfers from "../hooks/useAssetTransfers";
 
 import Session from "./Session";
+import useSceneMap from "../hooks/useSceneMap";
 
 import { getRoleControls } from "../helpers/roomControls";
 
@@ -33,7 +34,6 @@ import { MapState } from "../types/MapState";
 import {
   AssetManifest,
   AssetManifestAsset,
-  AssetManifestAssets,
 } from "../types/Asset";
 import { TokenState } from "../types/TokenState";
 import { DrawingState } from "../types/Drawing";
@@ -83,33 +83,6 @@ function NetworkedMapAndTokens({ session }: { session: Session }) {
       "mapId"
     );
 
-  async function loadAssetManifestFromMap(map: MapType, mapState: MapState) {
-    const assets: AssetManifestAssets = {};
-    const { owner } = map;
-    let processedTokens = new Set();
-    for (let tokenState of Object.values(mapState.tokens)) {
-      if (tokenState.type === "file" && !processedTokens.has(tokenState.file)) {
-        processedTokens.add(tokenState.file);
-        assets[tokenState.file] = {
-          id: tokenState.file,
-          owner: tokenState.owner,
-        };
-      }
-    }
-    if (map.type === "file") {
-      assets[map.thumbnail] = { id: map.thumbnail, owner };
-      if (map.quality !== "original") {
-        const qualityId = map.resolutions[map.quality];
-        if (qualityId) {
-          assets[qualityId] = { id: qualityId, owner };
-        }
-      } else {
-        assets[map.file] = { id: map.file, owner };
-      }
-    }
-    setAssetManifest({ mapId: map.id, assets }, true, true);
-  }
-
   function addAssetsIfNeeded(assets: AssetManifestAsset[]) {
     setAssetManifest((prevManifest) => {
       if (prevManifest?.assets) {
@@ -148,25 +121,13 @@ function NetworkedMapAndTokens({ session }: { session: Session }) {
     }
   }, [currentMap, debouncedMapState, userId, database, updateMapState]);
 
-  async function handleMapChange(
-    newMap: MapType | null,
-    newMapState: MapState | null
-  ) {
-    // Clear map before sending new one
-    setCurrentMap(null);
-    session.socket?.emit("map", null);
-
-    setCurrentMapState(newMapState, true, true);
-    setCurrentMap(newMap);
-
-    session.socket?.emit("map", newMap);
-
-    if (!newMap || !newMapState) {
-      setAssetManifest(null, true, true);
-      return;
+  const sceneMap = useSceneMap();
+  async function handleMapChange(newMap: MapType | null) {
+    try {
+      await sceneMap.pick(newMap);
+    } catch (error) {
+      console.error(error);
     }
-
-    await loadAssetManifestFromMap(newMap, newMapState);
   }
 
   const [mapActions, applyActions, updateActionIndex, resetActions] =
@@ -362,7 +323,7 @@ function NetworkedMapAndTokens({ session }: { session: Session }) {
 
   if (waiting) return <WelcomeScreen />;
 
-  const canChangeMap = !isLoading && getRoleControls(role).map;
+  const canChangeMap = !isLoading && !sceneMap.readOnly && getRoleControls(role).map;
 
   return (
     <RoomAssetsContext.Provider
