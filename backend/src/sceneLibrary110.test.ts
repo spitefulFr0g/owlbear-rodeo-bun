@@ -52,7 +52,7 @@ test("GM connections prepare independently while changes, grids and pointers sta
     const room = await createRoom(server, cookie, "Room");
     const gm = await server.joinRoomAsGM(room.id, cookie);
     const other = await server.joinRoomAsGM(room.id, cookie);
-    const openId = gm.snapshot!.scene.id;
+    const openId = gm.snapshot!.scene!.id;
     await action(gm.socket, "session", true);
     const player = await server.joinRoom(room.id, "", "player");
     const displayToken = await new Promise<string>(resolve => gm.socket.emit("get_display_token", resolve));
@@ -99,7 +99,7 @@ test("GM connections prepare independently while changes, grids and pointers sta
     expect((await preparationRelay)[0].sceneId).toBe(sceneId);
     await server.restart();
     const rejoined = await server.joinRoomAsGM(room.id, cookie);
-    expect(rejoined.snapshot!.scene.id).toBe(openId);
+    expect(rejoined.snapshot!.scene!.id).toBe(openId);
     const saved = nextMessage(rejoined.socket, "scene_snapshot");
     await action(rejoined.socket, "scene_view", { sceneId });
     expect((await saved)[0].scene.items.hero.label).toBe("Prepared");
@@ -158,7 +158,7 @@ test("invalid scene actions and missing scenes change nothing and emit no scene 
     for (const value of [null, [], "name", {}, { name: 12 }, { name: " " }, { name: "Valid", extra: true }]) {
       expect(await action(gm.socket, "scene_create", value)).toEqual({ ok: false, error: "invalid" });
     }
-    for (const value of [null, [], "id", {}, { sceneId: 12 }, { sceneId: gm.snapshot!.scene.id, extra: true }]) {
+    for (const value of [null, [], "id", {}, { sceneId: 12 }, { sceneId: gm.snapshot!.scene!.id, extra: true }]) {
       expect(await action(gm.socket, "scene_view", value)).toEqual({ ok: false, error: "invalid" });
     }
     expect(await action(gm.socket, "scene_view", { sceneId: "missing" })).toEqual({ ok: false, error: "not_found" });

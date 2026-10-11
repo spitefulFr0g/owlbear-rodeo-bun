@@ -13,7 +13,7 @@ test("a version 2 room keeps its items and grid with the new scene defaults afte
   try {
     const { cookie } = await signIn(server, "Administrator", "test-password");
     const gm = await server.joinRoomAsGM("version-2", cookie);
-    const scene = gm.snapshot!.scene;
+    const scene = gm.snapshot!.scene!;
     expect(scene).toMatchObject({ id: "old-scene", fogFill: false, viewOnly: false,
       grid: { type: "hexHorizontal", unitsPerCell: 150, measurement: { type: "euclidean", scale: "10m" }, shown: false, snap: false, opacity: 0.8, lineWidth: 3, color: "#333333" },
       items: { note: { text: "Kept through upgrade", position: { x: 123, y: -456 } } } });
@@ -45,11 +45,11 @@ test("older room documents open as one empty scene and save it as Scene 1", asyn
   try {
     const { cookie } = await signIn(server, "Administrator", "test-password");
     const gm = await server.joinRoomAsGM("version-1", cookie);
-    expect(gm.snapshot!.scene.items).toEqual({});
+    expect(gm.snapshot!.scene!.items).toEqual({});
     expect(gm.snapshot!.scene).toMatchObject({ fogFill: false, viewOnly: false, grid: { type: "square" } });
     await new Promise(resolve => gm.socket.emit("room_switches", { tokens: false }, resolve));
     await server.restart();
-    const scene = (await server.joinRoomAsGM("version-1", cookie)).snapshot!.scene;
+    const scene = (await server.joinRoomAsGM("version-1", cookie)).snapshot!.scene!;
     const { rooms } = await (await fetch(`${server.address}/api/rooms`, { headers: { Cookie: cookie } })).json() as { rooms: { id: string; sizeBytes: number }[] };
     expect(rooms.find((room) => room.id === "version-1")!.sizeBytes).toBe(Buffer.byteLength(JSON.stringify({ openSceneId: scene.id, welcomeSceneId: null, scenes: { [scene.id]: { ...scene, name: "Scene 1" } } })));
   } finally { await server.dispose(); }
@@ -68,7 +68,7 @@ test("no scene snapshot carries its stored name to a GM, player, trusted player 
     const display = await server.joinDisplay("version-3", token);
     for (const peer of [gm, player, trusted, display]) {
       expect(peer.snapshot!.scene).not.toHaveProperty("name");
-      expect(peer.snapshot!.scene.id).toBe("old-scene");
+      expect(peer.snapshot!.scene!.id).toBe("old-scene");
     }
   } finally { await server.dispose(); }
 });

@@ -13,7 +13,7 @@ test("hidden items are withheld in snapshots, relays and refusals, and revealed 
     const { cookie } = await setupAdministrator(server);
     const room = await createRoom(server, cookie, "Room");
     const gm = await server.joinRoomAsGM(room.id, cookie);
-    const sceneId = gm.snapshot!.scene.id;
+    const sceneId = gm.snapshot!.scene!.id;
     const batch = (changes: import("../../src/sceneRules").Change[]) => ({ id: "batch", sceneId, changes });
     await sendBatch(gm.socket, batch([{ type: "add", item: { ...token, hidden: true } }]));
     const waiting = await server.joinRoom(room.id, "", "waiting");
@@ -24,8 +24,8 @@ test("hidden items are withheld in snapshots, relays and refusals, and revealed 
     const other = await server.joinRoom(room.id, "", "bob");
     const displayToken = await new Promise<string>(resolve => gm.socket.emit("get_display_token", resolve));
     const display = await server.joinDisplay(room.id, displayToken);
-    expect(player.snapshot!.scene.items).toEqual({});
-    expect(display.snapshot!.scene.items).toEqual({});
+    expect(player.snapshot!.scene!.items).toEqual({});
+    expect(display.snapshot!.scene!.items).toEqual({});
     const events: unknown[] = [];
     other.socket.on("scene_changes", value => events.push(value));
     display.socket.on("scene_changes", value => events.push(value));
@@ -56,13 +56,13 @@ test("a player cannot claim GM ownership through their browser id", async () => 
     const { cookie } = await setupAdministrator(server);
     const room = await createRoom(server, cookie, "Room");
     const gm = await server.joinRoomAsGM(room.id, cookie);
-    const sceneId = gm.snapshot!.scene.id;
+    const sceneId = gm.snapshot!.scene!.id;
     await sendBatch(gm.socket, { id: "secret", sceneId, changes: [
       { type: "add", item: { ...token, hidden: true } },
     ] });
     await new Promise(resolve => gm.socket.emit("session", true, resolve));
     const player = await server.joinRoom(room.id, "", "gm");
-    expect(player.snapshot!.scene.items).toEqual({});
+    expect(player.snapshot!.scene!.items).toEqual({});
     const answer = await sendBatch(player.socket, { id: "guess", sceneId, changes: [
       { type: "update", id: token.id, fields: { label: "Claimed" } },
       { type: "add", item: { ...token, id: "forged-owner" } },

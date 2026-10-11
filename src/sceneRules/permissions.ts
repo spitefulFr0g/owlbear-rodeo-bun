@@ -9,7 +9,7 @@ export function mayChange(
 ): boolean {
   if (person.role === "display") return false;
   if (person.role === "gm") return true;
-  if (rules.viewOnly) return false;
+  if (rules.viewOnly || rules.welcomeScreen) return false;
   const target = change.type === "add" ? change.item : item;
   if (!target || target.layer === "map") return false;
   if (change.type !== "add" && target.hidden && target.owner !== person.id) return false;

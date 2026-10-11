@@ -25,12 +25,12 @@ test("Bring players here reaches every player once without moving GMs or cast di
     });
     const messages = players.map(peer => nextMessage(peer.socket, "player_view"));
     expect(await action(gm.socket, "scene_bring", { view })).toEqual({ ok: true });
-    for (const message of await Promise.all(messages)) expect(message[0]).toEqual({ sceneId: gm.snapshot!.scene.id, ...view });
+    for (const message of await Promise.all(messages)) expect(message[0]).toEqual({ sceneId: gm.snapshot!.scene!.id, ...view });
     const joined = await server.joinDisplay(room.id, token);
     const retained: unknown[] = [];
     joined.socket.on("display_view", value => retained.push(value));
     gm.socket.emit("display_freeze", false);
-    await action(gm.socket, "scene_view", { sceneId: gm.snapshot!.scene.id });
+    await action(gm.socket, "scene_view", { sceneId: gm.snapshot!.scene!.id });
     expect(retained).toEqual([]);
     // The explicit scene_view above is the only snapshot, sent to its GM.
     expect(excluded).toHaveLength(1);
@@ -44,7 +44,7 @@ test("Bring players here refuses non-GMs, malformed views, no session and a GM p
     const { cookie } = await setupAdministrator(server);
     const room = await createRoom(server, cookie, "Room");
     const gm = await server.joinRoomAsGM(room.id, cookie);
-    const openSceneId = gm.snapshot!.scene.id;
+    const openSceneId = gm.snapshot!.scene!.id;
     const player = await server.joinRoom(room.id, "", "player");
     const trusted = await server.joinRoom(room.id, "", "trusted");
     await new Promise(resolve => gm.socket.emit("room_trust", "trusted", true, resolve));
