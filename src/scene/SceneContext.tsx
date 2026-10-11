@@ -113,6 +113,8 @@ type SceneStore = {
   ) => Promise<SceneAnswer>;
   /** Sets a scene's name. The scene list shows it once the server has */
   renameScene: (sceneId: string, name: string) => Promise<SceneAnswer>;
+  /** Copies a scene in this room without moving anyone. Not in undo history. */
+  duplicateScene: (sceneId: string) => Promise<SceneAnswer>;
   /**
    * Removes a scene and everything on it, for good. The server refuses the
    * open scene, and moves a GM connection viewing the scene to the open scene.
@@ -418,7 +420,7 @@ export function SceneProvider({
   // Scene actions that move this connection nowhere by asking
   const askForList = useCallback(
     (
-      event: "scene_rename" | "scene_delete" | "scene_show" | "scene_bring" | "scene_welcome",
+      event: "scene_rename" | "scene_delete" | "scene_show" | "scene_bring" | "scene_welcome" | "scene_duplicate",
       payload: Record<string, unknown>
     ) =>
       new Promise<SceneAnswer>((resolve) => {
@@ -433,6 +435,10 @@ export function SceneProvider({
   const renameScene = useCallback(
     (sceneId: string, name: string) =>
       askForList("scene_rename", { sceneId, name }),
+    [askForList]
+  );
+  const duplicateScene = useCallback(
+    (sceneId: string) => askForList("scene_duplicate", { sceneId }),
     [askForList]
   );
   const deleteScene = useCallback(
@@ -500,11 +506,12 @@ export function SceneProvider({
       renameScene,
       deleteScene,
       welcomeScene,
+      duplicateScene,
       showScene,
       bringPlayers,
       share,
     }),
-    [scene, selection, person, switches, role, sceneList, playerView, readOnly, act, undo, redo, canUndo, canRedo, canChange, canSelect, setSettings, viewScene, createScene, renameScene, deleteScene, welcomeScene, showScene, bringPlayers, share]
+    [scene, selection, person, switches, role, sceneList, playerView, readOnly, act, undo, redo, canUndo, canRedo, canChange, canSelect, setSettings, viewScene, createScene, renameScene, deleteScene, welcomeScene, duplicateScene, showScene, bringPlayers, share]
   );
 
   return (
