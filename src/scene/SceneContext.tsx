@@ -32,6 +32,7 @@ import {
   gmOwner,
   Item,
   mayChange,
+  mayChangeNothing,
   Scene,
   SceneGrid,
   Vector2,
@@ -296,12 +297,13 @@ export function SceneProvider({
   }, [display, role, userId]);
 
   const switches = room.switches || defaultRoomSwitches;
+  const viewOnly = !!scene?.viewOnly;
 
   // Image availability is handled by the token bar; this gate covers item actions.
   const canChange = useCallback((change: Change) =>
-    !readOnly && mayChange(person, { switches, knownImage: () => true },
+    !readOnly && mayChange(person, { switches, viewOnly, knownImage: () => true },
       change.type === "add" ? undefined : scene?.items[change.id], change),
-    [readOnly, person, switches, scene]);
+    [readOnly, person, switches, viewOnly, scene]);
   const canSelect = useCallback((item: Item) => canChange({
     type: "update", id: item.id, fields: { position: item.position },
   }), [canChange]);
@@ -319,7 +321,8 @@ export function SceneProvider({
       if (!scene || !session.socket?.connected || !session.joinToken || askingRef.current) {
         return false;
       }
-      changes = changes.filter(change => mayChange(person, { switches, knownImage: () => true },
+      const rules = { switches, viewOnly: scene.viewOnly, knownImage: () => true };
+      changes = changes.filter(change => mayChange(person, rules,
         change.type === "add" ? undefined : scene.items[change.id], change));
       if (changes.length === 0) {
         return false;
@@ -360,8 +363,10 @@ export function SceneProvider({
   }, [session]);
   const undo = useCallback(() => replay("undo"), [replay]);
   const redo = useCallback(() => replay("redo"), [replay]);
-  const canUndo = !readOnly && history.undo.length > 0;
-  const canRedo = !readOnly && history.redo.length > 0;
+  // A step made before the scene became view-only would only be refused
+  const replays = !readOnly && !mayChangeNothing(person.role, { viewOnly });
+  const canUndo = replays && history.undo.length > 0;
+  const canRedo = replays && history.redo.length > 0;
 
   const setSettings = useCallback(
     (settings: Partial<SceneSettings>) => {
@@ -506,6 +511,12 @@ export function useScene() {
   return context;
 }
 
+/** The tools the room's switches and the scene viewed leave this connection */
+export function useToolPermissions() {
+  const { scene, switches } = useScene();
+  return getToolPermissions(useRole(), switches, scene?.viewOnly);
+}
+
 /**
  * Show to players, with this window's view of the scene as the view carried.
  * A scene this GM connection is not viewing is opened first.
@@ -532,7 +543,8 @@ export function useCanPlaceToken() {
   const files = useMemo(() => scene
     ? imagesInOrder(scene).reduce<string[]>((files, item) => files.concat(imageFiles(item)), [])
     : [], [scene]);
-  const permissions = getToolPermissions(person.role === "display" ? "player" : person.role, switches);
+  const permissions = getToolPermissions(
+    person.role === "display" ? "player" : person.role, switches, scene?.viewOnly);
   return (token: Token) => !readOnly && person.role !== "display" &&
     canPlaceImage(token, permissions, files);
 }

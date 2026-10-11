@@ -23,9 +23,9 @@ import { Settings } from "../../types/Settings";
 import { useKeyboard } from "../../contexts/KeyboardContext";
 
 import shortcuts from "../../shortcuts";
-import { useToolPermissions, useRole } from "../../contexts/RoomContext";
+import { useRole } from "../../contexts/RoomContext";
 import { getRoleControls } from "../../helpers/roomControls";
-import { useScene } from "../../scene/SceneContext";
+import { useScene, useToolPermissions } from "../../scene/SceneContext";
 import { fogItems } from "../../scene/fogItem";
 import { drawingsInOrder } from "../../scene/drawingItem";
 

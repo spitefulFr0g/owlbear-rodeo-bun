@@ -107,6 +107,17 @@ describe("sceneMarks", () => {
     expect(sceneMarks(list, "road", "road")).toEqual(["open", "viewed"]);
   });
 
+  test("marks a view-only scene, after the open and viewed marks", () => {
+    const handout: SceneList = {
+      ...list,
+      scenes: [list.scenes[0], { ...list.scenes[1], viewOnly: true }],
+      openSceneId: "keep",
+    };
+    expect(sceneMarks(handout, "road", "road")).toEqual(["viewed"]);
+    expect(sceneMarks(handout, "keep", "keep")).toEqual(["open", "viewed", "viewOnly"]);
+    expect(sceneMarks(handout, undefined, "keep")).toEqual(["open", "viewOnly"]);
+  });
+
   test("marks nothing as viewed before a scene has arrived", () => {
     expect(sceneMarks(list, undefined, "keep")).toEqual([]);
   });

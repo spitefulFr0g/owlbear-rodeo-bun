@@ -6,7 +6,7 @@ import MapControls from "./MapControls";
 import MapInteraction from "./MapInteraction";
 import SceneGrid from "../scene/SceneGrid";
 
-import { useScene } from "../../scene/SceneContext";
+import { useScene, useToolPermissions } from "../../scene/SceneContext";
 import { drawingsInOrder, deleteDrawings } from "../../scene/drawingItem";
 
 import DrawingTool from "../tools/DrawingTool";
@@ -18,7 +18,7 @@ import NetworkedDisplayView from "../../network/NetworkedDisplayView";
 import DisplayControls from "../display/DisplayControls";
 
 import { useSettings } from "../../contexts/SettingsContext";
-import { useToolPermissions, useRole } from "../../contexts/RoomContext";
+import { useRole } from "../../contexts/RoomContext";
 import { getRoleControls } from "../../helpers/roomControls";
 
 import Session from "../../network/Session";

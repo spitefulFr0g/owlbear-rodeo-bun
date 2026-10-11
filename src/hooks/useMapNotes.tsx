@@ -1,9 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import Konva from "konva";
 import { Box, Button, Flex } from "theme-ui";
-import { useScene } from "../scene/SceneContext";
+import { useScene, useToolPermissions } from "../scene/SceneContext";
 import { layers, maxTextLength, TextItem } from "../sceneRules";
-import { useToolPermissions } from "../contexts/RoomContext";
 import {
   useSetPreventMapInteraction,
   leftMouseButton,

@@ -1,4 +1,4 @@
-import { mayChange, TextItem, RoomRules, Person, Change } from "./index";
+import { mayChange, mayChangeNothing, TextItem, RoomRules, Person, Change } from "./index";
 const rules: RoomRules = { switches: { tokens: true, drawing: true, notes: true, fog: true, uploads: true, ownerOnly: false } };
 const map: TextItem = { id: "map", kind: "text", layer: "map", position: { x: 0, y: 0 }, rotation: 0,
   scale: { x: 1, y: 1 }, order: 0, owner: "gm", locked: true, hidden: false, metadata: {},
@@ -177,6 +177,15 @@ test("view-only scenes permit only the GM for every role, item kind, layer and c
     }
   }
 });
+
+test("only the GM can change anything on a view-only scene, and a cast display nothing anywhere", () => {
+  for (const role of ["gm", "trusted", "player", "display"] as const) {
+    expect(mayChangeNothing(role, { viewOnly: true })).toBe(role !== "gm");
+    expect(mayChangeNothing(role, { viewOnly: false })).toBe(role === "display");
+    expect(mayChangeNothing(role, {})).toBe(role === "display");
+  }
+});
+
 test("welcome-screen scenes permit only the GM for every role, item kind, layer and change", () => {
   for (const example of examples) {
     for (const layer of ["map", "grid", "drawing", "prop", "mount", "character", "attachment", "note", "text", "ruler", "fog"] as const) {

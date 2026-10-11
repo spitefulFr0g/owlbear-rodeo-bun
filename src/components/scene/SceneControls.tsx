@@ -93,6 +93,7 @@ function SceneControls() {
           <SettledInput id="scene-grid-line-width" type="range" min={minGridLineWidth} max={maxGridLineWidth} step={0.1} value={String(grid.lineWidth)} disabled={readOnly} onSettle={(value) => change({ lineWidth: parseFloat(value) })} />
           <Label htmlFor="scene-grid-color">Grid colour</Label>
           <SettledInput id="scene-grid-color" type="color" value={grid.color.toLowerCase()} disabled={readOnly} onSettle={(value) => change({ color: value })} />
+          <Label title="Only the GM can change a view-only scene. Players can still pan, zoom, point and measure."><Checkbox checked={scene.viewOnly} disabled={readOnly} onChange={(event) => setSettings({ viewOnly: event.target.checked })} />View-only</Label>
         </Box>
       )}
     </Box>

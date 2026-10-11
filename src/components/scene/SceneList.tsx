@@ -217,6 +217,7 @@ const sceneEntries: ComponentType<SceneEntryProps>[] = [
 const markLabels: Record<SceneMark, string> = {
   open: "Open scene",
   viewed: "Viewing",
+  viewOnly: "View-only",
 };
 
 type SceneListProps = {
