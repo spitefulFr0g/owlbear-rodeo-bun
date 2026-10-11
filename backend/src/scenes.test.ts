@@ -179,8 +179,8 @@ test("connections retain independent fields and converge on the server's last wr
     expect(last.applied as unknown).toEqual([
       { type: "update", id: "hero", fields: { position: { x: 900, y: 750 }, order: 2 } },
       { type: "update", id: "hero", fields: { layer: "prop", order: 1 } },
-      { type: "update", id: "map", fields: { position: { x: -150, y: 0 } } },
     ]);
+    expect(last.refused).toEqual([{ id: "map", item: { ...token, id: "map", layer: "map", owner: "gm", order: 0 } }]);
     const current = (await server.joinRoomAsGM(room.id, cookie)).snapshot!.scene;
     expect(current.items.hero).toEqual({ ...token, owner: "gm", layer: "prop", order: 1,
       position: { x: 900, y: 750 }, label: "Player label" });

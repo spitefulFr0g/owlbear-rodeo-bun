@@ -78,3 +78,5 @@ export function topOrder(scene: Scene, layer: Layer): number {
   return orders.length ? Math.max(...orders) + 1 : 0;
 }
 export { checkChange } from "./validation";
+
+export { mayChange } from "./permissions";

@@ -147,3 +147,17 @@ export type ItemFields = Partial<
     Omit<LineItem, keyof BaseItem | "kind"> &
     Omit<TextItem, keyof BaseItem | "kind">
 >;
+
+export type Person = { role: "gm" | "trusted" | "player" | "display"; id: string };
+export type RoomSwitches = {
+  tokens: boolean;
+  drawing: boolean;
+  notes: boolean;
+  fog: boolean;
+  uploads: boolean;
+  ownerOnly?: boolean;
+};
+export type RoomRules = {
+  switches: RoomSwitches;
+  knownImage?: (image: ImageSource) => boolean;
+};
