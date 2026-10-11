@@ -21,11 +21,7 @@ import TilesContainer from "../components/tile/TilesContainer";
 import TileActionBar from "../components/tile/TileActionBar";
 
 import { getGroupItems, getItemNames } from "../helpers/group";
-import {
-  createTokenFromFile,
-  createTokenState,
-  clientPositionToMapPosition,
-} from "../helpers/token";
+import { createTokenFromFile } from "../helpers/token";
 import Vector2 from "../helpers/Vector2";
 
 import useResponsiveLayout from "../hooks/useResponsiveLayout";
@@ -35,25 +31,21 @@ import { useUserId } from "../contexts/UserIdContext";
 import { useAssets } from "../contexts/AssetsContext";
 import { GroupProvider } from "../contexts/GroupContext";
 import { TileDragProvider } from "../contexts/TileDragContext";
-import { useMapStage } from "../contexts/MapStageContext";
 import { useDatabase } from "../contexts/DatabaseContext";
 
-import { TokenState } from "../types/TokenState";
-import {
-  TokensStateCreateHandler,
-  RequestCloseEventHandler,
-} from "../types/Events";
+import { useAddTokens } from "../scene/SceneContext";
+
+import { Token } from "../types/Token";
+import { RequestCloseEventHandler } from "../types/Events";
 
 type SelectTokensModalProps = {
   isOpen: boolean;
   onRequestClose: RequestCloseEventHandler;
-  onMapTokensStateCreate: TokensStateCreateHandler;
 };
 
 function SelectTokensModal({
   isOpen,
   onRequestClose,
-  onMapTokensStateCreate,
 }: SelectTokensModalProps) {
   const { addToast } = useToasts();
 
@@ -170,28 +162,18 @@ function SelectTokensModal({
 
   const [isDraggingToken, setIsDraggingToken] = useState(false);
 
-  const mapStageRef = useMapStage();
+  const addTokens = useAddTokens();
   function handleTokensAddToMap(groupIds: string[], rect: DOMRect) {
     let clientPosition = new Vector2(
       rect.width / 2 + rect.left,
       rect.height / 2 + rect.top
     );
-    const mapStage = mapStageRef.current;
-    if (!mapStage) {
-      return;
-    }
 
-    let position = clientPositionToMapPosition(mapStage, clientPosition, false);
-    if (!position || !userId) {
-      return;
-    }
-
-    let newTokenStates: TokenState[] = [];
+    let newTokens: Token[] = [];
 
     for (let id of groupIds) {
       if (id in tokensById && canPlaceToken(tokensById[id])) {
-        newTokenStates.push(createTokenState(tokensById[id], position, userId));
-        position = Vector2.add(position, 0.01);
+        newTokens.push(tokensById[id]);
       } else {
         // Check if a group is selected
         const group = tokenGroups.find(
@@ -202,19 +184,14 @@ function SelectTokensModal({
           const items = getGroupItems(group);
           for (let item of items) {
             if (item.id in tokensById && canPlaceToken(tokensById[item.id])) {
-              newTokenStates.push(
-                createTokenState(tokensById[item.id], position, userId)
-              );
-              position = Vector2.add(position, 0.01);
+              newTokens.push(tokensById[item.id]);
             }
           }
         }
       }
     }
 
-    if (newTokenStates.length > 0) {
-      onMapTokensStateCreate(newTokenStates);
-    }
+    addTokens(newTokens, clientPosition, false);
   }
 
   const layout = useResponsiveLayout();

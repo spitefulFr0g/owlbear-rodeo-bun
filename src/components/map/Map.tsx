@@ -8,6 +8,7 @@ import MapGrid from "./MapGrid";
 
 import DrawingTool from "../tools/DrawingTool";
 import FogTool from "../tools/FogTool";
+import SceneImages from "../scene/SceneImages";
 import MeasureTool from "../tools/MeasureTool";
 import NetworkedMapPointer from "../../network/NetworkedMapPointer";
 import NetworkedDisplayView from "../../network/NetworkedDisplayView";
@@ -220,6 +221,7 @@ function Map({
         />
         {notes}
         {tokens}
+        <SceneImages />
         <FogTool
           map={map}
           shapes={fogShapes}

@@ -14,7 +14,7 @@ check() {
   fi
 }
 
-if ! git diff --cached --quiet -- backend src/sceneRules; then
+if ! git diff --cached --quiet -- backend src/sceneRules src/scene; then
   cd "$root/backend" || exit 1
   check bun run typecheck
   check bun run test
