@@ -1,5 +1,7 @@
 import { Box, Button, Input, Label, Select, Textarea, Flex } from "theme-ui";
 import { v4 as uuid } from "uuid";
+import { useParty } from "../../contexts/PartyContext";
+import { itemOwners } from "../../helpers/itemOwners";
 import MapMenu from "../map/MapMenu";
 import { useScene } from "../../scene/SceneContext";
 import {
@@ -19,7 +21,8 @@ export default function SceneItemMenu({
   position: { x: number; y: number } | null;
   close: () => void;
 }) {
-  const { scene, selection, act, readOnly, setSelection, canChange } = useScene();
+  const { scene, selection, act, readOnly, setSelection, canChange, person } = useScene();
+  const party = useParty();
   const items = selection
     .map((id) => scene?.items[id])
     .filter((item): item is Item => !!item);
@@ -207,6 +210,28 @@ export default function SceneItemMenu({
               ))}
           </Select>
         </Label>
+        {person.role === "gm" && (
+          <>
+            <Label>
+              Owner
+              <Select
+                aria-label="Item owner"
+                value={items.every(item => item.owner === items[0].owner) ? items[0]?.owner : ""}
+                onChange={event => update({ owner: event.target.value })}
+              >
+                <option value="" disabled>Mixed owners</option>
+                {itemOwners(party, items.map(item => item.owner)).map(owner => (
+                  <option key={owner.id} value={owner.id}>{owner.name}</option>
+                ))}
+              </Select>
+            </Label>
+            <Button
+              onClick={() => update({ locked: !items.every(item => item.locked) })}
+            >
+              {items.every(item => item.locked) ? "Unlock" : "Lock"}
+            </Button>
+          </>
+        )}
         {all(
           (item) =>
             item.layer === "fog" &&
