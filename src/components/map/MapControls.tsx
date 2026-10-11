@@ -9,7 +9,6 @@ import SelectMapButton from "./SelectMapButton";
 
 import FogToolSettings from "../controls/FogToolSettings";
 import DrawingToolSettings from "../controls/DrawingToolSettings";
-import SelectToolSettings from "../controls/SelectToolSettings";
 
 import MoveToolIcon from "../../icons/MoveToolIcon";
 import FogToolIcon from "../../icons/FogToolIcon";
@@ -93,9 +92,8 @@ function MapContols({
     }
     if (!map) {
       disabled.push("pointer");
-      disabled.push("select");
     }
-    if (!permissions.tokens && !permissions.notes) disabled.push("select");
+    if (readOnly) disabled.push("select");
     if (readOnly || !allowMapDrawing) {
       disabled.push("drawing");
     }
@@ -128,13 +126,7 @@ function MapContols({
       disabled.push("redo");
     }
     return disabled;
-  }, [
-    map,
-    mapActions,
-    allowMapChange,
-    permissions,
-    readOnly,
-  ]);
+  }, [map, mapActions, allowMapChange, permissions, readOnly]);
 
   // Change back to move tool if selected tool becomes disabled
   useEffect(() => {
@@ -163,7 +155,6 @@ function MapContols({
       id: "select",
       icon: <SelectToolIcon />,
       title: "Select Tool (S)",
-      SettingsComponent: SelectToolSettings,
     },
     fog: {
       id: "fog",

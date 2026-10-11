@@ -34,11 +34,12 @@ import {
 } from "../../types/Drawing";
 
 type DrawingToolProps = {
+  visible?: boolean;
   active: boolean;
   toolSettings: DrawingToolSettings;
 };
 
-function DrawingTool({ active, toolSettings }: DrawingToolProps) {
+function DrawingTool({ active, toolSettings, visible }: DrawingToolProps) {
   const { scene, person, readOnly, act } = useScene();
   const drawings = scene ? drawingsInOrder(scene) : [];
   const placement = useWorldPlacement();
@@ -223,7 +224,7 @@ function DrawingTool({ active, toolSettings }: DrawingToolProps) {
   }
 
   return (
-    <World listening={shouldHover && !readOnly}>
+    <World visible={visible} listening={shouldHover && !readOnly}>
       {drawings.map((item) => (
         <SceneDrawing
           item={erasingDrawings.includes(item.id) ? { ...item, color: "primary" } : item}
