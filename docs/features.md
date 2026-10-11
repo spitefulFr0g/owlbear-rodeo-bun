@@ -28,7 +28,7 @@ A row with a split verdict names which part is which.
 
 Ten steps in build order, grouped into releases. Steps 1 to 5 run on today's canvas. Step 6 is the one large rewrite. Steps 7 to 10 build on it.
 
-v0.1.0 and v0.2.0 are firm. The grouping after v0.2.0 is a forecast, and the order of steps 8 to 10 is decided again once v0.3.0 is done.
+v0.1.0, v0.2.0 and v0.3.0 are firm. The grouping after v0.3.0 is a forecast, and the order of steps 8 to 10 is decided again once v0.3.0 is done.
 
 ### v0.1.0: the shared screen
 
@@ -86,6 +86,31 @@ Decided for this release:
 
 Placed 1.0 state (tokens, drawings, fog and notes on a map) is not migrated in step 6 and can be lost.
 
+Decided for this release, in [Plan v0.3.0: the item model](https://github.com/spitefulFr0g/owlbear-rodeo-bun/issues/76):
+
+- **Two specs, one release:** step 6 is specified and built first. Step 7 is specified once step 6 is merged, against the messages step 6 produces. Both ship as v0.3.0.
+- **No prototype:** the first piece of step 6 draws and moves one kind of item end to end, and the rest follows it.
+- **World units:** a world unit is a pixel, and the scene's grid says how many units one cell is, 150 by default. A map is scaled so that its cells match the scene's. The origin has no meaning ([ADR 0010](adr/0010-world-units-are-pixels-at-a-fixed-cell-size.md)).
+- **Transport:** it stays on socket.io.
+- **Maps until step 8:** the map picker stays. Picking a map replaces the image on the Map layer and sets the scene's grid from the map's saved grid, and everything else in the scene stays where it is. The interface places at most one map in a scene, though the model allows more. A map no longer keeps its own tokens, drawings, fog and notes, so until the scene library two prepared tables are two rooms.
+- **Editing the grid until step 8:** the map's edit dialog keeps working. Editing the grid of the map that is placed changes the scene's grid for everyone.
+- **Rooms at the changeover:** a room saved by v0.2 starts with one empty scene. The release notes are the only warning. There is no notice in the app and no export of the old state.
+- **Owner:** the GM or one player. A player is known by the random id their browser keeps, signed in or not, as with trusted marks. An item the GM owns belongs to the GM on every device and passes on with the room.
+- **Tokens switch:** with it on, a player adds tokens, moves, resizes, rotates and relabels any token and sets its status rings, and deletes only the tokens they own.
+- **Owner Only:** with it on, a player makes those changes only to tokens they own, whether they added them or the GM gave them. A player can still add a token.
+- **Fog switch:** with it on, a player adds, cuts, moves and deletes any fog shape, not only their own.
+- **Lock and owner:** only the GM locks, unlocks and changes an item's owner.
+- **Hide and show:** the GM, for any item. A trusted player, for their own items. A player cannot.
+- **Layer menu:** the GM moves any item to any layer. A trusted player moves their own items, never onto the Map layer. A player cannot.
+- **Selecting:** a player can select only the items they may change at that moment. The GM selects anything.
+- **Changes to several items:** one action is sent as one batch. The server checks each item on its own, applies the changes that are allowed and sends back the real state of the items it refused.
+- **Undo:** one action is one step, however many items it touched. Undo puts back the values those fields had before the action, even if someone changed them since. A step on a deleted item is skipped. The history holds 50 steps and is forgotten when the page reloads.
+- **Limits:** the server checks the shape of every change and refuses one that is malformed or over a fixed cap on items in a scene, points in a stroke or the length of a text. The caps are far above real play and are not settings.
+- **Uploads off:** a player can add an image item only from the built-in maps and tokens or from an image already in the room.
+- **Shared rules:** the item, scene and change types, and the pure rules over them, are defined once in a folder both the server and the interface import, and are tested there. The move from Create React App to Vite is not part of this release.
+- **Toolbar:** it becomes a list of tool entries in step 6 and looks the same.
+- **Until step 7:** presence, dice rolls and the timer stay as they are.
+
 ### v0.4.0: scenes, libraries and tools
 
 | Step | What is built |
@@ -116,8 +141,6 @@ Decisions that are known to be needed and are not made yet, with the step that n
 
 | Question | Needed by |
 | --- | --- |
-| What one world unit is (pixels at a fixed cell size, or grid cells) and where a scene's origin sits. | Step 6 |
-| Whether the transport stays on socket.io. | Step 6 |
 | Whether extensions written for `@owlbear-rodeo/sdk` should load unchanged. | The extension platform |
 
 ## Verdicts by section
