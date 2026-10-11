@@ -127,7 +127,7 @@ export default class GameServer {
         if (roomId && !this.gameRepo.games[roomId].session && socket.data.role !== "gm" &&
           event === "player_pointer") return;
         if (
-          socket.data.castDisplay && !["get_display_token", "join_display", "scene_grid", "room_switches", "room_trust", "room_password", "new_display_link", "session", "scene_create", "scene_view", "scene_show", "scene_bring"].includes(event)
+          socket.data.castDisplay && !["get_display_token", "join_display", "scene_grid", "room_switches", "room_trust", "room_password", "new_display_link", "session", "scene_create", "scene_view", "scene_show", "scene_settings", "scene_bring"].includes(event)
         ) {
           return;
         }
@@ -278,17 +278,29 @@ export default class GameServer {
           if (typeof answer === "function") answer({ ok: false, error: "not_room_gm" });
           return;
         }
-        const payload = value as { name?: unknown } | null;
+        const payload = value as { name?: unknown; grid?: SceneGrid; fogFill?: boolean; map?: Item } | null;
         if (!payload || typeof payload !== "object" || Array.isArray(payload) ||
-          Object.keys(payload).some(key => key !== "name") || typeof payload.name !== "string" ||
+          Object.keys(payload).some(key => !["name", "grid", "fogFill", "map"].includes(key)) || typeof payload.name !== "string" ||
           !payload.name.trim().length || payload.name.trim().length > 100) {
           if (typeof answer === "function") answer({ ok: false, error: "invalid" });
           return;
         }
         const game = this.gameRepo.games[gameId];
         const sceneId = randomBytes(16).toString("hex");
-        game.scenes[sceneId] = { id: sceneId, name: payload.name.trim(), grid: { ...defaultSceneGrid },
-          fogFill: false, viewOnly: false, items: {} };
+        let scene = { id: sceneId, name: payload.name.trim(), grid: payload.grid ?? { ...defaultSceneGrid },
+          fogFill: payload.fogFill ?? false, viewOnly: false, items: {} };
+        if ((Object.hasOwn(payload, "grid") && !checkGrid(payload.grid)) ||
+            (Object.hasOwn(payload, "fogFill") && typeof payload.fogFill !== "boolean") ||
+            (Object.hasOwn(payload, "map") && (!payload.map || payload.map.kind !== "image" ||
+              payload.map.layer !== "map" || checkChange(scene, { type: "add", item: payload.map })))) {
+          if (typeof answer === "function") answer({ ok: false, error: "invalid" });
+          return;
+        }
+        if (payload.map) {
+          const item = { ...payload.map, owner: gmOwner, locked: true, order: topOrder(scene, "map") };
+          scene = { ...scene, items: { [item.id]: item } };
+        }
+        game.scenes[sceneId] = scene;
         socket.data.viewedSceneId = sceneId;
         this.gameRepo.save(gameId);
         socket.emit("scene_snapshot", { scene: this.sceneFor(socket, gameId) });
@@ -314,6 +326,45 @@ export default class GameServer {
         }
         socket.data.viewedSceneId = payload.sceneId;
         socket.emit("scene_snapshot", { scene: this.sceneFor(socket, gameId) });
+        if (typeof answer === "function") answer({ ok: true });
+      });
+
+      socket.on("scene_settings", (value: unknown, answer?: (result: { ok: boolean; error?: string }) => void) => {
+        const gameId = gameState.getGameId();
+        if (!gameId || socket.data.castDisplay || socket.data.role !== "gm") {
+          if (typeof answer === "function") answer({ ok: false, error: "not_room_gm" });
+          return;
+        }
+        const payload = value as { sceneId?: unknown; grid?: SceneGrid; fogFill?: boolean; viewOnly?: boolean } | null;
+        if (!payload || typeof payload !== "object" || Array.isArray(payload) ||
+          Object.keys(payload).some(key => !["sceneId", "grid", "fogFill", "viewOnly"].includes(key)) ||
+          typeof payload.sceneId !== "string" ||
+          !["grid", "fogFill", "viewOnly"].some(key => Object.hasOwn(payload, key)) ||
+          (Object.hasOwn(payload, "grid") && !checkGrid(payload.grid)) ||
+          (Object.hasOwn(payload, "fogFill") && typeof payload.fogFill !== "boolean") ||
+          (Object.hasOwn(payload, "viewOnly") && typeof payload.viewOnly !== "boolean")) {
+          if (typeof answer === "function") answer({ ok: false, error: "invalid" });
+          return;
+        }
+        const game = this.gameRepo.games[gameId];
+        if (!Object.hasOwn(game.scenes, payload.sceneId)) {
+          if (typeof answer === "function") answer({ ok: false, error: "not_found" });
+          return;
+        }
+        const scene = game.scenes[payload.sceneId];
+        const viewOnlyChanged = payload.viewOnly !== undefined && payload.viewOnly !== scene.viewOnly;
+        if (payload.grid !== undefined) scene.grid = payload.grid;
+        if (payload.fogFill !== undefined) scene.fogFill = payload.fogFill;
+        if (payload.viewOnly !== undefined) scene.viewOnly = payload.viewOnly;
+        this.gameRepo.save(gameId);
+        const settings = { sceneId: scene.id, grid: scene.grid, fogFill: scene.fogFill, viewOnly: scene.viewOnly };
+        for (const id of this.io.sockets.adapter.rooms.get(gameId) || []) {
+          const peer = this.io.sockets.sockets.get(id);
+          if (peer?.data.viewedSceneId === scene.id && (game.session || peer.data.role === "gm")) {
+            peer.emit("scene_settings", settings);
+          }
+        }
+        if (viewOnlyChanged) this.broadcastSceneList(gameId);
         if (typeof answer === "function") answer({ ok: true });
       });
 
