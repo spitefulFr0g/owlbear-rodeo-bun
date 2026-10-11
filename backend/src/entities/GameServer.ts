@@ -527,7 +527,7 @@ export default class GameServer {
           const refusedItem = before && visibleTo(person, before) ? before : null;
           if ((socket.data.role !== "gm" && !game.session) ||
               checkChange(scene, change) ||
-              !mayChange(person, { switches: game.switches, knownImage: image =>
+              !mayChange(person, { switches: game.switches, viewOnly: scene.viewOnly, knownImage: image =>
                 image.type === "default" || [image.file, image.thumbnail, ...Object.values(image.resolutions ?? {})]
                   .filter((id): id is string => id !== undefined)
                   .every(id => this.database?.roomHasAsset(gameId, id) ?? false) },
