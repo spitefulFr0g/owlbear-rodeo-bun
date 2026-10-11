@@ -33,7 +33,7 @@ function image(id: string, fields: Partial<ImageItem> = {}): ImageItem {
 function scene(...items: ImageItem[]): Scene {
   const byId: Scene["items"] = {};
   for (const item of items) byId[item.id] = item;
-  return { id: "scene", grid: defaultSceneGrid, items: byId };
+  return { id: "scene", grid: defaultSceneGrid, fogFill: false, viewOnly: false, items: byId };
 }
 
 describe("changes another connection made", () => {

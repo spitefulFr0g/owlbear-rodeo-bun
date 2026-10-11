@@ -1,4 +1,4 @@
-import { applyChange, visibleTo, changeFor, Item, Scene, mayChange, Person, checkChange, readBatch, topOrder, gmOwner, Change, SceneGrid } from "../../../src/sceneRules";
+import { applyChange, visibleTo, changeFor, Item, Scene, mayChange, Person, checkChange, readBatch, topOrder, gmOwner, Change, SceneGrid, checkGrid } from "../../../src/sceneRules";
 import { randomBytes } from "crypto";
 import Accounts from "../accounts/Accounts";
 import { clientAddress } from "../clientRequest";
@@ -50,7 +50,7 @@ export default class GameServer {
   private sceneFor(socket: Socket, gameId: string): Scene {
     const scene = this.gameRepo.games[gameId].scene;
     const person = this.person(socket, gameId);
-    return { ...scene, items: Object.fromEntries(Object.entries(scene.items).filter(([, item]) => visibleTo(person, item))) };
+    return { id: scene.id, grid: scene.grid, fogFill: scene.fogFill, viewOnly: scene.viewOnly, items: Object.fromEntries(Object.entries(scene.items).filter(([, item]) => visibleTo(person, item))) };
   }
 
   private broadcastCanvas(sender: Socket, gameId: string, event: string, value: unknown): void {
@@ -266,14 +266,7 @@ export default class GameServer {
         const grid = payload?.grid;
         if (!payload || typeof payload !== "object" || Array.isArray(payload) ||
             Object.keys(payload).some(key => !["sceneId", "grid"].includes(key)) ||
-            payload.sceneId !== game.scene.id || !grid || typeof grid !== "object" || Array.isArray(grid) ||
-            Object.keys(grid).some(key => !["type", "unitsPerCell", "measurement", "shown", "snap"].includes(key)) ||
-            !["square", "hexVertical", "hexHorizontal"].includes(grid.type) || grid.unitsPerCell !== 150 ||
-            typeof grid.shown !== "boolean" || typeof grid.snap !== "boolean" ||
-            !grid.measurement || typeof grid.measurement !== "object" || Array.isArray(grid.measurement) ||
-            Object.keys(grid.measurement).some(key => !["type", "scale"].includes(key)) ||
-            !["chebyshev", "alternating", "euclidean", "manhattan"].includes(grid.measurement.type) ||
-            typeof grid.measurement.scale !== "string") {
+            payload.sceneId !== game.scene.id || !checkGrid(grid)) {
           if (typeof answer === "function") answer({ ok: false, error: "invalid" });
           return;
         }

@@ -122,10 +122,13 @@ Two specs, one release. Both ship as v0.4.0.
 Decided for this release, in [Plan v0.4.0: scenes and live play](https://github.com/spitefulFr0g/owlbear-rodeo-bun/issues/103):
 
 - **Step 8 first:** it gives back prepared tables, which v0.3.0 took away. Step 7 is built after it, because a live drag or ruler is sent only to the people viewing the same scene, and presence carries the scene being viewed. Its spec is written against the messages step 8 produces.
-- **Scenes dialog:** the button that opened the map picker opens a Scenes dialog. It lists the room's scenes, with create, rename, duplicate, delete, open and Show to players. "New scene" offers an empty scene or one made from a map in the browser library, which opens the importer for alignment and the fog fill setting. Editing a scene reopens the importer, where its map can be replaced or removed. The map picker has no other entry. The dialog's contents move into the dock's Scenes tab in step 9.
+- **Scenes dialog:** the button that opened the map picker opens a Scenes dialog. It lists the room's scenes by name, with create, rename, duplicate, delete, open and Show to players. "New scene" offers an empty scene or one made from a map in the browser library, which opens the importer for alignment and the fog fill setting. Editing a scene reopens the importer, where its map can be replaced or removed. The map picker has no other entry. The dialog's contents move into the dock's Scenes tab in step 9.
 - **Who views another scene:** only the GM. Players and trusted players are always on the open scene. The server sends the scene list to the GM alone, so nobody else learns the names of the other scenes.
 - **Cast display:** while the GM views a scene other than the open scene, the cast display stays on the open scene and holds its last view, as if frozen. It follows again when the GM comes back. A cast display never shows a scene the players are not on.
 - **View-only scene:** a player can pan, zoom, point and measure, and every item change is refused. A trusted player is refused as well, as with a locked item. Only the GM changes it. A scene serving as the welcome screen follows the same rule.
+- **Grid cell size:** fixed at 150 world units, with no control for it in Scene Controls.
+- **Scene document upgrade:** the database layout version rises to 2 without changing a table, to save the pre-upgrade copy and make v0.3.0 refuse upgraded data.
+- **Welcome-screen scene:** shown alone, with nothing laid over it, in place of the default welcome screen.
 - **Duplicating a scene:** an entry on a scene in the Scenes dialog makes a copy in the same room.
 - **No prototype:** step 8 is server routing and dialogs over a canvas that exists.
 - **Toolchain:** the move from Create React App to Vite is not part of this release. It is decided again before step 9.

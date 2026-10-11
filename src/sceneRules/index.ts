@@ -84,3 +84,5 @@ export { mayChange } from "./permissions";
 export { visibleTo, changeFor } from "./visibility";
 
 export { invertChange } from "./invert";
+
+export { checkGrid } from "./grid";

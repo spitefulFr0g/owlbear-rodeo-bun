@@ -1,11 +1,11 @@
-import { SceneGrid } from "../../src/sceneRules";
+import { SceneGrid, defaultSceneGrid } from "../../src/sceneRules";
 import { expect, test } from "bun:test";
 import { Socket } from "socket.io-client";
 import { createRoom, nextMessage, setupAdministrator, startTestServer } from "./testing/serverHelpers";
 
 const change = (socket: Socket, value: unknown) => new Promise<any>(resolve =>
   socket.timeout(500).emit("scene_grid", value, (error: Error | null, result: unknown) => resolve(error ? "timeout" : result)));
-const grid: SceneGrid = { type: "hexVertical", unitsPerCell: 150, measurement: { type: "euclidean", scale: "10m" }, shown: false, snap: false };
+const grid: SceneGrid = { ...defaultSceneGrid, opacity: 0.6, lineWidth: 3, color: "#123AbC", type: "hexVertical", unitsPerCell: 150, measurement: { type: "euclidean", scale: "10m" }, shown: false, snap: false };
 
 test("the GM changes the scene grid for every viewer and keeps it across a restart", async () => {
   const server = await startTestServer();

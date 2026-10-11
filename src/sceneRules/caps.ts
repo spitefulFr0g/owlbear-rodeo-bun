@@ -8,3 +8,7 @@ export const maxTextLength = 10000;
 export const maxChanges = 500;
 // Sixteen kibibytes of metadata, measured as UTF-8 JSON.
 export const maxMetadataBytes = 16 * 1024;
+
+// Grid lines range from one tenth to ten world units.
+export const minGridLineWidth = 0.1;
+export const maxGridLineWidth = 10;

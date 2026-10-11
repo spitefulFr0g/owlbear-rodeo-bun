@@ -158,6 +158,6 @@ test("obsolete canvas messages neither relay nor change the saved scene document
     expect(scene.items).toEqual({ hero: tokenItem });
     const list = await fetch(`${server.address}/api/rooms`, { headers: { Cookie: server.cookie } });
     const rooms = (await list.json() as { rooms: { id: string; sizeBytes: number }[] }).rooms;
-    expect(rooms.find(room => room.id === server.roomId)?.sizeBytes).toBe(Buffer.byteLength(JSON.stringify({ openSceneId: scene.id, scenes: { [scene.id]: scene } })));
+    expect(rooms.find(room => room.id === server.roomId)?.sizeBytes).toBe(Buffer.byteLength(JSON.stringify({ openSceneId: scene.id, welcomeSceneId: null, scenes: { [scene.id]: { ...scene, name: "Scene 1" } } })));
   } finally { await server.dispose(); }
 });

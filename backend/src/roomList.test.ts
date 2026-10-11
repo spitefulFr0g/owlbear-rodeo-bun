@@ -13,7 +13,7 @@ test("an account creates named rooms with server links and lists them by name", 
     const response = await request(server, "POST", undefined, cookie, { name: "  Zebra  " });
     expect(response.status).toBe(201);
     const { room } = await response.json() as any;
-    expect(room).toEqual({ id: expect.stringMatching(/^[A-Za-z0-9]{16}$/), name: "Zebra", hasPassword: false, sizeBytes: 267 });
+    expect(room).toEqual({ id: expect.stringMatching(/^[A-Za-z0-9]{16}$/), name: "Zebra", hasPassword: false, sizeBytes: 385 });
     const second = await request(server, "POST", undefined, cookie, { name: "Alpha", password: "secret" });
     const { room: alpha } = await second.json() as any;
     expect(alpha.id).not.toBe(room.id);
@@ -58,7 +58,7 @@ test("joining carries the name and renaming reaches players and cast displays wi
     await party;
     await sendBatch(player, { id: "map", sceneId: peer.snapshot!.scene.id, changes: [{ type: "add", item: { ...tokenItem, layer: "map", locked: true } }] });
     const scene = (await server.joinRoomAsGM(room.id, cookie)).snapshot!.scene;
-    const sizeBytes = Buffer.byteLength(JSON.stringify({ openSceneId: scene.id, scenes: { [scene.id]: scene } }));
+    const sizeBytes = Buffer.byteLength(JSON.stringify({ openSceneId: scene.id, welcomeSceneId: null, scenes: { [scene.id]: { ...scene, name: "Scene 1" } } }));
     const displayToken = await new Promise<string>(resolve => player.emit("get_display_token", resolve));
     const display = server.connect();
     const displayJoined = nextMessage(display, "joined_display");
@@ -109,11 +109,11 @@ test("renamed rooms keep their GM, name, document and link across restart and im
     expect((await request(server, "PATCH", `/api/rooms/${room.id}`, cookie, { name: "After" })).status).toBe(200);
     const copy = await server.durableCopy();
     try {
-      expect(await (await request(copy, "GET", undefined, cookie)).json()).toEqual({ rooms: [{ ...room, name: "After", sizeBytes: Buffer.byteLength(JSON.stringify({ openSceneId: peer.snapshot!.scene.id, scenes: { [peer.snapshot!.scene.id]: peer.snapshot!.scene } })) }] });
+      expect(await (await request(copy, "GET", undefined, cookie)).json()).toEqual({ rooms: [{ ...room, name: "After", sizeBytes: Buffer.byteLength(JSON.stringify({ openSceneId: peer.snapshot!.scene.id, welcomeSceneId: null, scenes: { [peer.snapshot!.scene.id]: { ...peer.snapshot!.scene, name: "Scene 1" } } })) }] });
       expect((await copy.joinRoomAsGM(room.id, cookie)).snapshot!.scene.items.hero).toEqual(tokenItem);
     } finally { await copy.dispose(); }
     await server.restart();
-    expect(await (await request(server, "GET", undefined, cookie)).json()).toEqual({ rooms: [{ ...room, name: "After", sizeBytes: Buffer.byteLength(JSON.stringify({ openSceneId: peer.snapshot!.scene.id, scenes: { [peer.snapshot!.scene.id]: peer.snapshot!.scene } })) }] });
+    expect(await (await request(server, "GET", undefined, cookie)).json()).toEqual({ rooms: [{ ...room, name: "After", sizeBytes: Buffer.byteLength(JSON.stringify({ openSceneId: peer.snapshot!.scene.id, welcomeSceneId: null, scenes: { [peer.snapshot!.scene.id]: { ...peer.snapshot!.scene, name: "Scene 1" } } })) }] });
     expect((await request(server, "PATCH", `/api/rooms/${room.id}`, cookie, { name: "Again" })).status).toBe(200);
     expect((await server.joinRoomAsGM(room.id, cookie)).snapshot!.scene.items.hero).toEqual(tokenItem);
   } finally { await server.dispose(); }

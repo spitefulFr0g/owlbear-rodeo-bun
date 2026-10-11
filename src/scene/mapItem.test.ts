@@ -56,5 +56,5 @@ test("the picker image is locked, GM owned and retains all stored resolution ids
   expect(item.locked).toBe(true);
   expect(item.owner).toBe("gm");
   expect(item.metadata.mapQuality).toBe("low");
-  expect(pickedMap({ id: "scene", grid: defaultSceneGrid, items: { placed: item } })).toEqual(item);
+  expect(pickedMap({ id: "scene", grid: defaultSceneGrid, fogFill: false, viewOnly: false, items: { placed: item } })).toEqual(item);
 });
