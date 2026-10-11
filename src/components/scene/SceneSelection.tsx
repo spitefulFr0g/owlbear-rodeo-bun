@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import Konva from "konva";
 import { Group } from "react-konva";
 import { v4 as uuid } from "uuid";
@@ -9,7 +9,7 @@ import {
   copySelection,
   moveSelection,
 } from "../../scene/selection";
-import { Change, Item, layers } from "../../sceneRules";
+import { Change, Item, Layer, layers } from "../../sceneRules";
 import { useMapStage } from "../../contexts/MapStageContext";
 import { useSetPreventMapInteraction } from "../../contexts/MapInteractionContext";
 import { useKeyboard } from "../../contexts/KeyboardContext";
@@ -19,6 +19,7 @@ import { useToolPermissions } from "../../contexts/RoomContext";
 import useSceneSnapping from "../../hooks/useSceneSnapping";
 import shortcuts from "../../shortcuts";
 import World from "./World";
+import SceneItemMenu from "./SceneItemMenu";
 import { SceneImage } from "./SceneImages";
 import SceneText from "./SceneText";
 import SceneDrawing from "./SceneDrawing";
@@ -27,12 +28,22 @@ import SceneDrawing from "./SceneDrawing";
 export default function SceneSelection({
   active,
   boxSelect,
+  layer,
 }: {
   active: boolean;
   boxSelect: boolean;
+  layer?: Layer;
 }) {
   const { scene, selection, setSelection, readOnly, act } = useScene();
   const stageRef = useMapStage();
+  const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
+  useEffect(() => {
+    setMenu(null);
+    if (layer)
+      setSelection((prev) =>
+        prev.filter((id) => scene?.items[id]?.layer === layer)
+      );
+  }, [active, layer, setSelection]);
   const root = useRef<Konva.Group>(null);
   const selectedRef = useRef(selection);
   selectedRef.current = selection;
@@ -44,6 +55,25 @@ export default function SceneSelection({
         .filter((node) => selectedRef.current.includes(node.id())) || []
     );
   }, [selection]);
+  useEffect(() => {
+    const stage = stageRef.current;
+    if (!scene || !stage) return;
+    function context(event: Konva.KonvaEventObject<MouseEvent>) {
+      event.evt.preventDefault();
+      if (readOnly) return;
+      let node: Konva.Node | null = event.target;
+      while (node && !scene!.items[node.id()]) node = node.getParent();
+      if (!node || (layer && scene!.items[node.id()].layer !== layer)) return;
+      if (!selectedRef.current.includes(node.id())) setSelection([node.id()]);
+      const rect = stage!.container().getBoundingClientRect();
+      const pointer = stage!.getPointerPosition() || { x: 0, y: 0 };
+      setMenu({ x: rect.left + pointer.x, y: rect.top + pointer.y });
+    }
+    stage.on("contextmenu.itemMenu dblclick.itemMenu dbltap.itemMenu", context);
+    return () => {
+      stage.off(".itemMenu");
+    };
+  }, [scene, readOnly, layer, setSelection, stageRef]);
   const clipboard = useRef<Item[]>([]);
   const prevent = useSetPreventMapInteraction();
   const snap = useSceneSnapping();
@@ -87,7 +117,13 @@ export default function SceneSelection({
     const world = root.current;
     const stage = stageRef.current;
     const nodes = () =>
-      stage.find(".scene-item").filter((node) => !!scene.items[node.id()]);
+      stage
+        .find(".scene-item")
+        .filter(
+          (node) =>
+            !!scene.items[node.id()] &&
+            (!layer || scene.items[node.id()].layer === layer)
+        );
     const selectedNodes = () =>
       nodes().filter((node) => selectedRef.current.includes(node.id()));
     const transformer = new Konva.Transformer({
@@ -184,6 +220,9 @@ export default function SceneSelection({
       while (node && !scene!.items[node.id()] && node !== transformer)
         node = node.getParent();
       if (node === transformer) return;
+      if (node && layer && scene!.items[node.id()]?.layer !== layer)
+        node = null;
+      setMenu(null);
       if (!node && !boxSelect) {
         setSelection([]);
         return;
@@ -210,7 +249,8 @@ export default function SceneSelection({
         // Higher token layers attach by overlap at the start of the action.
         for (const candidate of nodes()) {
           const item = scene!.items[candidate.id()];
-          if (item.kind !== "image" || moving.includes(candidate)) continue;
+          if (layer || item.kind !== "image" || moving.includes(candidate))
+            continue;
           if (
             moving.some((base) =>
               attachesTo(
@@ -303,6 +343,7 @@ export default function SceneSelection({
   }, [
     active,
     boxSelect,
+    layer,
     scene,
     readOnly,
     act,
@@ -310,19 +351,26 @@ export default function SceneSelection({
     setSelection,
     stageRef,
   ]);
-  if (!active || !scene) return null;
+  if (!scene) return null;
   return (
-    <World>
-      <Group ref={root} />
-    </World>
+    <>
+      {active && (
+        <World>
+          <Group ref={root} />
+        </World>
+      )}
+      <SceneItemMenu position={menu} close={() => setMenu(null)} />
+    </>
   );
 }
 
 /** Keep layer placement unchanged while all kinds share the same controller. */
 export function SceneItems({
   placement,
+  fogShapes = true,
 }: {
   placement: "belowGrid" | "aboveGrid" | "aboveRuler";
+  fogShapes?: boolean;
 }) {
   const { scene } = useScene();
   const permissions = useToolPermissions();
@@ -333,8 +381,15 @@ export function SceneItems({
       placement === "belowGrid"
         ? item.layer === "map"
         : placement === "aboveRuler"
-        ? item.layer === "fog"
-        : item.layer !== "map" && item.layer !== "fog"
+          ? item.layer === "fog"
+          : item.layer !== "map" && item.layer !== "fog"
+    )
+    .filter(
+      (item) =>
+        fogShapes ||
+        item.kind === "image" ||
+        item.kind === "text" ||
+        item.kind === "line"
     )
     .sort(
       (a, b) =>
@@ -364,10 +419,10 @@ export function SceneItems({
               item.layer === "fog" && permissions.fog
                 ? fogOpacity
                 : item.hidden
-                ? 0.5
-                : item.blend
-                ? 0.5
-                : 1
+                  ? 0.5
+                  : item.blend
+                    ? 0.5
+                    : 1
             }
           />
         )

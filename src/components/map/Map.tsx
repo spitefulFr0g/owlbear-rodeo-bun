@@ -48,7 +48,6 @@ import useMapTokens from "../../hooks/useMapTokens";
 import useMapNotes from "../../hooks/useMapNotes";
 import { MapActions } from "../../hooks/useMapActions";
 import SceneSelection, { SceneItems } from "../scene/SceneSelection";
-import SceneImages from "../scene/SceneImages";
 
 type MapProps = {
   map: MapType | null;
@@ -112,7 +111,7 @@ function Map({
     }
   }
 
-  const { tokens, propTokens, tokenMenu, tokenDragOverlay } = useMapTokens(
+  const { tokens, propTokens, tokenDragOverlay } = useMapTokens(
     map,
     mapState,
     onMapTokenStateChange,
@@ -121,9 +120,15 @@ function Map({
     selectedToolId
   );
 
-  const { notes, noteMenu, noteTool } = useMapNotes(selectedToolId);
+  const { noteMenu, noteTool } = useMapNotes(selectedToolId);
 
-  const selecting = selectedToolId === "move" || selectedToolId === "select";
+  const grabbing =
+    (selectedToolId === "drawing" && settings.drawing.type === "grab") ||
+    (selectedToolId === "fog" &&
+      settings.fog.type === "grab" &&
+      !settings.fog.preview);
+  const selecting =
+    grabbing || selectedToolId === "move" || selectedToolId === "select";
   const sceneGrid = useSceneGrid(map);
 
   return (
@@ -149,7 +154,6 @@ function Map({
               onRedo={onRedo}
             />
             <DisplayControls session={session} />
-            {tokenMenu}
             {noteMenu}
             {tokenDragOverlay}
           </>
@@ -157,32 +161,28 @@ function Map({
         selectedToolId={selectedToolId}
         onSelectedToolChange={setSelectedToolId}
       >
-        {selecting ? (
-          <SceneItems placement="belowGrid" />
-        ) : (
-          <SceneImages placement="belowGrid" />
-        )}
+        <SceneItems placement="belowGrid" />
         {sceneGrid}
         {propTokens}
         <DrawingTool
           visible={!selecting}
-          active={selectedToolId === "drawing" && permissions.drawing}
+          renderItems={
+            selectedToolId === "drawing" && settings.drawing.type === "erase"
+          }
+          active={
+            !grabbing && selectedToolId === "drawing" && permissions.drawing
+          }
           toolSettings={settings.drawing}
         />
         {tokens}
-        {selecting ? <SceneItems placement="aboveGrid" /> : <SceneImages />}
-        {!selecting && notes}
+        <SceneItems placement="aboveGrid" />
         {noteTool}
         <MeasureTool active={selectedToolId === "measure"} />
-        {selecting ? (
-          <SceneItems placement="aboveRuler" />
-        ) : (
-          <SceneImages placement="aboveRuler" />
-        )}
+        <SceneItems placement="aboveRuler" fogShapes={selecting} />
         <FogTool
           visible={!selecting}
           onShapeError={addToast}
-          active={selectedToolId === "fog"}
+          active={!grabbing && selectedToolId === "fog"}
           toolSettings={settings.fog}
           editable={permissions.fog && !settings.fog.preview}
         />
@@ -195,6 +195,13 @@ function Map({
         )}
         <SceneSelection
           active={selecting}
+          layer={
+            grabbing
+              ? selectedToolId === "fog"
+                ? "fog"
+                : "drawing"
+              : undefined
+          }
           boxSelect={selectedToolId === "select"}
         />
       </MapInteraction>

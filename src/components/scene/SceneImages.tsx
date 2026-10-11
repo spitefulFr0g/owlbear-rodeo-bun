@@ -1,4 +1,11 @@
-import { Group, Image as KonvaImage, Label, Tag, Text } from "react-konva";
+import {
+  Circle,
+  Group,
+  Image as KonvaImage,
+  Label,
+  Tag,
+  Text,
+} from "react-konva";
 import useImage from "use-image";
 
 import { useDataURL } from "../../contexts/AssetsContext";
@@ -8,6 +15,8 @@ import { useScene } from "../../scene/SceneContext";
 import { imagesInOrder } from "../../scene/shown";
 import { worldNodeId } from "../../scene/worldPosition";
 
+import colors from "../../helpers/colors";
+import { statusRingsKey } from "../../sceneRules";
 import { ImageItem } from "../../sceneRules";
 
 import { mapSources } from "../../maps";
@@ -47,6 +56,19 @@ export function SceneImage({ item, labelSize }: SceneImageProps) {
         <TokenOutline outline={item.outline} hidden={!!image} />
         <KonvaImage width={item.width} height={item.height} image={image} />
       </Group>
+      {Array.isArray(item.metadata[statusRingsKey]) &&
+        (item.metadata[statusRingsKey] as string[]).map((color, index) => (
+          <Circle
+            key={color}
+            radius={
+              Math.min(item.width, item.height) / 2 +
+              ((index + 1) * labelSize) / Math.abs(item.scale.x) / 4
+            }
+            stroke={colors[color as keyof typeof colors] || color}
+            strokeWidth={labelSize / Math.abs(item.scale.x) / 5}
+            listening={false}
+          />
+        ))}
       {item.label ? (
         <Label
           y={item.height / 2 - labelSize / Math.abs(item.scale.y)}
@@ -94,8 +116,8 @@ function SceneImages({ placement = "aboveGrid" }: SceneImagesProps) {
           placement === "belowGrid"
             ? item.layer === "map"
             : placement === "aboveRuler"
-            ? item.layer === "fog"
-            : item.layer !== "map" && item.layer !== "fog"
+              ? item.layer === "fog"
+              : item.layer !== "map" && item.layer !== "fog"
         )
         .map((item) => (
           <SceneImage
