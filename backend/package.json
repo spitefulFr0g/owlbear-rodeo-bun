@@ -6,7 +6,7 @@
   "scripts": {
     "start": "bun scripts/embed-frontend.ts && bun src/index.ts",
     "dev": "bun scripts/embed-frontend.ts && bun --watch src/index.ts --allow-origin '^http://localhost:3000$'",
-    "test": "bun test",
+    "test": "bun test ./src ../src/sceneRules",
     "typecheck": "bun scripts/embed-frontend.ts && tsc --noEmit",
     "build:frontend": "bun scripts/build-frontend.ts",
     "build": "bun scripts/build.ts",
