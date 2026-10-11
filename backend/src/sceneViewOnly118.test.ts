@@ -20,7 +20,7 @@ for (const trusted of [false, true]) {
       }, resolve));
       const player = await server.joinRoom(room.id, "", "player");
       await new Promise(resolve => gm.socket.emit("room_trust", "player", trusted, resolve));
-      const sceneId = gm.snapshot!.scene.id;
+      const sceneId = gm.snapshot!.scene!.id;
       expect((await sendBatch(player.socket, { id: "prepare", sceneId, changes: [{ type: "add", item: token }] })).refused).toEqual([]);
       await new Promise(resolve => gm.socket.emit("scene_settings", { sceneId, viewOnly: true }, resolve));
       const changes: Change[] = [
@@ -31,7 +31,7 @@ for (const trusted of [false, true]) {
       const refused = await sendBatch(player.socket, { id: "view-only", sceneId, changes });
       expect(refused.applied).toEqual([]);
       expect(refused.refused).toEqual([{ id: "new", item: null }, { id: token.id, item: token }, { id: token.id, item: token }]);
-      expect((await server.joinRoomAsGM(room.id, cookie)).snapshot!.scene.items).toEqual({ token });
+      expect((await server.joinRoomAsGM(room.id, cookie)).snapshot!.scene!.items).toEqual({ token });
       const allowed = await sendBatch(gm.socket, { id: "gm", sceneId, changes });
       expect(allowed.refused).toEqual([]);
       expect(allowed.applied).toHaveLength(3);

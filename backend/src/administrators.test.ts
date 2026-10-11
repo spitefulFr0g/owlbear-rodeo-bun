@@ -54,7 +54,7 @@ test("removing an account ends every HTTP sign-in and passes loaded and unloaded
     await new Promise(resolve => owner.socket.emit("session", true, resolve));
     await server.joinRoom(loaded.id, "room-password");
     const displayToken = await new Promise<string>(resolve => owner.socket.emit("get_display_token", resolve));
-    const sceneId = owner.snapshot!.scene.id;
+    const sceneId = owner.snapshot!.scene!.id;
     await sendBatch(owner.socket, { id: "seed", sceneId, changes: [{ type: "add", item: tokenItem }] });
     const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 1, 2, 3, 4]);
     const upload = await fetch(`${server.address}/assets/image`, { method: "PUT", body: png, headers: {
@@ -84,11 +84,11 @@ test("removing an account ends every HTTP sign-in and passes loaded and unloaded
     expect(await rooms()).toEqual(expected);
     expect((await request(server.address, "rooms", "GET", other.cookie)).status).toBe(401);
     const rejoined = await server.joinRoom(loaded.id, "room-password");
-    expect(rejoined.snapshot).toBeUndefined();
+    expect(rejoined.snapshot).toEqual({ scene: null });
     expect(await new Promise<string | null>(resolve => rejoined.socket.emit("get_display_token", resolve))).toBeNull();
     const newGM = await server.joinRoomAsGM(loaded.id, admin.cookie);
     await new Promise(resolve => newGM.socket.emit("session", true, resolve));
-    expect(newGM.snapshot!.scene.items.hero).toEqual(tokenItem);
+    expect(newGM.snapshot!.scene!.items.hero).toEqual(tokenItem);
     expect(await new Promise<string>(resolve => newGM.socket.emit("get_display_token", resolve))).toBe(displayToken);
     const image = await fetch(`${server.address}/assets/image`, { headers: { Authorization: `Bearer ${rejoined.token}` } });
     expect(new Uint8Array(await image.arrayBuffer())).toEqual(png);

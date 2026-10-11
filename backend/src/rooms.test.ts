@@ -15,7 +15,7 @@ async function change(server: Awaited<ReturnType<typeof startRoomServer>>, room 
   const owner = await server.joinRoomAsGM(room, server.cookie);
   await new Promise(resolve => owner.socket.emit("session", true, resolve));
   const observer = await server.joinRoom(room);
-  const sceneId = owner.snapshot!.scene.id;
+  const sceneId = owner.snapshot!.scene!.id;
   await sendBatch(owner.socket, { id: "seed", sceneId, changes: [{ type: "add", item: tokenItem }] });
   return { owner, observer, sceneId };
 }
@@ -27,7 +27,7 @@ test("a clean stop keeps every room's scene", async () => {
     await change(server, server.secondRoomId);
     await server.restart();
     for (const room of [server.roomId, server.secondRoomId]) {
-      expect((await server.joinRoomAsGM(room, server.cookie)).snapshot!.scene.items.hero).toEqual(tokenItem);
+      expect((await server.joinRoomAsGM(room, server.cookie)).snapshot!.scene!.items.hero).toEqual(tokenItem);
     }
   } finally { await server.dispose(); }
 });
@@ -55,7 +55,7 @@ test("the old display link joins after restart without restoring presence, dice,
     await party;
     const token = await new Promise<string>((resolve) => owner.socket.emit("get_display_token", resolve));
     expect(token).toBeString();
-    owner.socket.emit("display_view", { sceneId: owner.snapshot!.scene.id, x: 1, y: 2, width: 3, height: 4 });
+    owner.socket.emit("display_view", { sceneId: owner.snapshot!.scene!.id, x: 1, y: 2, width: 3, height: 4 });
     const frozen = nextMessage(observer.socket, "display_frozen");
     owner.socket.emit("display_freeze", true);
     await frozen;
@@ -90,14 +90,14 @@ test("saved image references remain downloadable and incremental edits survive r
     expect(uploaded.status).toBe(201);
     await uploaded.text();
     await server.clock.advance(3000);
-    await sendBatch(owner.socket, { id: "image", sceneId: owner.snapshot!.scene.id, changes: [
+    await sendBatch(owner.socket, { id: "image", sceneId: owner.snapshot!.scene!.id, changes: [
       { type: "update", id: "hero", fields: { image: { type: "file", file: "image" }, label: "The door is open" } },
     ] });
     owner.socket.disconnect();
     observer.socket.disconnect();
     await server.restart();
     const joined = await server.joinRoomAsGM(server.roomId, server.cookie);
-    const item = joined.snapshot!.scene.items.hero;
+    const item = joined.snapshot!.scene!.items.hero;
     expect(item).toEqual({ ...tokenItem, image: { type: "file", file: "image" }, label: "The door is open" });
     for (const token of [joined.token, (await server.joinRoom(server.roomId)).token]) {
       const response = await fetch(`${server.address}/assets/image`, {
@@ -119,7 +119,7 @@ test("a room that disconnects before its save delay still reaches durable storag
     observer.socket.disconnect();
     await server.clock.advance(3000);
     const copy = await server.durableCopy();
-    try { expect((await copy.joinRoomAsGM(server.roomId, server.cookie)).snapshot!.scene.items.hero).toEqual(tokenItem); }
+    try { expect((await copy.joinRoomAsGM(server.roomId, server.cookie)).snapshot!.scene!.items.hero).toEqual(tokenItem); }
     finally { await copy.dispose(); }
   } finally { await server.dispose(); }
 });
@@ -132,11 +132,11 @@ test("another item change resets the three-second save delay", async () => {
     await sendBatch(owner.socket, { id: "latest", sceneId, changes: [{ type: "update", id: "hero", fields: { label: "Latest" } }] });
     await server.clock.advance(2999);
     const before = await server.durableCopy();
-    try { expect((await before.joinRoomAsGM(server.roomId, server.cookie)).snapshot!.scene.items).toEqual({}); }
+    try { expect((await before.joinRoomAsGM(server.roomId, server.cookie)).snapshot!.scene!.items).toEqual({}); }
     finally { await before.dispose(); }
     await server.clock.advance(1);
     const after = await server.durableCopy();
-    try { expect((await after.joinRoomAsGM(server.roomId, server.cookie)).snapshot!.scene.items.hero).toEqual({ ...tokenItem, label: "Latest" }); }
+    try { expect((await after.joinRoomAsGM(server.roomId, server.cookie)).snapshot!.scene!.items.hero).toEqual({ ...tokenItem, label: "Latest" }); }
     finally { await after.dispose(); }
   } finally { await server.dispose(); }
 });
@@ -154,7 +154,7 @@ test("obsolete canvas messages neither relay nor change the saved scene document
     }
     expect(events).toEqual([]);
     await server.restart();
-    const scene = (await server.joinRoomAsGM(server.roomId, server.cookie)).snapshot!.scene;
+    const scene = (await server.joinRoomAsGM(server.roomId, server.cookie)).snapshot!.scene!;
     expect(scene.items).toEqual({ hero: tokenItem });
     const list = await fetch(`${server.address}/api/rooms`, { headers: { Cookie: server.cookie } });
     const rooms = (await list.json() as { rooms: { id: string; sizeBytes: number }[] }).rooms;

@@ -97,7 +97,7 @@ test("room size counts saved document UTF-8 bytes and changes only after saving"
     const writer = await server.joinRoomAsGM(room.id, cookie);
     await new Promise(resolve => writer.socket.emit("session", true, resolve));
     const observer = await server.joinRoom(room.id);
-    const sceneId = writer.snapshot!.scene.id;
+    const sceneId = writer.snapshot!.scene!.id;
     const received = nextMessage(observer.socket, "scene_changes");
     await sendBatch(writer.socket, { id: "utf8", sceneId, changes: [{ type: "add", item: { ...tokenItem, label: "é" } }] });
     await received;

@@ -15,7 +15,7 @@ test("the server refuses player and trusted player Map changes while allowing th
     const player = await server.joinRoom(room.id, "", "player-browser");
     const trusted = await server.joinRoom(room.id, "", "trusted-browser");
     await new Promise(resolve => gm.socket.emit("room_trust", "trusted-browser", true, resolve));
-    const sceneId = gm.snapshot!.scene.id;
+    const sceneId = gm.snapshot!.scene!.id;
     let serial = 0;
     const send = (socket: typeof gm.socket, changes: Change[]) => sendBatch(socket, { id: `batch-${serial++}`, sceneId, changes });
     const added = await send(gm.socket, [{ type: "add", item: map }]);
@@ -40,6 +40,6 @@ test("the server refuses player and trusted player Map changes while allowing th
       { type: "update", id: map.id, fields: { position: { x: 30, y: 40 } } },
       { type: "delete", id: map.id },
     ])).applied).toHaveLength(2);
-    expect((await server.joinRoomAsGM(room.id, cookie)).snapshot!.scene.items.map).toBeUndefined();
+    expect((await server.joinRoomAsGM(room.id, cookie)).snapshot!.scene!.items.map).toBeUndefined();
   } finally { await server.dispose(); }
 });

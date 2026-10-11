@@ -17,7 +17,7 @@ test("a stroke at the point cap reaches everyone and survives restart; an extra 
     const gm = await server.joinRoomAsGM(room.id, cookie);
     await new Promise(resolve => gm.socket.emit("session", true, resolve));
     const player = await server.joinRoom(room.id);
-    const sceneId = gm.snapshot!.scene.id;
+    const sceneId = gm.snapshot!.scene!.id;
     const points = Array.from({ length: maxPoints }, (_, x) => ({ x, y: x % 2 }));
     const accepted = { ...curve, points };
     const relay = nextMessage(player.socket, "scene_changes");
@@ -34,7 +34,7 @@ test("a stroke at the point cap reaches everyone and survives restart; an extra 
     expect(refusedEdit.applied).toEqual([]);
     expect(refusedEdit.refused).toEqual([{ id: curve.id, item: accepted }]);
     await server.restart();
-    expect((await server.joinRoomAsGM(room.id, cookie)).snapshot!.scene.items).toEqual({ brush: accepted });
+    expect((await server.joinRoomAsGM(room.id, cookie)).snapshot!.scene!.items).toEqual({ brush: accepted });
   } finally { await server.dispose(); }
 });
 
@@ -44,7 +44,7 @@ test("shape, marker and line drawings keep geometry and style across restart and
     const { cookie } = await setupAdministrator(server);
     const room = await createRoom(server, cookie, "Drawings");
     const gm = await server.joinRoomAsGM(room.id, cookie);
-    const sceneId = gm.snapshot!.scene.id;
+    const sceneId = gm.snapshot!.scene!.id;
     const base = { id: "", layer: curve.layer, position: curve.position, rotation: 0, scale: curve.scale,
       order: 0, owner: "gm", locked: false, hidden: false, metadata: {}, color: curve.color, strokeWidth: 15, blend: false };
     const items: Item[] = [
@@ -69,6 +69,6 @@ test("shape, marker and line drawings keep geometry and style across restart and
     expect(erased.refused).toEqual([]);
     expect((await relay)[0]).toEqual({ sceneId, changes: erased.applied });
     await server.restart();
-    expect((await server.joinRoomAsGM(room.id, cookie)).snapshot!.scene.items).toEqual({});
+    expect((await server.joinRoomAsGM(room.id, cookie)).snapshot!.scene!.items).toEqual({});
   } finally { await server.dispose(); }
 });

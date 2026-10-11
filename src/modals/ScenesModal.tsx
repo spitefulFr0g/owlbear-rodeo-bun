@@ -17,7 +17,7 @@ function ScenesModal({ isOpen, onDone }: ScenesModalProps) {
       contentLabel="Scenes"
       isOpen={isOpen}
       onRequestClose={onDone}
-      style={{ content: { maxWidth: "400px", width: "100%" } }}
+      style={{ content: { maxWidth: "480px", width: "100%" } }}
     >
       <Box>
         <Label py={2}>Scenes</Label>

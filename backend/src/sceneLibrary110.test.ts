@@ -52,21 +52,21 @@ test("GM connections prepare independently while changes, grids and pointers sta
     const room = await createRoom(server, cookie, "Room");
     const gm = await server.joinRoomAsGM(room.id, cookie);
     const other = await server.joinRoomAsGM(room.id, cookie);
-    const openId = gm.snapshot!.scene.id;
+    const openId = gm.snapshot!.scene!.id;
     await action(gm.socket, "session", true);
     const player = await server.joinRoom(room.id, "", "player");
     const displayToken = await new Promise<string>(resolve => gm.socket.emit("get_display_token", resolve));
     const display = await server.joinDisplay(room.id, displayToken);
     const unwanted: unknown[] = [];
     for (const peer of [other, player, display]) {
-      for (const event of ["scene_snapshot", "scene_changes", "scene_grid", "player_pointer"]) peer.socket.on(event, value => unwanted.push(value));
+      for (const event of ["scene_snapshot", "scene_changes", "scene_settings", "player_pointer"]) peer.socket.on(event, value => unwanted.push(value));
     }
     const otherList = nextMessage(other.socket, "scene_list");
     const { sceneId } = await action(gm.socket, "scene_create", { name: "Preparation" });
     expect((await otherList)[0].scenes).toContainEqual({ id: sceneId, name: "Preparation", viewOnly: false });
     const answer = await sendBatch(gm.socket, { id: "prepare", sceneId, changes: [{ type: "add", item: token }] });
     expect(answer.applied).toHaveLength(1);
-    expect(await action(gm.socket, "scene_grid", { sceneId, grid: { ...defaultSceneGrid, shown: true } })).toEqual({ ok: true });
+    expect(await action(gm.socket, "scene_settings", { sceneId, grid: { ...defaultSceneGrid, shown: true } })).toEqual({ ok: true });
     gm.socket.emit("player_pointer", { x: 12, y: 34 });
     await barrier(gm.socket);
     for (const peer of [other, player, display]) await barrier(peer.socket);
@@ -76,7 +76,6 @@ test("GM connections prepare independently while changes, grids and pointers sta
     ] });
     expect(wrong.applied).toEqual([]);
     expect(wrong.refused).toEqual([{ id: "hero", item: null }, { id: "intruder", item: null }]);
-    expect(await action(gm.socket, "scene_grid", { sceneId: openId, grid: defaultSceneGrid })).toEqual({ ok: false, error: "invalid" });
     const privateEvents: unknown[] = [];
     gm.socket.on("scene_changes", value => privateEvents.push(value));
     gm.socket.on("player_pointer", value => privateEvents.push(value));
@@ -91,15 +90,15 @@ test("GM connections prepare independently while changes, grids and pointers sta
     const viewed = nextMessage(other.socket, "scene_snapshot");
     expect(await action(other.socket, "scene_view", { sceneId })).toEqual({ ok: true });
     expect((await viewed)[0].scene.items.hero.owner).toBe("gm");
-    const gridRelay = nextMessage(other.socket, "scene_grid");
-    expect(await action(gm.socket, "scene_grid", { sceneId, grid: { ...defaultSceneGrid, opacity: 0.25 } })).toEqual({ ok: true });
-    expect((await gridRelay)[0]).toEqual({ sceneId, grid: { ...defaultSceneGrid, opacity: 0.25 } });
+    const gridRelay = nextMessage(other.socket, "scene_settings");
+    expect(await action(gm.socket, "scene_settings", { sceneId, grid: { ...defaultSceneGrid, opacity: 0.25 } })).toEqual({ ok: true });
+    expect((await gridRelay)[0]).toEqual({ sceneId, grid: { ...defaultSceneGrid, opacity: 0.25 }, fogFill: false, viewOnly: false });
     const preparationRelay = nextMessage(other.socket, "scene_changes");
     await sendBatch(gm.socket, { id: "edit", sceneId, changes: [{ type: "update", id: "hero", fields: { label: "Prepared" } }] });
     expect((await preparationRelay)[0].sceneId).toBe(sceneId);
     await server.restart();
     const rejoined = await server.joinRoomAsGM(room.id, cookie);
-    expect(rejoined.snapshot!.scene.id).toBe(openId);
+    expect(rejoined.snapshot!.scene!.id).toBe(openId);
     const saved = nextMessage(rejoined.socket, "scene_snapshot");
     await action(rejoined.socket, "scene_view", { sceneId });
     expect((await saved)[0].scene.items.hero.label).toBe("Prepared");
@@ -133,7 +132,7 @@ test("players, trusted players and cast displays never receive scene lists or re
     await displayJoined;
     const unexpected: unknown[] = [];
     for (const socket of [playerSocket, trusted.socket, displaySocket]) {
-      for (const event of ["scene_list", "scene_snapshot", "scene_changes", "scene_grid"]) socket.on(event, value => unexpected.push(value));
+      for (const event of ["scene_list", "scene_snapshot", "scene_changes", "scene_settings"]) socket.on(event, value => unexpected.push(value));
     }
     const { sceneId } = await action(gm.socket, "scene_create", { name: "Secret" });
     for (const socket of [playerSocket, trusted.socket, displaySocket]) {
@@ -158,7 +157,7 @@ test("invalid scene actions and missing scenes change nothing and emit no scene 
     for (const value of [null, [], "name", {}, { name: 12 }, { name: " " }, { name: "Valid", extra: true }]) {
       expect(await action(gm.socket, "scene_create", value)).toEqual({ ok: false, error: "invalid" });
     }
-    for (const value of [null, [], "id", {}, { sceneId: 12 }, { sceneId: gm.snapshot!.scene.id, extra: true }]) {
+    for (const value of [null, [], "id", {}, { sceneId: 12 }, { sceneId: gm.snapshot!.scene!.id, extra: true }]) {
       expect(await action(gm.socket, "scene_view", value)).toEqual({ ok: false, error: "invalid" });
     }
     expect(await action(gm.socket, "scene_view", { sceneId: "missing" })).toEqual({ ok: false, error: "not_found" });

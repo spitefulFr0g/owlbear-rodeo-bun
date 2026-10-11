@@ -177,3 +177,21 @@ test("view-only scenes permit only the GM for every role, item kind, layer and c
     }
   }
 });
+test("welcome-screen scenes permit only the GM for every role, item kind, layer and change", () => {
+  for (const example of examples) {
+    for (const layer of ["map", "grid", "drawing", "prop", "mount", "character", "attachment", "note", "text", "ruler", "fog"] as const) {
+      const item = { ...example, layer };
+      const changes: Change[] = [
+        { type: "add", item },
+        { type: "update", id: item.id, fields: { position: { x: 10, y: 20 } } },
+        { type: "delete", id: item.id },
+      ];
+      for (const role of ["gm", "trusted", "player", "display"] as const) {
+        for (const change of changes) {
+          expect(mayChange({ role, id: "player" }, { ...rules, viewOnly: false, welcomeScreen: true },
+            change.type === "add" ? undefined : item, change)).toBe(role === "gm");
+        }
+      }
+    }
+  }
+});

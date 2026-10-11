@@ -2,7 +2,7 @@ import { Batch, Change, defaultSceneGrid, ImageItem, Scene } from "../sceneRules
 import {
   afterAnswer,
   afterChanges,
-  afterGrid,
+  afterSettings,
   imageFiles,
   imagesInOrder,
   shownScene,
@@ -272,22 +272,25 @@ test("an image names every stored file it can be drawn from", () => {
   expect(imageFiles(image("b"))).toEqual([]);
 });
 
-describe("a grid change the server accepted", () => {
+describe("scene settings the server accepted", () => {
   const hex = { ...defaultSceneGrid, type: "hexVertical" as const };
 
-  test("replaces the grid of the scene it names and keeps the items", () => {
+  test("replace the grid, Fog Fill and view-only of the scene they name and keep the items", () => {
     const before = scene(image("a"));
-    const after = afterGrid(before, { sceneId: "scene", grid: hex });
+    const after = afterSettings(before, { sceneId: "scene", grid: hex, fogFill: true, viewOnly: true });
     expect(after?.grid).toEqual(hex);
+    expect(after?.fogFill).toBe(true);
+    expect(after?.viewOnly).toBe(true);
+    expect(after?.id).toBe("scene");
     expect(after?.items).toEqual(before.items);
   });
 
-  test("is ignored when it names another scene", () => {
+  test("are ignored when they name another scene", () => {
     const before = scene();
-    expect(afterGrid(before, { sceneId: "other", grid: hex })).toBe(before);
+    expect(afterSettings(before, { sceneId: "other", grid: hex, fogFill: true, viewOnly: true })).toBe(before);
   });
 
-  test("is ignored before the scene has arrived", () => {
-    expect(afterGrid(null, { sceneId: "scene", grid: hex })).toBeNull();
+  test("are ignored before the scene has arrived", () => {
+    expect(afterSettings(null, { sceneId: "scene", grid: hex, fogFill: true, viewOnly: true })).toBeNull();
   });
 });

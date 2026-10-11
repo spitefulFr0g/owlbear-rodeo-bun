@@ -71,14 +71,14 @@ function SceneEditor({ scene: listed, onCancel, onSaved, refusal }: SceneEditorP
       if (!answer.ok) return refusal(answer);
     }
     // Uploads may take time; use the scene as it is now, and never write to a different scene
-    const { scene, readOnly, act, setGrid } = latest.current;
+    const { scene, readOnly, act, setSettings } = latest.current;
     if (!scene || scene.id !== listed.id || readOnly) return notHere;
     if (!keepsUnknownMap) {
       const edit = sceneMapEdit(scene, saved, realigned, uuid());
       if (edit.changes.length > 0 && !act(edit.changes, false)) {
         return "The room did not take the change to the map. Try again in a moment.";
       }
-      if (edit.grid) setGrid(edit.grid);
+      if (edit.grid) setSettings({ grid: edit.grid });
     }
     onSaved();
   }

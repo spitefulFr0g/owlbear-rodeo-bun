@@ -25,7 +25,7 @@ test("players keep changing the scene until five minutes after the last GM leave
     const active = await server.joinRoom(room.id);
     expect(active.info.room.session).toBe(true);
     const update = nextMessage(active.socket, "scene_changes");
-    expect((await sendBatch(player.socket, { id: "allowed", sceneId: active.snapshot!.scene.id, changes: [{ type: "add", item: tokenItem }] })).applied).toHaveLength(1);
+    expect((await sendBatch(player.socket, { id: "allowed", sceneId: active.snapshot!.scene!.id, changes: [{ type: "add", item: tokenItem }] })).applied).toHaveLength(1);
     await update;
     const ended = [player.socket, display.socket].map(socket => nextMessage(socket, "room_state"));
     await server.clock.advance(1);

@@ -7,7 +7,11 @@ import RemoveMapIcon from "../../icons/RemoveMapIcon";
 import ConfirmModal from "../../modals/ConfirmModal";
 import SceneNameModal from "../../modals/SceneNameModal";
 
-import { useScene, SceneAnswer } from "../../scene/SceneContext";
+import {
+  useScene,
+  useShowToPlayers,
+  SceneAnswer,
+} from "../../scene/SceneContext";
 import {
   ListedScene,
   SceneMark,
@@ -29,6 +33,8 @@ function refusal(answer: SceneAnswer) {
       return "This room holds as many scenes as it can.";
     case "open_scene":
       return "The open scene cannot be deleted. Show another scene to players first.";
+    case "no_view":
+      return "The scene is not on screen yet. Try again in a moment.";
     case "invalid":
       return "A scene's name is 1 to 100 characters.";
     default:
@@ -60,6 +66,35 @@ function OpenSceneEntry({ scene, onRefused, onDone }: SceneEntryProps) {
       aria-label={`Open ${scene.name}`}
     >
       Open
+    </Button>
+  );
+}
+
+function ShowSceneEntry({ scene, onRefused, onDone }: SceneEntryProps) {
+  const { sceneList } = useScene();
+  const showToPlayers = useShowToPlayers();
+  const [isSending, setIsSending] = useState(false);
+  const isOpenScene = sceneList?.openSceneId === scene.id;
+
+  async function handleShow() {
+    setIsSending(true);
+    const answer = await showToPlayers(scene.id);
+    setIsSending(false);
+    if (answer.ok) onDone();
+    else onRefused(answer);
+  }
+
+  return (
+    <Button
+      type="button"
+      variant="secondary"
+      ml={1}
+      disabled={isOpenScene || isSending}
+      onClick={handleShow}
+      title={isOpenScene ? "Players are on this scene" : undefined}
+      aria-label={`Show ${scene.name} to players`}
+    >
+      Show to players
     </Button>
   );
 }
@@ -173,6 +208,7 @@ function DeleteSceneEntry({ scene, onRefused }: SceneEntryProps) {
 /** What a GM can do to one scene of the list, in the order shown */
 const sceneEntries: ComponentType<SceneEntryProps>[] = [
   OpenSceneEntry,
+  ShowSceneEntry,
   EditSceneEntry,
   RenameSceneEntry,
   DeleteSceneEntry,

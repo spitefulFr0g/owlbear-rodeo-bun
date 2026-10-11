@@ -12,7 +12,7 @@ test("renaming reaches every GM and deleting moves viewers to the open scene, sa
     const room = await createRoom(server, cookie, "Room");
     const gm = await server.joinRoomAsGM(room.id, cookie);
     const other = await server.joinRoomAsGM(room.id, cookie);
-    const openId = gm.snapshot!.scene.id;
+    const openId = gm.snapshot!.scene!.id;
     const { sceneId } = await action(gm.socket, "scene_create", { name: "Preparation" });
     await action(other.socket, "scene_view", { sceneId });
     const lists = [nextMessage(gm.socket, "scene_list"), nextMessage(other.socket, "scene_list")];
@@ -48,7 +48,7 @@ test("invalid names, malformed actions, missing scenes and deleting the open sce
     const { cookie } = await setupAdministrator(server);
     const room = await createRoom(server, cookie, "Room");
     const gm = await server.joinRoomAsGM(room.id, cookie);
-    const sceneId = gm.snapshot!.scene.id;
+    const sceneId = gm.snapshot!.scene!.id;
     const messages: unknown[] = [];
     for (const event of ["scene_list", "scene_snapshot"]) gm.socket.on(event, value => messages.push(value));
     for (const name of ["", " \n ", "x".repeat(101), null, 12]) {
@@ -121,7 +121,7 @@ test("deleting the scene players last held outside a session leaves them on the 
     const { cookie } = await setupAdministrator(server);
     const room = await createRoom(server, cookie, "Room");
     const gm = await server.joinRoomAsGM(room.id, cookie);
-    const firstId = gm.snapshot!.scene.id;
+    const firstId = gm.snapshot!.scene!.id;
     const player = await server.joinRoom(room.id, "", "player");
     const { sceneId } = await action(gm.socket, "scene_create", { name: "Next" });
     expect(await action(gm.socket, "scene_show", { sceneId, view: { x: 0, y: 0, width: 100, height: 100 } })).toEqual({ ok: true });

@@ -18,7 +18,7 @@ test("socket permissions return real items and use the latest switches and trust
     const gm = await server.joinRoomAsGM(room.id, cookie);
     await new Promise(resolve => gm.socket.emit("session", true, resolve));
     const player = await server.joinRoom(room.id, "", "player");
-    const sceneId = gm.snapshot!.scene.id;
+    const sceneId = gm.snapshot!.scene!.id;
     const prepared = await sendBatch(gm.socket, { id: "prepare", sceneId, changes: [{ type: "add", item: token }, { type: "add", item: drawing }] });
     expect(prepared.refused).toEqual([]);
     const refused = await sendBatch(player.socket, { id: "refused", sceneId, changes: [
@@ -43,7 +43,7 @@ test("socket permissions return real items and use the latest switches and trust
     expect(trusted.refused).toEqual(off.refused);
     await new Promise(resolve => gm.socket.emit("room_trust", "player", false, resolve));
     expect((await sendBatch(player.socket, { id: "untrusted", sceneId, changes: [{ type: "delete", id: "own" }] })).refused).toEqual(off.refused);
-    const scene = (await server.joinRoomAsGM(room.id, cookie)).snapshot!.scene;
+    const scene = (await server.joinRoomAsGM(room.id, cookie)).snapshot!.scene!;
     expect(scene.items.drawing).toEqual(drawing);
     expect(scene.items.own).toEqual(off.refused[0].item!);
     expect((scene.items.token as ImageItem).label).toBe("Trusted edit");
@@ -58,7 +58,7 @@ test("Owner Only refuses another's token, permits added and assigned tokens, and
     const gm = await server.joinRoomAsGM(room.id, cookie);
     await new Promise(resolve => gm.socket.emit("session", true, resolve));
     const player = await server.joinRoom(room.id, "", "player");
-    const sceneId = gm.snapshot!.scene.id;
+    const sceneId = gm.snapshot!.scene!.id;
     await sendBatch(gm.socket, { id: "prepare", sceneId, changes: [{ type: "add", item: token }] });
     await new Promise(resolve => gm.socket.emit("room_switches", { ownerOnly: true }, resolve));
     const move = { type: "update" as const, id: token.id, fields: { position: { x: 100, y: 100 } } };
@@ -89,7 +89,7 @@ test("socket lock refusals return the real state and assigned owners can delete"
     const gm = await server.joinRoomAsGM(room.id, cookie);
     await new Promise(resolve => gm.socket.emit("session", true, resolve));
     const player = await server.joinRoom(room.id, "", "player");
-    const sceneId = gm.snapshot!.scene.id;
+    const sceneId = gm.snapshot!.scene!.id;
     await sendBatch(gm.socket, { id: "prepare", sceneId, changes: [{ type: "add", item: token }] });
     expect((await sendBatch(gm.socket, { id: "lock", sceneId, changes: [
       { type: "update", id: token.id, fields: { locked: true } },
@@ -138,7 +138,7 @@ test("uploads off admits only built-in images and every file already used by thi
     for (const id of ["known", "thumbnail", "low", "medium", "high", "ultra"]) expect((await put(gm.token, id)).status).toBe(201);
     expect((await put(otherGM.token, "foreign")).status).toBe(201);
     const add = async (id: string, image: ImageItem["image"], peer = player) => sendBatch(peer.socket, {
-      id, sceneId: gm.snapshot!.scene.id, changes: [{ type: "add", item: { ...token, id, image } }],
+      id, sceneId: gm.snapshot!.scene!.id, changes: [{ type: "add", item: { ...token, id, image } }],
     });
     expect((await add("built-in", token.image)).refused).toEqual([]);
     const known: ImageItem["image"] = { type: "file", file: "known", thumbnail: "thumbnail",

@@ -27,7 +27,7 @@ export default function useSceneMap() {
         await initial.share(imageFiles(item));
       }
       // Uploads may take time; use the scene as it is now, and never write to a different scene.
-      const { scene, person, readOnly, act, setGrid } = latest.current;
+      const { scene, person, readOnly, act, setSettings } = latest.current;
       if (!scene || scene.id !== initial.scene.id || readOnly || person.role !== "gm") return;
       const previous = pickedMap(scene);
       const changes: Change[] = previous ? [{ type: "delete", id: previous.id }] : [];
@@ -37,7 +37,7 @@ export default function useSceneMap() {
           type: "add",
           item: mapItem(map, grid, uuid(), previous && mapTopLeft(previous)),
         });
-        if (act(changes, false)) setGrid(grid);
+        if (act(changes, false)) setSettings({ grid });
       } else {
         act(changes, false);
       }
