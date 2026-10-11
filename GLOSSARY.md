@@ -81,7 +81,7 @@ The one scene in a room that the players see during a session. The GM may be vie
 _Avoid_: Active scene, current scene, live scene
 
 **View-only scene**:
-A scene the GM has marked so that players can look at it but not change it.
+A scene the GM has marked so that only the GM can change it. Players, trusted or not, can still pan, zoom, point and measure.
 _Avoid_: Locked scene, read-only scene, presentation scene
 
 **Map**:
@@ -125,7 +125,7 @@ An item that only its owner and the GM can see. New notes and text start hidden,
 _Avoid_: Private item, invisible item, secret item
 
 **Cast display**:
-A view-only connection to a room, made to be shown on a shared screen. It shows what a player sees with no interface, follows the GM's view, and is not a player.
+A view-only connection to a room, made to be shown on a shared screen. It shows what a player sees with no interface, follows the GM's view, and is not a player. It stays on the open scene while the GM views another.
 _Avoid_: Player view, spectator, second screen, popout
 
 **Display link**:

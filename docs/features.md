@@ -26,9 +26,9 @@ A row with a split verdict names which part is which.
 
 ## Roadmap
 
-Ten steps in build order, grouped into releases. Steps 1 to 5 run on today's canvas. Step 6 is the one large rewrite. Steps 7 to 10 build on it.
+Ten steps, grouped into releases. They are built in number order, except that step 8 is built before step 7. Steps 1 to 5 run on today's canvas. Step 6 is the one large rewrite. Steps 7 to 10 build on it.
 
-v0.1.0, v0.2.0 and v0.3.0 are released. The grouping after v0.3.0 is a forecast. The order of steps 7 to 10, and which of them make v0.4.0, is being decided in [Plan v0.4.0: scenes and live play](https://github.com/spitefulFr0g/owlbear-rodeo-bun/issues/103).
+v0.1.0, v0.2.0 and v0.3.0 are released. v0.4.0 is firm. v0.5.0 is a forecast.
 
 ### v0.1.0: the shared screen
 
@@ -110,13 +110,32 @@ Decided for this release, in [Plan v0.3.0: the item model](https://github.com/sp
 - **Toolbar:** it becomes a list of tool entries in step 6 and looks the same.
 - **Until step 7:** presence, dice rolls and the timer stay as they are.
 
-### v0.4.0: live play, scenes, libraries and tools
+### v0.4.0: scenes and live play
 
 | Step | What is built |
 | --- | --- |
-| 7. Live play | Drags and rulers seen live by everyone. Movement mode. Presence carries name, colour, role and the scene being viewed, and dice rolls and the timer move onto it. |
-| 8. Scene library | Create, name, open, edit, delete and switch scenes. The one-step importer with map alignment and the fog fill setting. The Scene Controls menu for the grid, with grid opacity, line width and colour. Show to players, and a one-off "bring players here". Fog Fill. Assigning a scene as the welcome screen. The view-only scene. |
-| 9. Libraries and dock | The room library, the account library and the server set ([ADR 0005](adr/0005-assets-belong-to-a-room-or-an-account.md)). A dock along the bottom and one Asset Manager, replacing the token bar and the two pickers. Dropping an image file on the canvas with a type picker. The one-off import of a browser library into the account library. Today's Import / Export dialog and the `.owlbear` file are removed. |
+| 8. Scene library | Create, name, open, edit, duplicate, delete and switch scenes, from a Scenes dialog. The one-step importer with map alignment and the fog fill setting. The Scene Controls menu for the grid, with grid opacity, line width and colour. Show to players, and a one-off "bring players here". Fog Fill. Assigning a scene as the welcome screen. The view-only scene. |
+| 7. Live play | Drags and rulers seen live by everyone viewing the same scene. Movement mode. Presence carries name, colour, role and the scene being viewed, and dice rolls and the timer move onto it. |
+
+Two specs, one release. Both ship as v0.4.0.
+
+Decided for this release, in [Plan v0.4.0: scenes and live play](https://github.com/spitefulFr0g/owlbear-rodeo-bun/issues/103):
+
+- **Step 8 first:** it gives back prepared tables, which v0.3.0 took away. Step 7 is built after it, because a live drag or ruler is sent only to the people viewing the same scene, and presence carries the scene being viewed. Its spec is written against the messages step 8 produces.
+- **Scenes dialog:** the button that opened the map picker opens a Scenes dialog. It lists the room's scenes, with create, rename, duplicate, delete, open and Show to players. "New scene" offers an empty scene or one made from a map in the browser library, which opens the importer for alignment and the fog fill setting. Editing a scene reopens the importer, where its map can be replaced or removed. The map picker has no other entry. The dialog's contents move into the dock's Scenes tab in step 9.
+- **Who views another scene:** only the GM. Players and trusted players are always on the open scene. The server sends the scene list to the GM alone, so nobody else learns the names of the other scenes.
+- **Cast display:** while the GM views a scene other than the open scene, the cast display stays on the open scene and holds its last view, as if frozen. It follows again when the GM comes back. A cast display never shows a scene the players are not on.
+- **View-only scene:** a player can pan, zoom, point and measure, and every item change is refused. A trusted player is refused as well, as with a locked item. Only the GM changes it. A scene serving as the welcome screen follows the same rule.
+- **Duplicating a scene:** an entry on a scene in the Scenes dialog makes a copy in the same room.
+- **No prototype:** step 8 is server routing and dialogs over a canvas that exists.
+- **Toolchain:** the move from Create React App to Vite is not part of this release. It is decided again before step 9.
+- **Rough edges in v0.3.0:** the ones found in the hand check are fixed as v0.3.1 and are not part of either spec. See [Interface rough edges found in the v0.3.0 hand check](https://github.com/spitefulFr0g/owlbear-rodeo-bun/issues/106).
+
+### v0.5.0: libraries and tools
+
+| Step | What is built |
+| --- | --- |
+| 9. Libraries and dock | The room library, the account library and the server set ([ADR 0005](adr/0005-assets-belong-to-a-room-or-an-account.md)). A dock along the bottom and one Asset Manager, replacing the token bar, the two pickers and the Scenes dialog. Dropping an image file on the canvas with a type picker. The one-off import of a browser library into the account library. Today's Import / Export dialog and the `.owlbear` file are removed. |
 | 10. Small tools | The text tool, with colour and size. Notes and text that start hidden. Adjustable stroke width. Duplicate numbering. Double-click to select a locked item. A check that Space pans mid-shape. |
 
 The asset library stays in the browser until step 9. The reference suggested moving it to the server during the storage work, before the item model. It waits so that the server library is built once, against image types that are layers, and not first against today's separate map and token tables.
@@ -141,6 +160,10 @@ Decisions that are known to be needed and are not made yet, with the step that n
 
 | Question | Needed by |
 | --- | --- |
+| Whether movement mode is always on or a setting. | Step 7 |
+| Whether a live drag of a hidden item is withheld the way the item is. | Step 7 |
+| What the party list shows for a GM who is viewing another scene. | Step 7 |
+| Whether the interface moves from Create React App to Vite. | Step 9 |
 | Whether extensions written for `@owlbear-rodeo/sdk` should load unchanged. | The extension platform |
 
 ## Verdicts by section
@@ -191,7 +214,7 @@ Decision: [Decide whether to adopt scenes (section B)](https://github.com/spitef
 | --- | --- | --- | --- |
 | Scene as an unbounded canvas, independent of any image | In | 6 | Positions move to world units. |
 | Zero, one or many maps in a scene | In. Later: guided alignment for a second map | 6 | A scene can be created empty. Extra maps are dropped on the Map layer and scaled by hand. |
-| Scene library: create, name, open, edit, delete, switch | In | 8 | The room holds its scenes. |
+| Scene library: create, name, open, edit, delete, switch | In | 8 | The room holds its scenes. They are listed in a Scenes dialog until the dock. |
 | Grid as a scene property | In | 6 | Exactly one grid per scene. A scene with no map still has a grid. |
 | Create a scene with a map in one step, with alignment in the importer | In | 8 | Today's map editing flow, pointed at a scene. |
 | Importer remembers its last settings | Later | | |
@@ -202,9 +225,15 @@ Added by the decision:
 
 | Feature | Verdict | Step | Note |
 | --- | --- | --- | --- |
-| The GM views and edits a scene other than the open scene | In | 8 | Doing so never moves the players. |
+| The GM views and edits a scene other than the open scene | In | 8 | Doing so never moves the players. Only the GM can, and only the GM is sent the scene list. |
 | Show to players | In | 8 | Makes the scene the GM is viewing the open scene. Players start where the GM's view was. |
 | Copying a scene to another room | Later | | |
+
+Added in [Plan v0.4.0: scenes and live play](https://github.com/spitefulFr0g/owlbear-rodeo-bun/issues/103):
+
+| Feature | Verdict | Step | Note |
+| --- | --- | --- | --- |
+| Duplicating a scene inside a room | In | 8 | An entry on a scene in the scene list. |
 
 ### C. Storage, accounts and rooms
 
@@ -241,8 +270,8 @@ Added by the decisions:
 | A GM handing a room to another account | Later | | |
 | Session, started and ended by the GM | In | 5 | Ends by itself after the GM has been disconnected for about five minutes. |
 | Default welcome screen | In | 5 | Shown to players outside a session. |
-| Assigning a scene as the welcome screen | In | 8 | |
-| View-only scene | In | 8 | |
+| Assigning a scene as the welcome screen | In | 8 | Players can change nothing on it, as on a view-only scene. |
+| View-only scene | In | 8 | Players and trusted players can pan, zoom, point and measure. Only the GM changes it. |
 
 ### D. Roles and permissions
 
@@ -287,7 +316,7 @@ Decision: [Screen asset manager and image features (sections F and G)](https://g
 | Feature | Verdict | Step | Note |
 | --- | --- | --- | --- |
 | Six image types | In: Map, Prop, Mount, Character, Attachment. Later: Note | 9 | A type is the image's default layer. Notes stay text items. |
-| Dock along the bottom, a tab per type plus Scenes | In | 9 | Replaces the token bar. |
+| Dock along the bottom, a tab per type plus Scenes | In | 9 | Replaces the token bar and the Scenes dialog. |
 | Dock search with fuzzy name match and a tag preview | In: search. Out: tag preview | 9 | |
 | Asset Manager dialog | In | 9 | One dialog replaces the map picker and the token picker. |
 | Sort by created or by name | In | 9 | |
@@ -428,7 +457,7 @@ Added by the decision:
 
 | Feature | Verdict | Step | Note |
 | --- | --- | --- | --- |
-| Cast display, opened from a display link | In | 2 | |
+| Cast display, opened from a display link | In | 2 | From step 8 it stays on the open scene while the GM views another. |
 | Button that opens the display link in a popout window | In | 2 | |
 | Freezing the cast display | In | 2 | |
 
