@@ -1,4 +1,4 @@
-import { applyChange, mayChange, Person, checkChange, readBatch, topOrder, gmOwner, Change, SceneGrid } from "../../../src/sceneRules";
+import { applyChange, visibleTo, changeFor, Item, Scene, mayChange, Person, checkChange, readBatch, topOrder, gmOwner, Change, SceneGrid } from "../../../src/sceneRules";
 import { allowsLegacyMapStateUpdateV1 } from "../helpers/roomSwitches";
 import { randomBytes } from "crypto";
 import Accounts from "../accounts/Accounts";
@@ -47,6 +47,17 @@ export default class GameServer {
     return this.gameRepo.games[gameId].trustedPlayerIds.has(socket.data.playerId) ? "trusted" : "player";
   }
 
+  private person(socket: Socket, gameId: string): Person {
+    return { role: socket.data.castDisplay ? "display" : this.playerRole(socket, gameId),
+      id: socket.data.castDisplay ? "" : socket.data.role === "gm" ? gmOwner : socket.data.playerId };
+  }
+
+  private sceneFor(socket: Socket, gameId: string): Scene {
+    const scene = this.gameRepo.games[gameId].scene;
+    const person = this.person(socket, gameId);
+    return { ...scene, items: Object.fromEntries(Object.entries(scene.items).filter(([, item]) => visibleTo(person, item))) };
+  }
+
   private allowsManifest(socket: Socket, gameId: string, manifest: Manifest): boolean {
     if (this.playerRole(socket, gameId) !== "player" || this.gameRepo.games[gameId].switches.uploads) return true;
     const current = this.gameRepo.getState(gameId, "manifest") as Manifest | undefined;
@@ -75,7 +86,7 @@ export default class GameServer {
       for (const id of this.io.sockets.adapter.rooms.get(gameId) || []) {
         const peer = this.io.sockets.sockets.get(id);
         if (!peer || peer.data.role === "gm") continue;
-        peer.emit("scene_snapshot", { scene: game.scene });
+        peer.emit("scene_snapshot", { scene: this.sceneFor(peer, gameId) });
         peer.emit("map", game.getState("map"));
         peer.emit("map_state", game.getState("mapState"));
         peer.emit("manifest", game.getState("manifest"));
@@ -155,7 +166,7 @@ export default class GameServer {
         const token = this.joinTokens.issue(socket.id, gameId, "display");
         socket.emit("joined_display", socket.id, token, { room: this.gameRepo.roomState(gameId) });
         const game = this.gameRepo.games[gameId];
-        if (game.session) socket.emit("scene_snapshot", { scene: game.scene });
+        if (game.session) socket.emit("scene_snapshot", { scene: this.sceneFor(socket, gameId) });
         socket.emit("display_frozen", game.displayFrozen);
         if (game.session && game.shownDisplayView) socket.emit("display_view", game.shownDisplayView);
       });
@@ -254,7 +265,7 @@ export default class GameServer {
           // Only the player who joined gets the token for the asset routes
           const token = this.joinTokens.issue(socket.id, gameId, role);
           socket.emit("joined_game", socket.id, token, { role: this.playerRole(socket, gameId), color: socket.data.color, room: this.gameRepo.roomState(gameId) });
-          if (role === "gm" || game.session) socket.emit("scene_snapshot", { scene: game.scene });
+          if (role === "gm" || game.session) socket.emit("scene_snapshot", { scene: this.sceneFor(socket, gameId) });
           socket.emit("display_frozen", this.gameRepo.games[gameId].displayFrozen);
           socket.to(gameId).emit("joined_game", socket.id);
         } catch (error) {
@@ -298,19 +309,20 @@ export default class GameServer {
         const gameId = gameState.getGameId();
         if (!batch || !gameId || socket.data.castDisplay) return;
         const game = this.gameRepo.games[gameId];
-        const person: Person = { role: this.playerRole(socket, gameId),
-          id: socket.data.role === "gm" ? gmOwner : socket.data.playerId };
+        const person = this.person(socket, gameId);
         const applied: Change[] = [];
-        const refused: { id: string; item: import("../../../src/sceneRules").Item | null }[] = [];
+        const transitions: { before: Item | undefined; after: Item | undefined; change: Change }[] = [];
+        const refused: { id: string; item: Item | null }[] = [];
         for (const change of batch.changes) {
           const id = change.type === "add" ? change.item.id : change.id;
+          const before = Object.hasOwn(game.scene.items, id) ? game.scene.items[id] : undefined;
+          const refusedItem = before && visibleTo(person, before) ? before : null;
           if (batch.sceneId !== game.scene.id || (socket.data.role !== "gm" && !game.session) ||
               checkChange(game.scene, change) ||
               !mayChange(person, { switches: game.switches },
-                change.type === "add" ? undefined :
-                  Object.hasOwn(game.scene.items, id) ? game.scene.items[id] : undefined, change) ||
+                change.type === "add" ? undefined : before, change) ||
               (socket.data.role !== "gm" && !socket.data.playerId)) {
-            refused.push({ id, item: Object.hasOwn(game.scene.items, id) ? game.scene.items[id] : null });
+            refused.push({ id, item: refusedItem });
             continue;
           }
           let actual: Change = change;
@@ -328,15 +340,27 @@ export default class GameServer {
           }
           const result = applyChange(game.scene, actual);
           if (!result.applied) {
-            refused.push({ id, item: game.scene.items[id] ?? null });
+            refused.push({ id, item: refusedItem });
             continue;
           }
           game.scene = result.scene;
           applied.push(actual);
+          transitions.push({ before, after: Object.hasOwn(game.scene.items, id) ? game.scene.items[id] : undefined, change: actual });
         }
         if (applied.length) this.gameRepo.changed(gameId);
         socket.emit("scene_answer", { batchId: batch.id, sceneId: batch.sceneId, applied, refused });
-        if (applied.length) this.broadcastCanvas(socket, gameId, "scene_changes", { sceneId: game.scene.id, changes: applied });
+        if (applied.length) {
+          for (const id of this.io.sockets.adapter.rooms.get(gameId) || []) {
+            const peer = this.io.sockets.sockets.get(id);
+            if (!peer || peer.id === socket.id || (!game.session && peer.data.role !== "gm")) continue;
+            const viewer = this.person(peer, gameId);
+            const changes = transitions.flatMap(({ before, after, change }) => {
+              const visibleChange = changeFor(viewer, before, after, change);
+              return visibleChange ? [visibleChange] : [];
+            });
+            if (changes.length) peer.emit("scene_changes", { sceneId: game.scene.id, changes });
+          }
+        }
       });
 
       const followedGame = () => {
