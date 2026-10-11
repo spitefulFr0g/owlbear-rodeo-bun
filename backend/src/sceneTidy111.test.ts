@@ -114,3 +114,26 @@ test("a room accepts its hundredth scene and refuses further creation without mo
     expect((await action(gm.socket, "scene_create", { name: "Room again" })).ok).toBe(true);
   } finally { await server.dispose(); }
 });
+
+test("deleting the scene players last held outside a session leaves them on the open scene", async () => {
+  const server = await startTestServer();
+  try {
+    const { cookie } = await setupAdministrator(server);
+    const room = await createRoom(server, cookie, "Room");
+    const gm = await server.joinRoomAsGM(room.id, cookie);
+    const firstId = gm.snapshot!.scene.id;
+    const player = await server.joinRoom(room.id, "", "player");
+    const { sceneId } = await action(gm.socket, "scene_create", { name: "Next" });
+    expect(await action(gm.socket, "scene_show", { sceneId, view: { x: 0, y: 0, width: 100, height: 100 } })).toEqual({ ok: true });
+    const snapshots: unknown[] = [];
+    player.socket.on("scene_snapshot", value => snapshots.push(value));
+    expect(await action(gm.socket, "scene_delete", { sceneId: firstId })).toEqual({ ok: true });
+    const answer = nextMessage(player.socket, "scene_answer");
+    player.socket.emit("scene_changes", { id: "batch", sceneId: firstId, changes: [{ type: "delete", id: "item" }] });
+    expect((await answer)[0]).toEqual({ batchId: "batch", sceneId: firstId, applied: [], refused: [{ id: "item", item: null }] });
+    expect(snapshots).toEqual([]);
+    const snapshot = nextMessage(player.socket, "scene_snapshot");
+    await action(gm.socket, "session", true);
+    expect((await snapshot)[0].scene.id).toBe(sceneId);
+  } finally { await server.dispose(); }
+});
