@@ -9,8 +9,8 @@ export type MapRect = {
   height: number;
 };
 
-/** The part of a map the followed player can see, as sent to cast displays */
-export type DisplayView = MapRect & { mapId: string };
+/** The GM view of a scene in world units, as sent to cast displays */
+export type DisplayView = MapRect & { sceneId: string };
 
 /** The pan and zoom of the map stage */
 export type StageTransform = {

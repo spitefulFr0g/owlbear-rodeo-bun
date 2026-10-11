@@ -9,7 +9,10 @@ import { useRoom } from "../contexts/RoomContext";
 import WelcomeScreen from "../components/WelcomeScreen";
 import DisplayMap from "../components/display/DisplayMap";
 
-import { DisplayView, fullMapRect } from "../helpers/displayView";
+import { DisplayView } from "../helpers/displayView";
+
+import { useScene } from "../scene/SceneContext";
+import { defaultDisplayView } from "../helpers/defaultDisplayView";
 
 import { Map as MapType } from "../types/Map";
 import { MapState } from "../types/MapState";
@@ -19,6 +22,7 @@ import { AssetManifest } from "../types/Asset";
  * The map of a room as a cast display receives it. Nothing is ever sent back.
  */
 function NetworkedDisplay({ session }: { session: Session }) {
+  const { scene } = useScene();
   const waiting = useRoom().session === false;
   const [currentMap, setCurrentMap] = useState<MapType | null>(null);
   const [currentMapState, setCurrentMapState] = useNetworkedState<MapState | null>(
@@ -41,7 +45,7 @@ function NetworkedDisplay({ session }: { session: Session }) {
   // A cast display belongs to nobody, so every asset is loaded from the server
   useAssetTransfers(session, assetManifest, undefined, true);
 
-  // The view of the player being followed
+  // The view of the GM being followed
   const [displayView, setDisplayView] = useState<DisplayView | null>(null);
 
   useEffect(() => {
@@ -77,11 +81,11 @@ function NetworkedDisplay({ session }: { session: Session }) {
 
   if (waiting) return <WelcomeScreen />;
 
-  // Show the whole map until a view of it arrives
+  // Fit the scene until a view of it arrives
   const view =
-    displayView && currentMap && displayView.mapId === currentMap.id
+    displayView && scene && displayView.sceneId === scene.id
       ? displayView
-      : fullMapRect;
+      : defaultDisplayView(scene);
 
   return (
     <DisplayMap

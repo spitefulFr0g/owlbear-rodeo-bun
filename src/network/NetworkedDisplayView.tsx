@@ -2,45 +2,41 @@ import { useEffect, useRef } from "react";
 
 import { useMapStage } from "../contexts/MapStageContext";
 import {
-  useMapHeight,
-  useMapWidth,
   useStageHeight,
   useStageWidth,
 } from "../contexts/MapInteractionContext";
 
 import {
   DisplayView,
-  getVisibleMapRect,
   isSameMapRect,
 } from "../helpers/displayView";
 
 import Session from "./Session";
+import { worldNodeId } from "../scene/worldPosition";
 
 // Send view updates every 50ms (20fps), as the pointer does
 const sendTickRate = 50;
-// The server drops views that arrive before it knows who we are or which map
+// The server drops views that arrive before it knows who we are or which scene
 // is shown, so repeat a view that stays still
 const resendInterval = 2000;
 
 type NetworkedDisplayViewProps = {
   session: Session;
-  mapId: string;
+  sceneId: string;
 };
 
 /**
- * Tells the server which part of the map this window shows, for cast displays
+ * Tells the server which part of the scene this window shows, for cast displays
  * to follow. Rendered only for a GM connection.
  */
-function NetworkedDisplayView({ session, mapId }: NetworkedDisplayViewProps) {
+function NetworkedDisplayView({ session, sceneId }: NetworkedDisplayViewProps) {
   const mapStageRef = useMapStage();
   const stageWidth = useStageWidth();
   const stageHeight = useStageHeight();
-  const mapWidth = useMapWidth();
-  const mapHeight = useMapHeight();
 
-  const frameRef = useRef({ stageWidth, stageHeight, mapWidth, mapHeight });
+  const frameRef = useRef({ stageWidth, stageHeight });
   useEffect(() => {
-    frameRef.current = { stageWidth, stageHeight, mapWidth, mapHeight };
+    frameRef.current = { stageWidth, stageHeight };
   });
 
   const sentViewRef = useRef<DisplayView | null>(null);
@@ -74,27 +70,27 @@ function NetworkedDisplayView({ session, mapId }: NetworkedDisplayViewProps) {
       counter = 0;
 
       const stage = mapStageRef.current;
-      const layer = stage?.findOne("#mapImage")?.getLayer();
-      if (!stage || !layer || !session.socket?.connected) {
+      const world = stage?.findOne(`#${worldNodeId}`);
+      if (!stage || !world || !session.socket?.connected) {
         return;
       }
-      const rect = getVisibleMapRect(
-        { x: stage.x(), y: stage.y(), scale: stage.scaleX() },
-        { ...frameRef.current, layerX: layer.x(), layerY: layer.y() }
-      );
+      const inverse = world.getAbsoluteTransform().copy().invert();
+      const topLeft = inverse.point({ x: 0, y: 0 });
+      const bottomRight = inverse.point({ x: frameRef.current.stageWidth, y: frameRef.current.stageHeight });
+      const rect = { ...topLeft, width: bottomRight.x - topLeft.x, height: bottomRight.y - topLeft.y };
       if (!Object.values(rect).every(Number.isFinite)) {
         return;
       }
       const sent = sentViewRef.current;
       if (
         sent &&
-        sent.mapId === mapId &&
+        sent.sceneId === sceneId &&
         isSameMapRect(sent, rect) &&
         time - sentTimeRef.current < resendInterval
       ) {
         return;
       }
-      const view = { mapId, ...rect };
+      const view = { sceneId, ...rect };
       session.socket.emit("display_view", view);
       sentViewRef.current = view;
       sentTimeRef.current = time;
@@ -103,7 +99,7 @@ function NetworkedDisplayView({ session, mapId }: NetworkedDisplayViewProps) {
     return () => {
       cancelAnimationFrame(request);
     };
-  }, [session, mapId, mapStageRef]);
+  }, [session, sceneId, mapStageRef]);
 
   return null;
 }
