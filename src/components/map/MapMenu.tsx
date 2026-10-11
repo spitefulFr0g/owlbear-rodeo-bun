@@ -7,6 +7,7 @@ import { RequestCloseEventHandler } from "../../types/Events";
 import { useInteractionEmitter } from "../../contexts/MapInteractionContext";
 
 type MapMenuProps = {
+  contentLabel?: string;
   isOpen: boolean;
   onRequestClose: RequestCloseEventHandler;
   onModalContent: (instance: HTMLDivElement) => void;
@@ -20,6 +21,7 @@ type MapMenuProps = {
 };
 
 function MapMenu({
+  contentLabel,
   isOpen,
   onRequestClose,
   onModalContent,
@@ -92,6 +94,7 @@ function MapMenu({
 
   return (
     <Modal
+      contentLabel={contentLabel}
       isOpen={isOpen}
       onRequestClose={onRequestClose}
       style={{

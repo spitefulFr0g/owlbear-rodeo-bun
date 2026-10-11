@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { Box, IconButton, Label, Checkbox, Select, Input, Slider } from "theme-ui";
 
+import MapMenu from "../map/MapMenu";
+
 import GridOnIcon from "../../icons/GridOnIcon";
 
 import { useScene } from "../../scene/SceneContext";
@@ -58,6 +60,7 @@ function SettledInput({ type, value, onSettle, ...props }: SettledInputProps) {
 function SceneControls() {
   const { scene, person, readOnly, setSettings } = useScene();
   const [expanded, setExpanded] = useState(false);
+  const buttonRef = useRef<HTMLButtonElement>(null);
   const [scale, setScale] = useState(scene?.grid.measurement.scale || "");
   useEffect(() => { setScale(scene?.grid.measurement.scale || ""); }, [scene?.grid.measurement.scale]);
   if (!scene || person.role !== "gm") return null;
@@ -67,9 +70,17 @@ function SceneControls() {
   }
   return (
     <Box>
-      <IconButton aria-label="Scene Controls" title="Scene Controls" onClick={() => setExpanded(!expanded)}><GridOnIcon /></IconButton>
-      {expanded && (
-        <Box sx={{ position: "absolute", right: "100%", top: 0, width: 240, backgroundColor: "overlay", borderRadius: 4 }} p={3}>
+      <IconButton ref={buttonRef} aria-expanded={expanded} aria-haspopup="dialog" aria-label="Scene Controls" title="Scene Controls" onClick={() => setExpanded(!expanded)}><GridOnIcon /></IconButton>
+      <MapMenu
+        contentLabel="Scene Controls"
+        isOpen={expanded}
+        onRequestClose={() => setExpanded(false)}
+        excludeNode={buttonRef.current}
+        top={16}
+        right={76}
+        style={{ width: "min(272px, calc(100vw - 92px))", maxHeight: "calc(100vh - 32px)", overflowY: "auto" }}
+      >
+        <Box p={3} onKeyDown={(event) => { if (event.key !== "Escape" && event.key !== "Tab") event.stopPropagation(); }} onKeyUp={(event) => event.stopPropagation()}>
           <Label htmlFor="scene-grid-type">Grid type</Label>
           <Select id="scene-grid-type" value={grid.type} disabled={readOnly} onChange={(event) => change({ type: event.target.value as GridType })}>
             <option value="square">Square</option>
@@ -96,7 +107,7 @@ function SceneControls() {
           <Label><Checkbox checked={scene.fogFill} disabled={readOnly} onChange={(event) => setSettings({ fogFill: event.target.checked })} />Fog Fill</Label>
           <Label title="Only the GM can change a view-only scene. Players can still pan, zoom, point and measure."><Checkbox checked={scene.viewOnly} disabled={readOnly} onChange={(event) => setSettings({ viewOnly: event.target.checked })} />View-only</Label>
         </Box>
-      )}
+      </MapMenu>
     </Box>
   );
 }

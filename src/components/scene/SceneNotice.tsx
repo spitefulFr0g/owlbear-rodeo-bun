@@ -29,25 +29,29 @@ function SceneNotice() {
       role="status"
       sx={{
         position: "absolute",
-        bottom: 0,
+        bottom: 56,
+        "@media (min-width: 1024px)": { bottom: 0 },
         left: "50%",
         transform: "translateX(-50%)",
         alignItems: "center",
-        maxWidth: "calc(100% - 320px)",
+        flexWrap: "wrap",
+        gap: 2,
+        width: "calc(100% - 32px)",
+        maxWidth: 760,
         backgroundColor: "highlight",
         color: "hsl(210, 50%, 96%)",
         borderRadius: "4px",
       }}
-      m={2}
+      my={2}
       p={2}
     >
-      <Text as="p" variant="body2" sx={{ overflowWrap: "anywhere" }} mr={2}>
+      <Text as="p" variant="body2" sx={{ overflowWrap: "anywhere", flexBasis: "100%", minWidth: 0 }} mr={2}>
         You are viewing {away.viewedName ? `“${away.viewedName}”` : "a scene"},
         which is not the open scene. Players do not see it.
       </Text>
       <Button
         type="button"
-        sx={{ flexShrink: 0, color: "inherit", borderColor: "currentcolor" }}
+        sx={{ flexShrink: 1, maxWidth: "100%", whiteSpace: "normal", color: "inherit", borderColor: "currentcolor" }}
         mr={2}
         disabled={readOnly || isSending}
         onClick={handleShow}
@@ -56,8 +60,12 @@ function SceneNotice() {
       </Button>
       <Button
         type="button"
-        sx={{ flexShrink: 0, color: "inherit", borderColor: "currentcolor" }}
-        onClick={() => viewScene(away.openSceneId)}
+        sx={{ flexShrink: 1, maxWidth: "100%", whiteSpace: "normal", color: "inherit", borderColor: "currentcolor" }}
+        disabled={readOnly || isSending}
+        onClick={async () => {
+          const answer = await viewScene(away.openSceneId);
+          if (!answer.ok) addToast("Unable to open the scene. Try again in a moment.", { appearance: "error" });
+        }}
         title={away.openName && `Back to “${away.openName}”`}
       >
         Back to the open scene

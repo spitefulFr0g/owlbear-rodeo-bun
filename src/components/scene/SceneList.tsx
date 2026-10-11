@@ -25,6 +25,8 @@ import SceneEditor from "./SceneEditor";
 
 function refusal(answer: SceneAnswer) {
   switch (answer.error) {
+    case "timeout":
+      return "The room did not answer. Check the scene list before trying again.";
     case "offline":
       return "Not connected to the room. Try again in a moment.";
     case "not_found":
@@ -369,7 +371,7 @@ function SceneList({ onDone }: SceneListProps) {
         />
       )}
       {error && (
-        <Text as="p" variant="caption" sx={{ color: "highlight" }} mt={2}>
+        <Text as="p" role="alert" variant="caption" sx={{ color: "highlight" }} mt={2}>
           {error}
         </Text>
       )}
