@@ -169,5 +169,6 @@ export type RoomSwitches = {
 };
 export type RoomRules = {
   switches: RoomSwitches;
+  viewOnly?: boolean;
   knownImage?: (image: ImageSource) => boolean;
 };

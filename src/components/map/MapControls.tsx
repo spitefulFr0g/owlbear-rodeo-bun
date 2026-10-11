@@ -18,7 +18,6 @@ import RedoButton from "../controls/shared/RedoButton";
 import useSetting from "../../hooks/useSetting";
 
 import { MapToolId } from "../../types/Map";
-import { MapChangeEventHandler } from "../../types/Events";
 import { Settings } from "../../types/Settings";
 
 import { useKeyboard } from "../../contexts/KeyboardContext";
@@ -31,8 +30,6 @@ import { fogItems } from "../../scene/fogItem";
 import { drawingsInOrder } from "../../scene/drawingItem";
 
 type MapControlsProps = {
-  onMapChange: MapChangeEventHandler;
-  allowMapChange: boolean;
   selectedToolId: MapToolId;
   onSelectedToolChange: (toolId: MapToolId) => void;
   toolSettings: Settings;
@@ -41,8 +38,6 @@ type MapControlsProps = {
 };
 
 function MapContols({
-  onMapChange,
-  allowMapChange,
   selectedToolId,
   onSelectedToolChange,
   toolSettings,
@@ -78,7 +73,6 @@ function MapContols({
   });
   const disabledControls: MapToolId[] = tools
     .filter(tool => !tool.mayUse).map(tool => tool.id);
-  if (!allowMapChange) disabledControls.push("map");
   if (!canUndo) disabledControls.push("undo");
   if (!canRedo) disabledControls.push("redo");
 
@@ -90,12 +84,7 @@ function MapContols({
   const sections = [
     {
       id: "map",
-      component: (
-        <ScenesButton
-          onMapChange={onMapChange}
-          allowMapChange={!disabledControls.includes("map")}
-        />
-      ),
+      component: <ScenesButton />,
     },
     { id: "grid", component: <SceneGridControls /> },
     {

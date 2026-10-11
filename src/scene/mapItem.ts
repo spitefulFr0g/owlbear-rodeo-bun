@@ -1,4 +1,6 @@
-import { gmOwner, ImageItem, Scene, SceneGrid, Vector2 } from "../sceneRules";
+import {
+  defaultSceneGrid, gmOwner, ImageItem, maxSceneNameLength, Scene, SceneGrid, Vector2,
+} from "../sceneRules";
 import { Map } from "../types/Map";
 import { cellSize, snapPosition } from "./grid";
 
@@ -60,4 +62,18 @@ export function mapItem(map: Map, grid: SceneGrid, id: string, near?: Vector2): 
     width: map.width, height: map.height, label: "",
     outline: { type: "rect", x: 0, y: 0, width: map.width, height: map.height },
   };
+}
+
+/** The name the importer gives a scene: what was typed, else the map's own name. */
+export function importedSceneName(map: Map, typed: string | undefined): string {
+  return typed === undefined ? map.name.trim().slice(0, maxSceneNameLength) : typed.trim();
+}
+
+/**
+ * What one create carries for a scene made from a map: the default grid with
+ * the map's type and measurement, and the map fitted to it.
+ */
+export function sceneFromMap(map: Map, typedName: string | undefined, itemId: string) {
+  const grid = mapSceneGrid(map, defaultSceneGrid);
+  return { name: importedSceneName(map, typedName), grid, map: mapItem(map, grid, itemId) };
 }
