@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import Konva from "konva";
 import { Group } from "react-konva";
 import { v4 as uuid } from "uuid";
@@ -19,7 +19,6 @@ import { useToolPermissions } from "../../contexts/RoomContext";
 import useSceneSnapping from "../../hooks/useSceneSnapping";
 import shortcuts from "../../shortcuts";
 import World from "./World";
-import SceneItemMenu from "./SceneItemMenu";
 import { SceneImage } from "./SceneImages";
 import SceneText from "./SceneText";
 import SceneDrawing from "./SceneDrawing";
@@ -29,21 +28,22 @@ export default function SceneSelection({
   active,
   boxSelect,
   layer,
+  onMenuOpen,
 }: {
   active: boolean;
   boxSelect: boolean;
   layer?: Layer;
+  onMenuOpen: (position: { x: number; y: number } | null) => void;
 }) {
   const { scene, selection, setSelection, readOnly, act } = useScene();
   const stageRef = useMapStage();
-  const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
   useEffect(() => {
-    setMenu(null);
+    onMenuOpen(null);
     if (layer)
       setSelection((prev) =>
         prev.filter((id) => scene?.items[id]?.layer === layer)
       );
-  }, [active, layer, setSelection]);
+  }, [active, layer, setSelection, onMenuOpen]);
   const root = useRef<Konva.Group>(null);
   const selectedRef = useRef(selection);
   selectedRef.current = selection;
@@ -67,13 +67,13 @@ export default function SceneSelection({
       if (!selectedRef.current.includes(node.id())) setSelection([node.id()]);
       const rect = stage!.container().getBoundingClientRect();
       const pointer = stage!.getPointerPosition() || { x: 0, y: 0 };
-      setMenu({ x: rect.left + pointer.x, y: rect.top + pointer.y });
+      onMenuOpen({ x: rect.left + pointer.x, y: rect.top + pointer.y });
     }
     stage.on("contextmenu.itemMenu dblclick.itemMenu dbltap.itemMenu", context);
     return () => {
       stage.off(".itemMenu");
     };
-  }, [scene, readOnly, layer, setSelection, stageRef]);
+  }, [scene, readOnly, layer, setSelection, stageRef, onMenuOpen]);
   const clipboard = useRef<Item[]>([]);
   const prevent = useSetPreventMapInteraction();
   const snap = useSceneSnapping();
@@ -222,7 +222,7 @@ export default function SceneSelection({
       if (node === transformer) return;
       if (node && layer && scene!.items[node.id()]?.layer !== layer)
         node = null;
-      setMenu(null);
+      onMenuOpen(null);
       if (!node && !boxSelect) {
         setSelection([]);
         return;
@@ -350,6 +350,7 @@ export default function SceneSelection({
     prevent,
     setSelection,
     stageRef,
+    onMenuOpen,
   ]);
   if (!scene) return null;
   return (
@@ -359,7 +360,6 @@ export default function SceneSelection({
           <Group ref={root} />
         </World>
       )}
-      <SceneItemMenu position={menu} close={() => setMenu(null)} />
     </>
   );
 }

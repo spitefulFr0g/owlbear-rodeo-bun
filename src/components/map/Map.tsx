@@ -45,7 +45,8 @@ import {
 } from "../../types/Events";
 
 import useMapTokens from "../../hooks/useMapTokens";
-import useMapNotes from "../../hooks/useMapNotes";
+import NoteTool from "../tools/NoteTool";
+import SceneItemMenu from "../scene/SceneItemMenu";
 import { MapActions } from "../../hooks/useMapActions";
 import SceneSelection, { SceneItems } from "../scene/SceneSelection";
 
@@ -101,7 +102,10 @@ function Map({
     }));
   }
 
-  const { scene, act, readOnly } = useScene();
+  const [itemMenu, setItemMenu] = useState<{ x: number; y: number } | null>(
+    null
+  );
+  const { scene, act, readOnly, setSelection } = useScene();
   function handleToolAction(action: string) {
     if (action === "eraseAll" && scene && permissions.drawing && !readOnly) {
       deleteDrawings(
@@ -119,8 +123,6 @@ function Map({
     onMapTokensStateCreate,
     selectedToolId
   );
-
-  const { noteMenu, noteTool } = useMapNotes(selectedToolId);
 
   const grabbing =
     (selectedToolId === "drawing" && settings.drawing.type === "grab") ||
@@ -154,7 +156,10 @@ function Map({
               onRedo={onRedo}
             />
             <DisplayControls session={session} />
-            {noteMenu}
+            <SceneItemMenu
+              position={itemMenu}
+              close={() => setItemMenu(null)}
+            />
             {tokenDragOverlay}
           </>
         }
@@ -176,7 +181,21 @@ function Map({
         />
         {tokens}
         <SceneItems placement="aboveGrid" />
-        {noteTool}
+        <NoteTool
+          active={selectedToolId === "note" && permissions.notes}
+          onEdit={(id, node) => {
+            setSelection([id]);
+            const rect = node.getClientRect();
+            const mapRect = document
+              .querySelector(".map")
+              ?.getBoundingClientRect();
+            if (mapRect)
+              setItemMenu({
+                x: mapRect.left + rect.x,
+                y: mapRect.top + rect.y + rect.height,
+              });
+          }}
+        />
         <MeasureTool active={selectedToolId === "measure"} />
         <SceneItems placement="aboveRuler" fogShapes={selecting} />
         <FogTool
@@ -194,6 +213,7 @@ function Map({
           <NetworkedDisplayView session={session} sceneId={scene.id} />
         )}
         <SceneSelection
+          onMenuOpen={setItemMenu}
           active={selecting}
           layer={
             grabbing
