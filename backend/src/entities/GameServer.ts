@@ -1,4 +1,4 @@
-import { applyChange, checkChange, readBatch, topOrder, gmOwner, Change } from "../../../src/sceneRules";
+import { applyChange, checkChange, readBatch, topOrder, gmOwner, Change, SceneGrid } from "../../../src/sceneRules";
 import { allowsLegacyMapStateUpdateV1 } from "../helpers/roomSwitches";
 import { randomBytes } from "crypto";
 import Accounts from "../accounts/Accounts";
@@ -118,7 +118,7 @@ export default class GameServer {
         if (roomId && !this.gameRepo.games[roomId].session && socket.data.role !== "gm" &&
           ["map", "map_state", "map_state_update", "manifest", "manifest_update", "player_pointer"].includes(event)) return;
         if (
-          socket.data.castDisplay && !["get_display_token", "join_display", "room_switches", "room_trust", "room_password", "new_display_link", "session"].includes(event)
+          socket.data.castDisplay && !["get_display_token", "join_display", "scene_grid", "room_switches", "room_trust", "room_password", "new_display_link", "session"].includes(event)
         ) {
           const gameId = gameState.getGameId();
           if (gameId && (event === "map" || event === "map_state")) {
@@ -262,6 +262,35 @@ export default class GameServer {
         } finally {
           joining = false;
         }
+      });
+
+      socket.on("scene_grid", (value: unknown, answer?: (result: { ok: boolean; error?: string }) => void) => {
+        const gameId = gameState.getGameId();
+        if (!gameId || socket.data.castDisplay || socket.data.role !== "gm") {
+          if (typeof answer === "function") answer({ ok: false, error: "not_room_gm" });
+          return;
+        }
+        const game = this.gameRepo.games[gameId];
+        const payload = value as { sceneId?: unknown; grid?: SceneGrid } | null;
+        const grid = payload?.grid;
+        if (!payload || typeof payload !== "object" || Array.isArray(payload) ||
+            Object.keys(payload).some(key => !["sceneId", "grid"].includes(key)) ||
+            payload.sceneId !== game.scene.id || !grid || typeof grid !== "object" || Array.isArray(grid) ||
+            Object.keys(grid).some(key => !["type", "unitsPerCell", "measurement", "shown", "snap"].includes(key)) ||
+            !["square", "hexVertical", "hexHorizontal"].includes(grid.type) || grid.unitsPerCell !== 150 ||
+            typeof grid.shown !== "boolean" || typeof grid.snap !== "boolean" ||
+            !grid.measurement || typeof grid.measurement !== "object" || Array.isArray(grid.measurement) ||
+            Object.keys(grid.measurement).some(key => !["type", "scale"].includes(key)) ||
+            !["chebyshev", "alternating", "euclidean", "manhattan"].includes(grid.measurement.type) ||
+            typeof grid.measurement.scale !== "string") {
+          if (typeof answer === "function") answer({ ok: false, error: "invalid" });
+          return;
+        }
+        game.scene = { ...game.scene, grid };
+        this.gameRepo.changed(gameId);
+        socket.emit("scene_grid", { sceneId: game.scene.id, grid });
+        this.broadcastCanvas(socket, gameId, "scene_grid", { sceneId: game.scene.id, grid });
+        if (typeof answer === "function") answer({ ok: true });
       });
 
       socket.on("scene_changes", (value: unknown) => {
