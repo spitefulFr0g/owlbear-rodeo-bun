@@ -1,4 +1,12 @@
-import { readBatch } from "./index";
+import {
+  readBatch,
+  applyChange,
+  checkChange,
+  topOrder,
+  Scene,
+  TextItem,
+  defaultSceneGrid,
+} from "./index";
 test("a batch envelope accepts item ids and refuses malformed changes", () => {
   expect(
     readBatch({
@@ -11,13 +19,6 @@ test("a batch envelope accepts item ids and refuses malformed changes", () => {
     readBatch({ id: "batch", sceneId: "scene", changes: [{ type: "delete" }] })
   ).toBeUndefined();
 });
-import {
-  applyChange,
-  topOrder,
-  Scene,
-  TextItem,
-  defaultSceneGrid,
-} from "./index";
 const item: TextItem = {
   id: "note",
   kind: "text",
@@ -73,7 +74,6 @@ test("items preserve independent field and metadata writes without changing earl
       reason: "missing",
     });
 });
-import { checkChange } from "./index";
 test("scene changes refuse unknown shapes, wrong types and nonfinite numbers", () => {
   expect(checkChange(empty, { type: "add", item })).toBeUndefined();
   for (const fields of [

@@ -17,4 +17,4 @@ jobs:
           node-version: 16.20.0
           cache: yarn
       - run: yarn install --frozen-lockfile --non-interactive
-      - run: yarn typecheck
+      - run: yarn check:frontend

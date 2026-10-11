@@ -2,7 +2,7 @@
 # Runs the checks CI runs, for the half of the repo the commit touches.
 # Quiet when they pass; prints the end of the failing check's output when not.
 # Turn it on once per clone: git config core.hooksPath .githooks
-root=$(git rev-parse --show-toplevel)
+root=$(git rev-parse --show-toplevel) || exit 1
 log=$(mktemp)
 trap 'rm -f "$log"' EXIT
 
@@ -14,14 +14,19 @@ check() {
   fi
 }
 
-if ! git diff --cached --quiet -- backend src/sceneRules src/scene; then
+if ! git diff --cached --quiet -- backend src package.json yarn.lock tsconfig.json scripts .githooks .github/workflows; then
+  cd "$root" || exit 1
+  check node scripts/frontend.cjs setup
+fi
+
+if ! git diff --cached --quiet -- backend src/sceneRules src/scene package.json yarn.lock; then
   cd "$root/backend" || exit 1
   check bun run typecheck
   check bun run test
   check bun run lint
 fi
 
-if ! git diff --cached --quiet -- src tsconfig.json; then
+if ! git diff --cached --quiet -- src tsconfig.json package.json yarn.lock scripts .githooks .github/workflows/frontend.yml; then
   cd "$root" || exit 1
-  check .githooks/frontend-typecheck
+  check node scripts/frontend.cjs check
 fi
