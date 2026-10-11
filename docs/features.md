@@ -28,7 +28,7 @@ A row with a split verdict names which part is which.
 
 Ten steps in build order, grouped into releases. Steps 1 to 5 run on today's canvas. Step 6 is the one large rewrite. Steps 7 to 10 build on it.
 
-v0.1.0, v0.2.0 and v0.3.0 are firm. The grouping after v0.3.0 is a forecast, and the order of steps 8 to 10 is decided again once v0.3.0 is done.
+v0.1.0, v0.2.0 and v0.3.0 are released. The grouping after v0.3.0 is a forecast. The order of steps 7 to 10, and which of them make v0.4.0, is being decided in [Plan v0.4.0: scenes and live play](https://github.com/spitefulFr0g/owlbear-rodeo-bun/issues/103).
 
 ### v0.1.0: the shared screen
 
@@ -82,13 +82,12 @@ Decided for this release:
 | Step | What is built |
 | --- | --- |
 | 6. Item model, scene core and per-item sync | Built as one step, because all three replace the same state. One `Item` type with five kinds and an explicit layer ([ADR 0002](adr/0002-item-model-without-state-migration.md)). The scene as an unbounded canvas with one grid and positions in world units; a room has exactly one scene until step 8 ([ADR 0003](adr/0003-scenes-arrive-with-the-item-model.md)). Server-ordered changes per item ([ADR 0004](adr/0004-server-ordered-item-changes.md)). Per-item permission checks, hidden items withheld by the server ([ADR 0006](adr/0006-hidden-items-are-seen-by-creator-and-gm.md)), Owner Only and locked items. One selection and transform system, one context menu, the Layer menu and shared undo. Fog and drawings become selectable, with cut and uncut per fog shape. |
-| 7. Live play | Drags and rulers seen live by everyone. Movement mode. Presence carries name, colour, role and the scene being viewed, and dice rolls and the timer move onto it. |
 
 Placed 1.0 state (tokens, drawings, fog and notes on a map) is not migrated in step 6 and can be lost.
 
 Decided for this release, in [Plan v0.3.0: the item model](https://github.com/spitefulFr0g/owlbear-rodeo-bun/issues/76):
 
-- **Two specs, one release:** step 6 is specified and built first. Step 7 is specified once step 6 is merged, against the messages step 6 produces. Both ship as v0.3.0.
+- **One step:** v0.3.0 is step 6 alone. Step 7 was planned for this release and moved to the next one when step 6 was released on its own. It is specified against the messages step 6 produces.
 - **No prototype:** the first piece of step 6 draws and moves one kind of item end to end, and the rest follows it.
 - **World units:** a world unit is a pixel, and the scene's grid says how many units one cell is, 150 by default. A map is scaled so that its cells match the scene's. The origin has no meaning ([ADR 0010](adr/0010-world-units-are-pixels-at-a-fixed-cell-size.md)).
 - **Transport:** it stays on socket.io.
@@ -111,10 +110,11 @@ Decided for this release, in [Plan v0.3.0: the item model](https://github.com/sp
 - **Toolbar:** it becomes a list of tool entries in step 6 and looks the same.
 - **Until step 7:** presence, dice rolls and the timer stay as they are.
 
-### v0.4.0: scenes, libraries and tools
+### v0.4.0: live play, scenes, libraries and tools
 
 | Step | What is built |
 | --- | --- |
+| 7. Live play | Drags and rulers seen live by everyone. Movement mode. Presence carries name, colour, role and the scene being viewed, and dice rolls and the timer move onto it. |
 | 8. Scene library | Create, name, open, edit, delete and switch scenes. The one-step importer with map alignment and the fog fill setting. The Scene Controls menu for the grid, with grid opacity, line width and colour. Show to players, and a one-off "bring players here". Fog Fill. Assigning a scene as the welcome screen. The view-only scene. |
 | 9. Libraries and dock | The room library, the account library and the server set ([ADR 0005](adr/0005-assets-belong-to-a-room-or-an-account.md)). A dock along the bottom and one Asset Manager, replacing the token bar and the two pickers. Dropping an image file on the canvas with a type picker. The one-off import of a browser library into the account library. Today's Import / Export dialog and the `.owlbear` file are removed. |
 | 10. Small tools | The text tool, with colour and size. Notes and text that start hidden. Adjustable stroke width. Duplicate numbering. Double-click to select a locked item. A check that Space pans mid-shape. |
