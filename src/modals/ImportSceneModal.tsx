@@ -13,11 +13,8 @@ import useResponsiveLayout from "../hooks/useResponsiveLayout";
 
 import { useMapData } from "../contexts/MapDataContext";
 import { SceneAnswer, useScene } from "../scene/SceneContext";
-import {
-  importedSceneName,
-  sceneFromMap,
-  sceneNameMaxLength,
-} from "../scene/mapItem";
+import { importedSceneName, sceneFromMap } from "../scene/mapItem";
+import { maxSceneNameLength } from "../sceneRules";
 import { imageFiles } from "../scene/shown";
 
 import { Map } from "../types/Map";
@@ -126,7 +123,7 @@ function ImportSceneModal({
             onChange={(event: ChangeEvent<HTMLInputElement>) =>
               setTypedName(event.target.value)
             }
-            maxLength={sceneNameMaxLength}
+            maxLength={maxSceneNameLength}
             autoComplete="off"
             my={1}
           />

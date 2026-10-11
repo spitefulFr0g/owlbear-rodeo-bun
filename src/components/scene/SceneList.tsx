@@ -3,7 +3,7 @@ import { Box, Button, Flex, Input, Label, Text } from "theme-ui";
 
 import { useScene, SceneAnswer } from "../../scene/SceneContext";
 import { ListedScene } from "../../helpers/sceneList";
-import { sceneNameMaxLength } from "../../scene/mapItem";
+import { maxSceneNameLength } from "../../sceneRules";
 
 import SceneImporter from "./SceneImporter";
 
@@ -118,7 +118,7 @@ function SceneList({ onDone }: SceneListProps) {
             onChange={(event: ChangeEvent<HTMLInputElement>) =>
               setName(event.target.value)
             }
-            maxLength={sceneNameMaxLength}
+            maxLength={maxSceneNameLength}
             autoComplete="off"
             mr={2}
           />
