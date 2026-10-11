@@ -11,6 +11,8 @@ import useImageCenter from "../../hooks/useImageCenter";
 import usePreventContextMenu from "../../hooks/usePreventContextMenu";
 import useFollowMapRect from "../../hooks/useFollowMapRect";
 
+import { useScene } from "../../scene/SceneContext";
+
 import { MapRect } from "../../helpers/displayView";
 import KonvaBridge from "../../helpers/KonvaBridge";
 
@@ -92,13 +94,13 @@ function MapInteraction({
     containerRef
   );
 
+  const { scene } = useScene();
   const isFollowing = followRect !== undefined;
   useFollowMapRect(
     followRect,
-    map?.id,
+    scene?.id,
     mapStageRef,
-    mapLayerRef,
-    { stageWidth, stageHeight, mapWidth, mapHeight },
+    { stageWidth, stageHeight },
     stageTranslateRef,
     setStageScale
   );

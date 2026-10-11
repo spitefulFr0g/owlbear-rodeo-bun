@@ -1,5 +1,4 @@
 import { useEffect, useRef } from "react";
-import Konva from "konva";
 
 import { MapStage } from "../contexts/MapStageContext";
 import {
@@ -8,32 +7,32 @@ import {
   MapFrame,
   MapRect,
 } from "../helpers/displayView";
+import { worldNodeId } from "../scene/worldPosition";
 import Vector2 from "../helpers/Vector2";
 
 // Time for the stage to cover about two thirds of the way to a new rectangle (ms)
 const followTime = 120;
 
 /**
- * Keep a rectangle of the map fitted to the stage, easing to it as it changes
+ * Keep a rectangle of the scene fitted to the stage, easing to it as it changes
  *
  * @param rect The rectangle to show, undefined to leave the stage alone
- * @param mapId Jump to the rectangle when this changes instead of easing
+ * @param sceneId Jump to the rectangle when this changes instead of easing
  */
 function useFollowMapRect(
   rect: MapRect | undefined,
-  mapId: string | undefined,
+  sceneId: string | undefined,
   stageRef: MapStage,
-  layerRef: React.RefObject<Konva.Layer>,
-  frame: Omit<MapFrame, "layerX" | "layerY">,
+  frame: Pick<MapFrame, "stageWidth" | "stageHeight">,
   stageTranslateRef: React.MutableRefObject<Vector2>,
   setStageScale: React.Dispatch<React.SetStateAction<number>>
 ) {
   const rectRef = useRef(rect);
-  const mapIdRef = useRef(mapId);
+  const sceneIdRef = useRef(sceneId);
   const frameRef = useRef(frame);
   useEffect(() => {
     rectRef.current = rect;
-    mapIdRef.current = mapId;
+    sceneIdRef.current = sceneId;
     frameRef.current = frame;
   });
 
@@ -44,7 +43,7 @@ function useFollowMapRect(
     }
     // The rectangle the stage is showing as it eases towards the one to show
     let shown: MapRect | undefined;
-    let shownMapId: string | undefined;
+    let shownSceneId: string | undefined;
     let prevTime = performance.now();
     let request = requestAnimationFrame(update);
 
@@ -55,14 +54,14 @@ function useFollowMapRect(
 
       const target = rectRef.current;
       const stage = stageRef.current;
-      const layer = layerRef.current;
-      if (!target || !stage || !layer) {
+      const world = stage?.findOne(`#${worldNodeId}`);
+      if (!target || !stage || !world) {
         return;
       }
 
-      if (!shown || shownMapId !== mapIdRef.current) {
+      if (!shown || shownSceneId !== sceneIdRef.current) {
         shown = target;
-        shownMapId = mapIdRef.current;
+        shownSceneId = sceneIdRef.current;
       } else if (isSameMapRect(shown, target, 1e-5)) {
         shown = target;
       } else {
@@ -75,11 +74,16 @@ function useFollowMapRect(
         };
       }
 
-      // Read the layer as it is now, it only moves when the map changes
+      // Read the world placement independently of the current stage pan and zoom
+      const local = stage.getAbsoluteTransform().copy().invert().multiply(world.getAbsoluteTransform());
+      const origin = local.point({ x: 0, y: 0 });
+      const unit = local.point({ x: 1, y: 1 });
       const transform = fitMapRect(shown, {
         ...frameRef.current,
-        layerX: layer.x(),
-        layerY: layer.y(),
+        mapWidth: unit.x - origin.x,
+        mapHeight: unit.y - origin.y,
+        layerX: origin.x,
+        layerY: origin.y,
       });
       if (
         !Number.isFinite(transform.scale) ||
@@ -99,7 +103,7 @@ function useFollowMapRect(
     return () => {
       cancelAnimationFrame(request);
     };
-  }, [isFollowing, stageRef, layerRef, stageTranslateRef, setStageScale]);
+  }, [isFollowing, stageRef, stageTranslateRef, setStageScale]);
 }
 
 export default useFollowMapRect;

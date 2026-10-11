@@ -238,8 +238,8 @@ function Map({
           active={selectedToolId === "pointer"}
           session={session}
         />
-        {map && roleControls.room && (
-          <NetworkedDisplayView session={session} mapId={map.id} />
+        {scene && roleControls.room && (
+          <NetworkedDisplayView session={session} sceneId={scene.id} />
         )}
         {selectionTool}
       </MapInteraction>
