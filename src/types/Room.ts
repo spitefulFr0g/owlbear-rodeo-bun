@@ -1,10 +1,10 @@
 import { PlayerColour } from "../helpers/playerColour";
+import { RoomSwitches } from "../sceneRules";
 
 /** What a connection may do in a room, decided by the server */
 export type Role = "gm" | "trusted" | "player";
 
 export type { RoomSwitches } from "../sceneRules";
-import { RoomSwitches } from "../sceneRules";
 
 /** What everyone in a room is told about it, kept current by the server */
 export type RoomState = {

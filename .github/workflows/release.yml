@@ -14,6 +14,7 @@ on:
     paths:
       - ".github/workflows/release.yml"
       - "backend/scripts/**"
+      - "scripts/**"
   workflow_dispatch:
 
 jobs:
@@ -46,6 +47,7 @@ jobs:
         env:
           # Create React App fails the build on a lint warning when CI is set.
           CI: "false"
+      - run: yarn check:frontend
       - run: bun test
         working-directory: backend
       - run: bun run typecheck

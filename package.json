@@ -72,7 +72,11 @@
     "start": "react-scripts start",
     "build": "react-scripts --max_old_space_size=4096 build",
     "test": "react-scripts test",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "node scripts/frontend.cjs typecheck",
+    "lint": "node scripts/frontend.cjs lint",
+    "test:helpers": "node scripts/frontend.cjs test",
+    "check:frontend": "node scripts/frontend.cjs check",
+    "setup:worktree": "node scripts/frontend.cjs setup",
     "eject": "react-scripts eject"
   },
   "eslintConfig": {

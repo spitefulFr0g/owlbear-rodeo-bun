@@ -16,18 +16,24 @@ one to ten minutes, the long end when it installs dependencies first.
 
 ## Worktrees
 
-Agent worktrees go in `.claude/worktrees/<name>`, which is ignored. In a new one:
+Worktrees may be inside or outside the main checkout. In a new one:
 
-- run `bun install --frozen-lockfile` in `backend/`;
-- leave the frontend's `node_modules` out. `bun run build:frontend` and
-  `.githooks/frontend-typecheck` both borrow the main checkout's, as long as
-  `yarn.lock` is unchanged.
+- run `node scripts/frontend.cjs setup` at the root, then
+  `bun install --frozen-lockfile` in `backend/`.
+
+Frontend setup links the main checkout's dependencies when `yarn.lock` and
+the package dependency declarations match. Checks repeat that validation.
+When they differ, remove the borrowed link and install locally with Yarn.
+The Docker frontend build preserves that link while building.
 
 ## Checks
 
 `.githooks/pre-commit` runs what CI runs for the half a commit touches, and
 prints only on failure. A fresh clone turns it on with
 `git config core.hooksPath .githooks`; worktrees share that setting.
+
+Frontend checks include the helper tests through Jest's browser environment.
+Running those tests with Bun alone omits browser globals such as localStorage.
 
 Tests hash passwords at the lowest bcrypt cost (`backend/scripts/test-setup.ts`).
 
