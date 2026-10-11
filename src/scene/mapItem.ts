@@ -4,10 +4,11 @@ import { cellSize, snapPosition } from "./grid";
 
 /** Identifies the image placed by the map picker, independently of the library. */
 export function pickedMap(scene: Scene | null): ImageItem | undefined {
-  return scene && Object.values(scene.items).find(
+  if (!scene) return undefined;
+  return Object.values(scene.items).find(
     (item): item is ImageItem => item.kind === "image" && item.layer === "map" &&
       typeof item.metadata.pickerMapId === "string"
-  ) || undefined;
+  );
 }
 
 /** The saved map changes type and measurement, keeping the scene's cell size and switches. */
