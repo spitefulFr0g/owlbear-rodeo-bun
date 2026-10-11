@@ -1,7 +1,7 @@
 import { Box } from "theme-ui";
 
 import MapInteraction from "../map/MapInteraction";
-import useSceneGrid from "../../hooks/useSceneGrid";
+import SceneGrid from "../scene/SceneGrid";
 
 import { SceneItems } from "../scene/SceneSelection";
 import NetworkedMapPointer from "../../network/NetworkedMapPointer";
@@ -20,7 +20,6 @@ function ignore() {}
 
 /** The map as a player sees it with nothing to press, for a cast display */
 function DisplayMap({ view, session }: DisplayMapProps) {
-  const sceneGrid = useSceneGrid();
 
   return (
     <Box sx={{ flexGrow: 1, height: "100%" }}>
@@ -31,7 +30,7 @@ function DisplayMap({ view, session }: DisplayMapProps) {
         followRect={view}
       >
         <SceneItems placement="belowGrid" />
-        {sceneGrid}
+        <SceneGrid />
         <SceneItems placement="aboveGrid" />
         <SceneItems placement="aboveRuler" />
         <NetworkedMapPointer active={false} session={session} />
