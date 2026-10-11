@@ -127,7 +127,7 @@ export default class GameServer {
         if (roomId && !this.gameRepo.games[roomId].session && socket.data.role !== "gm" &&
           event === "player_pointer") return;
         if (
-          socket.data.castDisplay && !["get_display_token", "join_display", "scene_grid", "room_switches", "room_trust", "room_password", "new_display_link", "session", "scene_create", "scene_view", "scene_show"].includes(event)
+          socket.data.castDisplay && !["get_display_token", "join_display", "scene_grid", "room_switches", "room_trust", "room_password", "new_display_link", "session", "scene_create", "scene_view", "scene_show", "scene_bring"].includes(event)
         ) {
           return;
         }
@@ -368,6 +368,45 @@ export default class GameServer {
         }
         this.gameRepo.save(gameId);
         this.broadcastSceneList(gameId);
+        respond({ ok: true });
+      });
+
+      socket.on("scene_bring", (value: unknown, answer?: (result: { ok: boolean; error?: string }) => void) => {
+        const gameId = gameState.getGameId();
+        const respond = (result: { ok: boolean; error?: string }) => {
+          if (typeof answer === "function") answer(result);
+        };
+        if (!gameId || socket.data.castDisplay || socket.data.role !== "gm") {
+          respond({ ok: false, error: "not_room_gm" });
+          return;
+        }
+        const payload = value as { view?: Partial<DisplayView> } | null;
+        const view = payload?.view;
+        if (!payload || typeof payload !== "object" || Array.isArray(payload) ||
+          Object.keys(payload).some(key => key !== "view") ||
+          !view || typeof view !== "object" || Array.isArray(view) ||
+          Object.keys(view).some(key => !["x", "y", "width", "height"].includes(key)) ||
+          ![view.x, view.y, view.width, view.height].every(number => typeof number === "number" && Number.isFinite(number)) ||
+          view.width! <= 0 || view.height! <= 0) {
+          respond({ ok: false, error: "invalid" });
+          return;
+        }
+        const game = this.gameRepo.games[gameId];
+        if (!game.session) {
+          respond({ ok: false, error: "no_session" });
+          return;
+        }
+        if (socket.data.viewedSceneId !== game.openSceneId) {
+          respond({ ok: false, error: "not_open_scene" });
+          return;
+        }
+        const carriedView = { sceneId: game.openSceneId, x: view.x!, y: view.y!, width: view.width!, height: view.height! };
+        for (const id of this.io.sockets.adapter.rooms.get(gameId) || []) {
+          const peer = this.io.sockets.sockets.get(id);
+          if (peer && !peer.data.castDisplay && peer.data.role !== "gm" && peer.data.viewedSceneId === game.openSceneId) {
+            peer.emit("player_view", carriedView);
+          }
+        }
         respond({ ok: true });
       });
 
