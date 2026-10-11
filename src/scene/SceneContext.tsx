@@ -31,7 +31,6 @@ import {
   Item,
   mayChange,
   Scene,
-  SceneGrid,
   Vector2,
 } from "../sceneRules";
 
@@ -41,12 +40,13 @@ import { Token } from "../types/Token";
 import {
   afterAnswer,
   afterChanges,
-  afterGrid,
+  afterSettings,
   BatchAnswer,
-  GridChange,
   imageFiles,
   imagesInOrder,
   RelayedChanges,
+  SceneSettings,
+  SettingsChange,
   shownScene,
 } from "./shown";
 import { emptyHistory, History, remember, historyChanges, dropStep } from "./history";
@@ -84,10 +84,11 @@ type SceneStore = {
   canChange: (change: Change) => boolean;
   canSelect: (item: Item) => boolean;
   /**
-   * Changes the scene's grid for everyone viewing it. It shows once the
-   * server has accepted it, which it does from a GM only.
+   * Changes settings of the scene for everyone viewing it: any of its grid,
+   * Fog Fill and view-only. They show once the server has accepted them,
+   * which it does from a GM only. Not in the undo history.
    */
-  setGrid: (grid: SceneGrid) => void;
+  setSettings: (settings: Partial<SceneSettings>) => void;
   /**
    * Moves this GM connection to another scene. The canvas is read-only until
    * its snapshot arrives. Not in the undo history.
@@ -199,20 +200,20 @@ export function SceneProvider({
         ),
       }));
     }
-    function handleGrid(change: GridChange) {
-      changeHeld((held) => ({ ...held, server: afterGrid(held.server, change) }));
+    function handleSettings(change: SettingsChange) {
+      changeHeld((held) => ({ ...held, server: afterSettings(held.server, change) }));
     }
     session.socket?.on("scene_list", setSceneList);
     session.socket?.on("scene_snapshot", handleSnapshot);
     session.socket?.on("scene_changes", handleChanges);
     session.socket?.on("scene_answer", handleAnswer);
-    session.socket?.on("scene_grid", handleGrid);
+    session.socket?.on("scene_settings", handleSettings);
     return () => {
       session.socket?.off("scene_list", setSceneList);
       session.socket?.off("scene_snapshot", handleSnapshot);
       session.socket?.off("scene_changes", handleChanges);
       session.socket?.off("scene_answer", handleAnswer);
-      session.socket?.off("scene_grid", handleGrid);
+      session.socket?.off("scene_settings", handleSettings);
     };
   }, [session.socket]);
 
@@ -329,18 +330,18 @@ export function SceneProvider({
   const canUndo = !readOnly && history.undo.length > 0;
   const canRedo = !readOnly && history.redo.length > 0;
 
-  const setGrid = useCallback(
-    (grid: SceneGrid) => {
+  const setSettings = useCallback(
+    (settings: Partial<SceneSettings>) => {
       const scene = sceneRef.current;
       if (!scene || !session.socket?.connected || !session.joinToken) {
         return;
       }
       session.socket.emit(
-        "scene_grid",
-        { sceneId: scene.id, grid },
+        "scene_settings",
+        { sceneId: scene.id, ...settings },
         (answer: { ok: boolean; error?: string }) => {
           if (!answer.ok) {
-            console.error(`Unable to change the grid: ${answer.error}`);
+            console.error(`Unable to change the scene's settings: ${answer.error}`);
           }
         }
       );
@@ -410,12 +411,12 @@ export function SceneProvider({
       undo, redo, canUndo, canRedo,
       canChange,
       canSelect,
-      setGrid,
+      setSettings,
       viewScene,
       createScene,
       share,
     }),
-    [scene, selection, person, switches, role, sceneList, readOnly, act, undo, redo, canUndo, canRedo, canChange, canSelect, setGrid, viewScene, createScene, share]
+    [scene, selection, person, switches, role, sceneList, readOnly, act, undo, redo, canUndo, canRedo, canChange, canSelect, setSettings, viewScene, createScene, share]
   );
 
   return (

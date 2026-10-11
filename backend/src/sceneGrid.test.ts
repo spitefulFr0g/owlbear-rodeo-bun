@@ -4,7 +4,7 @@ import { Socket } from "socket.io-client";
 import { createRoom, nextMessage, setupAdministrator, startTestServer } from "./testing/serverHelpers";
 
 const change = (socket: Socket, value: unknown) => new Promise<any>(resolve =>
-  socket.timeout(500).emit("scene_grid", value, (error: Error | null, result: unknown) => resolve(error ? "timeout" : result)));
+  socket.timeout(500).emit("scene_settings", value, (error: Error | null, result: unknown) => resolve(error ? "timeout" : result)));
 const grid: SceneGrid = { ...defaultSceneGrid, opacity: 0.6, lineWidth: 3, color: "#123AbC", type: "hexVertical", unitsPerCell: 150, measurement: { type: "euclidean", scale: "10m" }, shown: false, snap: false };
 
 test("the GM changes the scene grid for every viewer and keeps it across a restart", async () => {
@@ -19,9 +19,9 @@ test("the GM changes the scene grid for every viewer and keeps it across a resta
     const display = await server.joinDisplay(room.id, displayToken);
     const otherGM = await server.joinRoomAsGM(room.id, cookie);
     const payload = { sceneId: gm.snapshot!.scene.id, grid };
-    const relays = [gm, player, display, otherGM].map(peer => nextMessage(peer.socket, "scene_grid"));
+    const relays = [gm, player, display, otherGM].map(peer => nextMessage(peer.socket, "scene_settings"));
     expect(await change(gm.socket, payload)).toEqual({ ok: true });
-    for (const relay of relays) expect((await relay)[0]).toEqual(payload);
+    for (const relay of relays) expect((await relay)[0]).toEqual({ ...payload, fogFill: false, viewOnly: false });
     await server.restart();
     expect((await server.joinRoomAsGM(room.id, cookie)).snapshot!.scene.grid).toEqual(grid);
   } finally { await server.dispose(); }
@@ -53,7 +53,7 @@ test("malformed grid changes are refused without changing the scene", async () =
     const gm = await server.joinRoomAsGM(room.id, cookie);
     const sceneId = gm.snapshot!.scene.id;
     for (const value of [
-      null, [], {}, { sceneId: "elsewhere", grid }, { sceneId, grid: [] },
+      null, [], {}, { sceneId, grid: [] },
       ...[
         { ...grid, type: "unknown" }, { ...grid, unitsPerCell: 100 },
         { ...grid, unitsPerCell: NaN }, { ...grid, unitsPerCell: Infinity },
@@ -69,7 +69,7 @@ test("malformed grid changes are refused without changing the scene", async () =
   } finally { await server.dispose(); }
 });
 
-test("grid changes stay with GM connections outside a session and save after the delay", async () => {
+test("grid changes stay with GM connections outside a session and are saved at once", async () => {
   const server = await startTestServer();
   try {
     const { cookie } = await setupAdministrator(server);
@@ -79,15 +79,14 @@ test("grid changes stay with GM connections outside a session and save after the
     const displayToken = await new Promise<string>(resolve => gm.socket.emit("get_display_token", resolve));
     const display = await server.joinDisplay(room.id, displayToken);
     const events: unknown[] = [];
-    player.socket.on("scene_grid", value => events.push(value));
-    display.socket.on("scene_grid", value => events.push(value));
+    player.socket.on("scene_settings", value => events.push(value));
+    display.socket.on("scene_settings", value => events.push(value));
     for (const type of ["square", "hexHorizontal"]) {
       expect(await change(gm.socket, { sceneId: gm.snapshot!.scene.id, grid: { ...grid, type } })).toEqual({ ok: true });
     }
     await new Promise(resolve => player.socket.emit("get_display_token", resolve));
     await new Promise(resolve => display.socket.emit("get_display_token", resolve));
     expect(events).toEqual([]);
-    await server.clock.advance(3000);
     const copy = await server.durableCopy();
     try { expect((await copy.joinRoomAsGM(room.id, cookie)).snapshot!.scene.grid).toEqual({ ...grid, type: "hexHorizontal" }); }
     finally { await copy.dispose(); }

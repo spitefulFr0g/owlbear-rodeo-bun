@@ -104,7 +104,7 @@ try {
   if (answer.refused.length || answer.applied.length !== 1) throw new Error("The smoke note was not placed");
   const grid = { type: "hexHorizontal", unitsPerCell: 150, measurement: { type: "euclidean", scale: "10m" }, shown: false, snap: false };
   const styledGrid = { ...grid, opacity: 0.8, lineWidth: 3, color: "#333333" };
-  const gridAnswer = await new Promise<any>(resolve => first.socket.emit("scene_grid", { sceneId: savedSceneId,
+  const gridAnswer = await new Promise<any>(resolve => first.socket.emit(released ? "scene_grid" : "scene_settings", { sceneId: savedSceneId,
     grid: released ? grid : styledGrid }, resolve));
   if (!gridAnswer.ok) throw new Error("The smoke grid was not changed");
   const upload = await fetch(`${server.address}/assets/smoke-image`, {
