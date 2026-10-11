@@ -8,25 +8,34 @@ import { Map } from "../types/Map";
 
 /**
  * Changes to a map of the browser library, held until they are saved to its
- * record. Saving changes no scene.
+ * record. Saving changes no scene. The changes belong to the map they were
+ * made to, and are dropped when another map, or none, takes its place.
  */
-function useMapEdits(map: Map, onUpdateMap: UpdateMapEventHanlder) {
-  const [changes, setChanges] = useState<Partial<Map>>({});
+function useMapEdits<M extends Map | undefined>(
+  map: M,
+  onUpdateMap: UpdateMapEventHanlder
+) {
+  const mapId = map?.id;
+  const [held, setHeld] = useState<{ mapId?: string; changes: Partial<Map> }>({
+    mapId,
+    changes: {},
+  });
+  const changes = held.mapId === mapId ? held.changes : {};
 
   function change(change: Partial<Map>) {
-    setChanges((prevChanges) => ({
-      ...prevChanges,
-      ...change,
+    setHeld((held) => ({
+      mapId,
+      changes: { ...(held.mapId === mapId ? held.changes : {}), ...change },
     }));
   }
 
   function discard() {
-    setChanges({});
+    setHeld({ mapId, changes: {} });
   }
 
   /** Saves the changes and returns the map as it is now stored */
-  async function save(): Promise<Map> {
-    if (isEmpty(changes)) {
+  async function save(): Promise<M> {
+    if (!map || isEmpty(changes)) {
       return map;
     }
     // Ensure grid values are positive
@@ -50,11 +59,16 @@ function useMapEdits(map: Map, onUpdateMap: UpdateMapEventHanlder) {
       }
     }
     await onUpdateMap(map.id, verifiedChanges);
-    setChanges({});
-    return { ...map, ...verifiedChanges } as Map;
+    setHeld({ mapId, changes: {} });
+    return { ...map, ...verifiedChanges } as M;
   }
 
-  return { edited: { ...map, ...changes } as Map, change, discard, save };
+  return {
+    edited: (map && { ...map, ...changes }) as M,
+    change,
+    discard,
+    save,
+  };
 }
 
 export default useMapEdits;

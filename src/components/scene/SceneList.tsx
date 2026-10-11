@@ -17,6 +17,7 @@ import {
 import { maxSceneNameLength } from "../../sceneRules";
 
 import SceneImporter from "./SceneImporter";
+import SceneEditor from "./SceneEditor";
 
 function refusal(answer: SceneAnswer) {
   switch (answer.error) {
@@ -93,6 +94,48 @@ function RenameSceneEntry({ scene }: SceneEntryProps) {
   );
 }
 
+/** Opens the importer on the scene, which this GM connection views first */
+function EditSceneEntry({ scene, onRefused, onDone }: SceneEntryProps) {
+  const { scene: viewed, viewScene } = useScene();
+  const [isEditing, setIsEditing] = useState(false);
+
+  async function handleEdit() {
+    if (viewed?.id !== scene.id) {
+      const answer = await viewScene(scene.id);
+      if (!answer.ok) {
+        onRefused(answer);
+        return;
+      }
+    }
+    setIsEditing(true);
+  }
+
+  return (
+    <>
+      <Button
+        type="button"
+        variant="secondary"
+        ml={1}
+        onClick={handleEdit}
+        aria-label={`Edit ${scene.name}`}
+      >
+        Edit
+      </Button>
+      {isEditing && viewed?.id === scene.id && (
+        <SceneEditor
+          scene={scene}
+          onCancel={() => setIsEditing(false)}
+          onSaved={() => {
+            setIsEditing(false);
+            onDone();
+          }}
+          refusal={refusal}
+        />
+      )}
+    </>
+  );
+}
+
 function DeleteSceneEntry({ scene, onRefused }: SceneEntryProps) {
   const { sceneList, deleteScene } = useScene();
   const [isConfirming, setIsConfirming] = useState(false);
@@ -130,6 +173,7 @@ function DeleteSceneEntry({ scene, onRefused }: SceneEntryProps) {
 /** What a GM can do to one scene of the list, in the order shown */
 const sceneEntries: ComponentType<SceneEntryProps>[] = [
   OpenSceneEntry,
+  EditSceneEntry,
   RenameSceneEntry,
   DeleteSceneEntry,
 ];
