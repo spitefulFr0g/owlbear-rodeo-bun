@@ -102,7 +102,7 @@ function MapContols({
     if (readOnly || !allowFogDrawing) {
       disabled.push("fog");
     }
-    if (!map || !allowNoteEditing) {
+    if (readOnly || !allowNoteEditing) {
       disabled.push("note");
     }
     const allowed = (index: number) =>

@@ -86,9 +86,6 @@ function Map({
   onSelectionItemsCreate,
   onMapChange,
   onMapReset,
-  onMapNoteCreate,
-  onMapNoteChange,
-  onMapNoteRemove,
   allowMapChange,
   session,
   onUndo,
@@ -127,14 +124,7 @@ function Map({
     selectedToolId
   );
 
-  const { notes, noteMenu, noteDragOverlay } = useMapNotes(
-    map,
-    mapState,
-    onMapNoteCreate,
-    onMapNoteChange,
-    onMapNoteRemove,
-    selectedToolId
-  );
+  const { notes, noteMenu, noteTool } = useMapNotes(selectedToolId);
 
   const { selectionTool, selectionMenu, selectionDragOverlay } =
     useMapSelection(
@@ -180,7 +170,6 @@ function Map({
             {noteMenu}
             {selectionMenu}
             {tokenDragOverlay}
-            {noteDragOverlay}
             {selectionDragOverlay}
             {sceneDragOverlay}
           </>
@@ -195,9 +184,10 @@ function Map({
           active={selectedToolId === "drawing" && permissions.drawing}
           toolSettings={settings.drawing}
         />
-        {notes}
         {tokens}
         {sceneImages}
+        {notes}
+        {noteTool}
         <MeasureTool active={selectedToolId === "measure"} />
         {sceneFogImages}
         <FogTool

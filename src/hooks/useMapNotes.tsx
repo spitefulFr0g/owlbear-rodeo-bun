@@ -1,186 +1,228 @@
+import { useCallback, useEffect, useState } from "react";
 import Konva from "konva";
-import { Group } from "react-konva";
-import { KonvaEventObject } from "konva/lib/Node";
-import { useEffect, useState } from "react";
-import { v4 as uuid } from "uuid";
-
-import Note from "../components/konva/Note";
-import NoteDragOverlay from "../components/note/NoteDragOverlay";
-import NoteMenu from "../components/note/NoteMenu";
-import NoteTool from "../components/tools/NoteTool";
-import { useBlur, useKeyboard } from "../contexts/KeyboardContext";
+import { Box, Button, Flex } from "theme-ui";
+import { useScene } from "../scene/SceneContext";
+import { layers, maxTextLength, TextItem } from "../sceneRules";
 import { useToolPermissions } from "../contexts/RoomContext";
-import shortcuts from "../shortcuts";
 import {
-  NoteChangeEventHandler,
-  NoteCreateEventHander,
-  NoteRemoveEventHander,
-} from "../types/Events";
-import { Map, MapToolId } from "../types/Map";
-import { MapState } from "../types/MapState";
-import {
-  Note as NoteType,
-  NoteDraggingOptions,
-  NoteMenuOptions,
-} from "../types/Note";
+  useSetPreventMapInteraction,
+  leftMouseButton,
+} from "../contexts/MapInteractionContext";
+import { MapToolId } from "../types/Map";
+import colors, { colorOptions } from "../helpers/colors";
+import SceneText from "../components/scene/SceneText";
+import World from "../components/scene/World";
+import NoteTool from "../components/tools/NoteTool";
+import MapMenu from "../components/map/MapMenu";
+import TextareaAutosize from "../components/TextareaAutoSize";
+import useSceneSnapping from "./useSceneSnapping";
 
-function useMapNotes(
-  map: Map | null,
-  mapState: MapState | null,
-  onNoteCreate: NoteCreateEventHander,
-  onNoteChange: NoteChangeEventHandler,
-  onNoteRemove: NoteRemoveEventHander,
-  selectedToolId: MapToolId
-) {
+function useMapNotes(selectedToolId: MapToolId) {
+  const { scene, readOnly, act, person } = useScene();
   const permissions = useToolPermissions();
-  const allowNoteEditing = permissions.notes;
-
-  const [isNoteMenuOpen, setIsNoteMenuOpen] = useState<boolean>(false);
-  const [noteMenuOptions, setNoteMenuOptions] = useState<NoteMenuOptions>();
-  const [noteDraggingOptions, setNoteDraggingOptions] =
-    useState<NoteDraggingOptions>();
-
+  const editable = permissions.notes && !readOnly && person.role !== "display";
+  const interactive =
+    editable && (selectedToolId === "move" || selectedToolId === "note");
+  const [editor, setEditor] = useState<{
+    id: string;
+    left: number;
+    top: number;
+    text: string;
+  } | null>(null);
+  const open = useCallback((id: string, node: Konva.Node, text = "") => {
+    const rect = node.getClientRect();
+    const map = document.querySelector(".map")?.getBoundingClientRect();
+    if (!map) return;
+    setEditor({
+      id,
+      left: Math.max(
+        map.left,
+        Math.min(map.right - 180, map.left + rect.x + rect.width / 2 - 90),
+      ),
+      top: Math.max(
+        map.top,
+        Math.min(map.bottom - 240, map.top + rect.y + rect.height + 20),
+      ),
+      text,
+    });
+  }, []);
+  const item = editor && scene?.items[editor.id];
+  const note = item?.kind === "text" ? item : undefined;
   useEffect(() => {
-    if (!permissions.notes) setIsNoteMenuOpen(false);
-  }, [permissions.notes]);
-
-  function handleNoteMenuOpen(
-    noteId: string,
-    noteNode: Konva.Node,
-    focus: boolean
-  ) {
-    setNoteMenuOptions({ noteId, noteNode, focus });
-    setIsNoteMenuOpen(true);
+    if (!editable || (editor && !note)) setEditor(null);
+  }, [editable, editor, note]);
+  function close() {
+    if (editor && note && editable && editor.text !== note.text)
+      act([{ type: "update", id: note.id, fields: { text: editor.text } }]);
+    setEditor(null);
   }
-
-  function handleNoteMenuClose() {
-    setIsNoteMenuOpen(false);
-  }
-
-  function handleNoteDragStart(_: KonvaEventObject<DragEvent>, noteId: string) {
-    if (duplicateNote) {
-      const note = mapState?.notes[noteId];
-      if (note) {
-        onNoteCreate([{ ...note, id: uuid() }]);
-      }
-    }
-    setNoteDraggingOptions({ dragging: true, noteId });
-  }
-
-  function handleNoteDragEnd() {
-    noteDraggingOptions &&
-      setNoteDraggingOptions({ ...noteDraggingOptions, dragging: false });
-  }
-
-  function handleNoteRemove(noteIds: string[]) {
-    onNoteRemove(noteIds);
-    setNoteDraggingOptions(undefined);
-  }
-
-  const [duplicateNote, setDuplicateNote] = useState(false);
-  function handleKeyDown(event: KeyboardEvent) {
-    if (shortcuts.duplicate(event)) {
-      setDuplicateNote(true);
-    }
-  }
-
-  function handleKeyUp(event: KeyboardEvent) {
-    if (shortcuts.duplicate(event)) {
-      setDuplicateNote(false);
-    }
-  }
-
-  function handleBlur() {
-    setDuplicateNote(false);
-  }
-
-  useKeyboard(handleKeyDown, handleKeyUp);
-  useBlur(handleBlur);
-
+  const items = scene
+    ? Object.values(scene.items)
+        .filter((item): item is TextItem => item.kind === "text")
+        .sort(
+          (a, b) =>
+            layers.indexOf(a.layer) - layers.indexOf(b.layer) ||
+            a.order - b.order ||
+            a.id.localeCompare(b.id),
+        )
+    : [];
   const notes = (
-    <Group id="notes">
-      {(mapState
-        ? Object.values(mapState.notes).sort((a, b) =>
-            sortNotes(a, b, noteDraggingOptions)
-          )
-        : []
-      ).map((note) => (
-        <Note
-          note={note}
-          map={map}
-          key={note.id}
-          onNoteMenuOpen={handleNoteMenuOpen}
-          onNoteMenuClose={handleNoteMenuClose}
-          draggable={
-            allowNoteEditing &&
-            (selectedToolId === "note" || selectedToolId === "move") &&
-            !note.locked
-          }
-          onNoteChange={onNoteChange}
-          onNoteDragStart={handleNoteDragStart}
-          onNoteDragEnd={handleNoteDragEnd}
-          fadeOnHover={selectedToolId === "drawing"}
-          selected={
-            !!noteMenuOptions &&
-            isNoteMenuOpen &&
-            noteMenuOptions.noteId === note.id
-          }
+    <World id="notes">
+      {items.map((item) => (
+        <SceneNote
+          key={item.id}
+          item={editor?.id === item.id ? { ...item, text: editor.text } : item}
+          interactive={interactive}
+          onEdit={open}
+          onFinishEditing={close}
         />
       ))}
-      <NoteTool
-        map={map}
-        active={selectedToolId === "note"}
-        onNoteCreate={onNoteCreate}
-        onNoteMenuOpen={handleNoteMenuOpen}
-      />
-    </Group>
+    </World>
   );
-
   const noteMenu = (
-    <NoteMenu
-      isOpen={isNoteMenuOpen}
-      onRequestClose={handleNoteMenuClose}
-      onNoteChange={onNoteChange}
-      note={noteMenuOptions && mapState?.notes[noteMenuOptions.noteId]}
-      noteNode={noteMenuOptions?.noteNode}
-      focus={noteMenuOptions?.focus}
-      map={map}
-    />
+    <MapMenu
+      isOpen={!!editor && !!note}
+      onRequestClose={close}
+      left={editor?.left}
+      top={editor?.top}
+      onModalContent={(node) => {
+        const input = node?.querySelector<HTMLTextAreaElement>("textarea");
+        input?.focus();
+      }}
+    >
+      <Box p={1} sx={{ width: 180 }}>
+        <TextareaAutosize
+          aria-label="Note text"
+          value={editor?.text || ""}
+          maxLength={maxTextLength}
+          maxRows={4}
+          onChange={(event) =>
+            setEditor((prev) => prev && { ...prev, text: event.target.value })
+          }
+          onKeyPress={(event) => {
+            if (event.key === "Enter" && !event.shiftKey) {
+              event.preventDefault();
+              close();
+            }
+          }}
+        />
+        <Flex sx={{ flexWrap: "wrap" }}>
+          {colorOptions
+            .filter((color) => color !== "primary")
+            .map((color) => (
+              <Box
+                key={color}
+                aria-label={`Note color ${color}`}
+                onClick={() =>
+                  note &&
+                  act([{ type: "update", id: note.id, fields: { color } }])
+                }
+                sx={{
+                  width: "16.66%",
+                  height: 24,
+                  backgroundColor: colors[color],
+                  cursor: "pointer",
+                  border:
+                    note?.color === color
+                      ? "2px solid white"
+                      : "2px solid transparent",
+                }}
+              />
+            ))}
+        </Flex>
+        <Flex>
+          <Button
+            onClick={() =>
+              note &&
+              act([
+                {
+                  type: "update",
+                  id: note.id,
+                  fields: {
+                    square: !note.square,
+                    layer: note.square ? "text" : "note",
+                  },
+                },
+              ])
+            }
+          >
+            {note?.square ? "Text Mode" : "Note Mode"}
+          </Button>
+          <Button
+            onClick={() => {
+              if (note) act([{ type: "delete", id: note.id }]);
+              setEditor(null);
+            }}
+          >
+            Delete
+          </Button>
+        </Flex>
+      </Box>
+    </MapMenu>
   );
-
-  const noteDragOverlay = noteDraggingOptions ? (
-    <NoteDragOverlay
-      draggingOptions={noteDraggingOptions}
-      onNoteRemove={handleNoteRemove}
-    />
-  ) : null;
-
-  return { notes, noteMenu, noteDragOverlay };
+  return {
+    notes,
+    noteMenu,
+    noteTool: (
+      <NoteTool active={editable && selectedToolId === "note"} onEdit={open} />
+    ),
+  };
 }
-
 export default useMapNotes;
 
-function sortNotes(
-  a: NoteType,
-  b: NoteType,
-  noteDraggingOptions?: NoteDraggingOptions
-) {
-  if (
-    noteDraggingOptions &&
-    noteDraggingOptions.dragging &&
-    noteDraggingOptions.noteId === a.id
-  ) {
-    // If dragging token `a` move above
-    return 1;
-  } else if (
-    noteDraggingOptions &&
-    noteDraggingOptions.dragging &&
-    noteDraggingOptions.noteId === b.id
-  ) {
-    // If dragging token `b` move above
-    return -1;
-  } else {
-    // Else sort so last modified is on top
-    return a.lastModified - b.lastModified;
-  }
+/** Canvas interactions run beneath MapInteraction's providers. */
+function SceneNote({
+  item,
+  interactive,
+  onEdit,
+  onFinishEditing,
+}: {
+  item: TextItem;
+  interactive: boolean;
+  onEdit: (id: string, node: Konva.Node, text?: string) => void;
+  onFinishEditing: () => void;
+}) {
+  const { person, act } = useScene();
+  const prevent = useSetPreventMapInteraction();
+  const snap = useSceneSnapping();
+  const editable = interactive && (!item.locked || person.role === "gm");
+  return (
+    <SceneText
+      item={item}
+      draggable={editable}
+      onMouseDown={(event: Konva.KonvaEventObject<MouseEvent>) => {
+        if (editable && leftMouseButton(event)) prevent(true);
+      }}
+      onTouchStart={() => {
+        if (editable) prevent(true);
+      }}
+      onMouseUp={() => prevent(false)}
+      onTouchEnd={() => prevent(false)}
+      onClick={(event: Konva.KonvaEventObject<MouseEvent>) => {
+        if (editable && leftMouseButton(event))
+          onEdit(item.id, event.currentTarget, item.text);
+      }}
+      onTap={(event: Konva.KonvaEventObject<TouchEvent>) => {
+        if (editable) onEdit(item.id, event.currentTarget, item.text);
+      }}
+      onDragStart={() => {
+        onFinishEditing();
+        prevent(true);
+      }}
+      onDragMove={(event: Konva.KonvaEventObject<DragEvent>) => {
+        if (event.target === event.currentTarget)
+          event.target.position(snap(event.target.position()));
+      }}
+      onDragEnd={(event: Konva.KonvaEventObject<DragEvent>) => {
+        act([
+          {
+            type: "update",
+            id: item.id,
+            fields: { position: snap(event.currentTarget.position()) },
+          },
+        ]);
+        prevent(false);
+      }}
+    />
+  );
 }

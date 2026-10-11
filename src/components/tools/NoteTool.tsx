@@ -1,151 +1,92 @@
-import { useState, useEffect, useRef } from "react";
-import shortid from "shortid";
-import { Group } from "react-konva";
+import { useEffect, useRef, useState } from "react";
 import Konva from "konva";
-
+import shortid from "shortid";
 import {
   useInteractionEmitter,
   MapDragEvent,
   leftMouseButton,
 } from "../../contexts/MapInteractionContext";
 import { useMapStage } from "../../contexts/MapStageContext";
-import { useUserId } from "../../contexts/UserIdContext";
-
-import Vector2 from "../../helpers/Vector2";
 import { getRelativePointerPosition } from "../../helpers/konva";
+import useSceneSnapping from "../../hooks/useSceneSnapping";
+import { useScene } from "../../scene/SceneContext";
+import { worldNodeId } from "../../scene/worldPosition";
+import { TextItem } from "../../sceneRules";
+import SceneText from "../scene/SceneText";
+import World from "../scene/World";
 
-import useGridSnapping from "../../hooks/useGridSnapping";
-
-import BlankNote from "../konva/BlankNote";
-
-import { Map } from "../../types/Map";
-import { Note as NoteType } from "../../types/Note";
-import {
-  NoteCreateEventHander,
-  NoteMenuOpenEventHandler,
-} from "../../types/Events";
-
-const defaultNoteSize = 2;
-
-type MapNoteProps = {
-  map: Map | null;
+function NoteTool({
+  active,
+  onEdit,
+}: {
   active: boolean;
-  onNoteCreate: NoteCreateEventHander;
-  onNoteMenuOpen: NoteMenuOpenEventHandler;
-};
-
-function NoteTool({ map, active, onNoteCreate, onNoteMenuOpen }: MapNoteProps) {
-  const interactionEmitter = useInteractionEmitter();
-  const userId = useUserId();
-  const mapStageRef = useMapStage();
-  const [noteData, setNoteData] = useState<NoteType | null>(null);
-
-  const creatingNoteRef = useRef<Konva.Group>(null);
-
-  const snapPositionToGrid = useGridSnapping();
-
+  onEdit: (id: string, node: Konva.Node) => void;
+}) {
+  const { scene, person, readOnly, act } = useScene();
+  const emitter = useInteractionEmitter();
+  const stage = useMapStage();
+  const snap = useSceneSnapping();
+  const draft = useRef<TextItem | null>(null);
+  const [preview, setPreview] = useState<TextItem | null>(null);
   useEffect(() => {
-    if (!active) {
+    if (!active || readOnly) {
+      draft.current = null;
+      setPreview(null);
       return;
     }
-    const mapStage = mapStageRef.current;
-
-    function getBrushPosition() {
-      if (!mapStage) {
-        return;
-      }
-      const mapImage = mapStage.findOne("#mapImage");
-      let position = getRelativePointerPosition(mapImage);
-      if (!position) {
-        return;
-      }
-      if (map?.snapToGrid) {
-        position = snapPositionToGrid(position);
-      }
-      return Vector2.divide(position, {
-        x: mapImage.width(),
-        y: mapImage.height(),
-      });
+    function position() {
+      const world = stage.current?.findOne(`#${worldNodeId}`);
+      const point = world && getRelativePointerPosition(world);
+      return point ? snap(point) : undefined;
     }
-
-    function handleBrushDown(props: MapDragEvent) {
-      if (!leftMouseButton(props)) {
-        return;
-      }
-      const brushPosition = getBrushPosition();
-      if (!brushPosition || !userId) {
-        return;
-      }
-      setNoteData({
-        x: brushPosition.x,
-        y: brushPosition.y,
-        size: defaultNoteSize,
-        text: "",
+    function down(event: MapDragEvent) {
+      const point = position();
+      if (!leftMouseButton(event) || !point || !scene) return;
+      draft.current = {
         id: shortid.generate(),
-        lastModified: Date.now(),
-        lastModifiedBy: userId,
-        visible: true,
-        locked: false,
-        color: "yellow",
-        textOnly: false,
+        kind: "text",
+        layer: "note",
+        position: point,
         rotation: 0,
-      });
-      if (creatingNoteRef.current) {
-        creatingNoteRef.current.visible(true);
-      }
+        scale: { x: 1, y: 1 },
+        order: 0,
+        owner: person.id,
+        locked: false,
+        hidden: false,
+        metadata: {},
+        text: "",
+        color: "yellow",
+        size: scene.grid.unitsPerCell * 2,
+        square: true,
+      };
+      setPreview(draft.current);
     }
-
-    function handleBrushMove(props: MapDragEvent) {
-      if (!leftMouseButton(props)) {
-        return;
-      }
-      if (noteData) {
-        const brushPosition = getBrushPosition();
-        if (!brushPosition) {
-          return;
-        }
-        setNoteData((prev) => {
-          if (!prev) {
-            return prev;
-          }
-          return {
-            ...prev,
-            x: brushPosition.x,
-            y: brushPosition.y,
-          };
-        });
-      }
+    function move(event: MapDragEvent) {
+      const point = position();
+      if (!leftMouseButton(event) || !point || !draft.current) return;
+      draft.current = { ...draft.current, position: point };
+      setPreview(draft.current);
     }
-
-    function handleBrushUp(props: MapDragEvent) {
-      if (!leftMouseButton(props)) {
-        return;
-      }
-      if (noteData && creatingNoteRef.current) {
-        onNoteCreate([noteData]);
-        onNoteMenuOpen(noteData.id, creatingNoteRef.current, true);
-        // Hide creating note tool here as settings noteData to null
-        // was causing performance issues in FireFox
-        creatingNoteRef.current.visible(false);
-      }
+    function up(event: MapDragEvent) {
+      if (!leftMouseButton(event) || !draft.current) return;
+      const item = draft.current;
+      const node = stage.current?.findOne(`#${item.id}`);
+      act([{ type: "add", item }]);
+      if (node) onEdit(item.id, node);
+      draft.current = null;
+      setPreview(null);
     }
-
-    interactionEmitter?.on("dragStart", handleBrushDown);
-    interactionEmitter?.on("drag", handleBrushMove);
-    interactionEmitter?.on("dragEnd", handleBrushUp);
-
+    emitter?.on("dragStart", down);
+    emitter?.on("drag", move);
+    emitter?.on("dragEnd", up);
     return () => {
-      interactionEmitter?.off("dragStart", handleBrushDown);
-      interactionEmitter?.off("drag", handleBrushMove);
-      interactionEmitter?.off("dragEnd", handleBrushUp);
+      emitter?.off("dragStart", down);
+      emitter?.off("drag", move);
+      emitter?.off("dragEnd", up);
     };
-  });
-
+  }, [active, readOnly, scene, person.id, stage, snap, emitter, act, onEdit]);
   return (
-    <Group ref={creatingNoteRef}>
-      {noteData && <BlankNote note={noteData} />}
-    </Group>
+    <World>{preview && <SceneText item={preview} listening={false} />}</World>
   );
 }
-
 export default NoteTool;
