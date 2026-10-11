@@ -64,7 +64,6 @@ test("notes and text edits reach everyone and survive a restart", async () => {
             text: "The tower is empty",
             position: { x: -300, y: 450 },
             square: false,
-            layer: "text",
           },
         },
       ],
@@ -79,7 +78,6 @@ test("notes and text edits reach everyone and survive a restart", async () => {
       text: "The tower is empty",
       position: { x: -300, y: 450 },
       square: false,
-      layer: "text",
     });
     await server.restart();
     expect(

@@ -25,6 +25,7 @@ export const defaultRoomSwitches: RoomSwitches = {
   notes: true,
   fog: false,
   uploads: false,
+  ownerOnly: false,
 };
 
 /** Trusted players bypass switches, but retain the GM-only boundaries above. */

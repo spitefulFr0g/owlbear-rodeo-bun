@@ -552,7 +552,7 @@ export default class GameServer {
           }
 
           if (!isSafeUpdate(update) || (socket.data.role !== "gm" && !allowsLegacyMapStateUpdateV1(update, this.playerRole(socket, gameId) === "trusted"
-            ? { tokens: true, drawing: true, notes: true, fog: true, uploads: true }
+            ? { tokens: true, drawing: true, notes: true, fog: true, uploads: true, ownerOnly: false }
             : this.gameRepo.games[gameId].switches))) {
             socket.emit("map_state", this.gameRepo.getState(gameId, "mapState"));
             return;

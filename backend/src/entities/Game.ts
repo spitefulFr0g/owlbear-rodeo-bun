@@ -13,7 +13,7 @@ export default class Game {
   name = "";
   session = false;
   cancelSessionCountdown?: () => void;
-  switches: RoomSwitches = { tokens: true, drawing: true, notes: true, fog: false, uploads: false };
+  switches: RoomSwitches = { tokens: true, drawing: true, notes: true, fog: false, uploads: false, ownerOnly: false };
   trustedPlayerIds = new Set<string>();
   gmAccountId: string | null = null;
   hasPassword = false;
