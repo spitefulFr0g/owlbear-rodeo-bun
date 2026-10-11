@@ -1,7 +1,6 @@
 import { Person, RoomRules, Item, Change, statusRingsKey } from "./types";
 
-/** Item permissions; shape validation is separate. Locks and visibility
- * are extended by their respective permission rows. */
+/** Item permissions; shape validation and visibility are separate. */
 export function mayChange(
   person: Person,
   rules: RoomRules,
@@ -12,6 +11,7 @@ export function mayChange(
   if (person.role === "gm") return true;
   const target = change.type === "add" ? change.item : item;
   if (!target || target.layer === "map") return false;
+  if (change.type !== "add" && target.locked) return false;
   if (change.type === "add") {
     if (target.locked || target.hidden) return false;
   } else if (change.type === "update") {

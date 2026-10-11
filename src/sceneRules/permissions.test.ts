@@ -112,3 +112,33 @@ test("Owner Only limits token edits to their owner, leaves adds allowed and exem
     }
   }
 });
+
+test("locked items refuse every player change and allow the GM", () => {
+  for (const example of examples) {
+    for (const layer of ["character", "drawing", "note", "fog"] as const) {
+      for (const owner of ["player", "other", "gm"]) {
+        const item = { ...example, layer, owner, locked: true };
+        const changes: Change[] = [
+          { type: "update", id: item.id, fields: {} },
+          { type: "update", id: item.id, fields: { position: { x: 1, y: 2 } } },
+          { type: "update", id: item.id, fields: { locked: false } },
+          { type: "update", id: item.id, fields: { owner: "player" } },
+          { type: "delete", id: item.id },
+        ];
+        for (const role of ["gm", "trusted", "player", "display"] as const) {
+          for (const change of changes) expect(mayChange({ role, id: "player" }, rules, item, change)).toBe(role === "gm");
+        }
+      }
+    }
+  }
+});
+
+test("only the GM can lock, unlock or assign an unlocked item's owner", () => {
+  for (const role of ["gm", "trusted", "player"] as const) {
+    for (const fields of [{ locked: true }, { locked: false }, { owner: "other" }]) {
+      expect(mayChange({ role, id: "player" }, rules, base, {
+        type: "update", id: base.id, fields: { position: { x: 1, y: 2 }, ...fields },
+      })).toBe(role === "gm");
+    }
+  }
+});
