@@ -30,3 +30,17 @@ test("placing fog after a cut covers that area again", () => {
   const replacement = fogItem(rectangle("replacement", 100, 100), "gm", false, false);
   expect(coveredFog([cover, cut, replacement])[0].data.holes).toEqual([]);
 });
+
+
+test("circular fog covers its transformed area and can cut a hole", () => {
+  const base = fogItem(rectangle("circle", 0, 400), "gm", false, false);
+  const circle = { ...base, kind: "shape" as const,
+    geometry: { type: "circle" as const, radius: 50 },
+    position: { x: 200, y: 200 }, scale: { x: 2, y: 1 }, rotation: 90 };
+  const points = fogShape(circle).data.points;
+  expect(points[0].x).toBeCloseTo(200);
+  expect(points[0].y).toBeCloseTo(300);
+  expect(coveredFog([circle])).toHaveLength(1);
+  const cover = fogItem(rectangle("cover", 0, 400), "gm", false, false);
+  expect(coveredFog([cover, { ...circle, cut: true }])[0].data.holes).toHaveLength(1);
+});

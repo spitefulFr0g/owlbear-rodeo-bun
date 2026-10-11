@@ -36,6 +36,12 @@ export function fogShape(item: FogItem): Fog {
   const geometry = item.kind === "shape" ? item.geometry : null;
   const points = item.kind === "curve" ? item.points : geometry?.type === "rectangle"
     ? [{ x: 0, y: 0 }, { x: geometry.width, y: 0 }, { x: geometry.width, y: geometry.height }, { x: 0, y: geometry.height }]
+    : geometry?.type === "circle"
+      // Polygon clipping approximates the circle before applying its world transform.
+      ? Array.from({ length: 128 }, (_, index) => {
+          const angle = index * Math.PI * 2 / 128;
+          return { x: Math.cos(angle) * geometry.radius, y: Math.sin(angle) * geometry.radius };
+        })
     : geometry?.type === "polygon" || geometry?.type === "triangle" ? geometry.points : [];
   return { id: item.id, type: "fog", color: item.cut ? "red" : item.color as Fog["color"], strokeWidth: 0.5, visible: !item.hidden,
     data: { points: world(points), holes: geometry?.type === "polygon" ? geometry.holes.map(world) : [] } };
