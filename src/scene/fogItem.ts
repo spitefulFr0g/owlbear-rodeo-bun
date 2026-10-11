@@ -2,7 +2,7 @@ import polygonClipping from "polygon-clipping";
 import shortid from "shortid";
 import { CurveItem, Scene, ShapeItem, Vector2 } from "../sceneRules";
 import { Fog } from "../types/Fog";
-import { fogToGeometry } from "../helpers/actions";
+import { fogToGeometry } from "../helpers/fogGeometry";
 import { mergeFogShapes } from "../helpers/drawing";
 
 export type FogItem = ShapeItem | CurveItem;

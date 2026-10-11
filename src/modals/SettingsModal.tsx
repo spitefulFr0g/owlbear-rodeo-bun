@@ -22,7 +22,6 @@ import useSetting from "../hooks/useSetting";
 import ConfirmModal from "./ConfirmModal";
 import ImportExportModal from "./ImportExportModal";
 
-import { MapState } from "../types/MapState";
 import { RequestCloseEventHandler } from "../types/Events";
 
 type SettingsModalProps = {
@@ -87,38 +86,7 @@ function SettingsModal({ isOpen, onRequestClose }: SettingsModalProps) {
         .where("owner")
         .notEqual(userId)
         .toArray();
-      const states: MapState[] = await database.table("states").toArray();
-      for (let asset of assets) {
-        let inUse = false;
-        for (let state of states) {
-          for (let tokenState of Object.values(state.tokens)) {
-            if (tokenState.type === "file" && asset.id === tokenState.file) {
-              inUse = true;
-            }
-          }
-        }
-        if (!inUse) {
-          await database.table("assets").delete(asset.id);
-        }
-      }
-
-      // TODO: Remove this when 1.11 comes out
-      // Hack to fix broken database upgrade
-      for (let state of states) {
-        if ((state as any).drawShapes) {
-          await database.table("states").update(state.mapId, {
-            drawShapes: undefined,
-            drawings: (state as any).drawShapes,
-          });
-        }
-
-        if ((state as any).fogShapes) {
-          await database.table("states").update(state.mapId, {
-            fogShapes: undefined,
-            fogs: (state as any).fogShapes,
-          });
-        }
-      }
+      await database.table("assets").bulkDelete(assets.map((asset) => asset.id));
     }
 
     window.location.reload();

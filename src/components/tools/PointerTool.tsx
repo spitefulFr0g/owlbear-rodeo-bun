@@ -1,18 +1,16 @@
 import { useEffect, useRef } from "react";
-import { Group } from "react-konva";
+import World from "../scene/World";
+import { worldNodeId } from "../../scene/worldPosition";
 
 import {
-  useMapWidth,
-  useMapHeight,
   useInteractionEmitter,
   MapDragEvent,
   leftMouseButton,
   rightMouseButton,
 } from "../../contexts/MapInteractionContext";
 import { useMapStage } from "../../contexts/MapStageContext";
-import { useGridStrokeWidth } from "../../contexts/GridContext";
 
-import { getRelativePointerPositionNormalized } from "../../helpers/konva";
+import { getRelativePointerPosition } from "../../helpers/konva";
 import Vector2 from "../../helpers/Vector2";
 
 import Pointer from "../konva/Pointer";
@@ -38,10 +36,7 @@ function PointerTool({
   visible,
   color,
 }: MapPointerProps) {
-  const mapWidth = useMapWidth();
-  const mapHeight = useMapHeight();
   const interactionEmitter = useInteractionEmitter();
-  const gridStrokeWidth = useGridStrokeWidth();
   const mapStageRef = useMapStage();
 
   const brushDownRef = useRef(false);
@@ -53,8 +48,8 @@ function PointerTool({
       if (!mapStage) {
         return;
       }
-      const mapImage = mapStage.findOne("#mapImage");
-      return getRelativePointerPositionNormalized(mapImage);
+      const world = mapStage.findOne(`#${worldNodeId}`);
+      return world && getRelativePointerPosition(world);
     }
 
     function handleBrushDown(props: MapDragEvent) {
@@ -91,19 +86,19 @@ function PointerTool({
     };
   });
 
-  const size = 2 * gridStrokeWidth;
+  const size = 30;
 
   return (
-    <Group>
+    <World listening={false}>
       {visible && (
         <Pointer
-          position={Vector2.multiply(position, { x: mapWidth, y: mapHeight })}
+          position={position}
           color={colors[color]}
           size={size}
           duration={200}
         />
       )}
-    </Group>
+    </World>
   );
 }
 

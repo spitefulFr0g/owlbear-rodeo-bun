@@ -5,6 +5,7 @@ import useSceneGrid from "../../hooks/useSceneGrid";
 
 import DrawingTool from "../tools/DrawingTool";
 import FogTool from "../tools/FogTool";
+import useMapNotes from "../../hooks/useMapNotes";
 import SceneImages from "../scene/SceneImages";
 import NetworkedMapPointer from "../../network/NetworkedMapPointer";
 
@@ -14,15 +15,7 @@ import Session from "../../network/Session";
 
 import { MapRect } from "../../helpers/displayView";
 
-import { Map as MapType } from "../../types/Map";
-import { MapState } from "../../types/MapState";
-
-import useMapTokens from "../../hooks/useMapTokens";
-import useMapNotes from "../../hooks/useMapNotes";
-
 type DisplayMapProps = {
-  map: MapType | null;
-  mapState: MapState | null;
   // The part of the map to show
   view: MapRect;
   session: Session;
@@ -31,30 +24,17 @@ type DisplayMapProps = {
 function ignore() {}
 
 /** The map as a player sees it with nothing to press, for a cast display */
-function DisplayMap({ map, mapState, view, session }: DisplayMapProps) {
+function DisplayMap({ view, session }: DisplayMapProps) {
   const { settings } = useSettings();
 
 
-
-  // The pointer tool leaves tokens and notes with nothing to drag or select
-  const { tokens, propTokens } = useMapTokens(
-    map,
-    mapState,
-    ignore,
-    ignore,
-    ignore,
-    "pointer"
-  );
-
   const { notes } = useMapNotes("pointer");
 
-  const sceneGrid = useSceneGrid(map);
+  const sceneGrid = useSceneGrid();
 
   return (
     <Box sx={{ flexGrow: 1, height: "100%" }}>
       <MapInteraction
-        map={map}
-        mapState={mapState}
         controls={null}
         selectedToolId="pointer"
         onSelectedToolChange={ignore}
@@ -62,12 +42,10 @@ function DisplayMap({ map, mapState, view, session }: DisplayMapProps) {
       >
         <SceneImages placement="belowGrid" />
         {sceneGrid}
-        {propTokens}
         <DrawingTool
           active={false}
           toolSettings={settings.drawing}
         />
-        {tokens}
         <SceneImages />
         {notes}
         <SceneImages placement="aboveRuler" />

@@ -109,9 +109,6 @@ let service = {
       if (table === "maps") {
         return mapIds.includes(value.id);
       }
-      if (table === "states") {
-        return mapIds.includes(value.mapId);
-      }
       if (table === "tokens") {
         return tokenIds.includes(value.id);
       }
@@ -187,7 +184,7 @@ let service = {
           return "id" in value && "owner" in value;
         }
         if (table === "states") {
-          return "mapId" in value;
+          return false;
         }
         return true;
       },
