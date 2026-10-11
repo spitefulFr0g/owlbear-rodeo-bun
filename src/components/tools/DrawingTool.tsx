@@ -20,11 +20,14 @@ import { getRelativePointerPosition } from "../../helpers/konva";
 import useSceneSnapping from "../../hooks/useSceneSnapping";
 import useWorldPlacement from "../../hooks/useWorldPlacement";
 import { useScene } from "../../scene/SceneContext";
-import { drawingItem, drawingsInOrder, deleteDrawings } from "../../scene/drawingItem";
+import {
+  drawingItem,
+  drawingsInOrder,
+  deleteDrawings,
+} from "../../scene/drawingItem";
 import SceneDrawing from "../scene/SceneDrawing";
 import World from "../scene/World";
 import { worldNodeId } from "../../scene/worldPosition";
-
 
 import {
   Drawing,
@@ -35,11 +38,17 @@ import {
 
 type DrawingToolProps = {
   visible?: boolean;
+  renderItems?: boolean;
   active: boolean;
   toolSettings: DrawingToolSettings;
 };
 
-function DrawingTool({ active, toolSettings, visible }: DrawingToolProps) {
+function DrawingTool({
+  active,
+  toolSettings,
+  visible,
+  renderItems = true,
+}: DrawingToolProps) {
   const { scene, person, readOnly, act } = useScene();
   const drawings = scene ? drawingsInOrder(scene) : [];
   const placement = useWorldPlacement();
@@ -70,7 +79,6 @@ function DrawingTool({ active, toolSettings, visible }: DrawingToolProps) {
       setErasingDrawings([]);
     }
   }, [active, readOnly]);
-
 
   useEffect(() => {
     if (!active || readOnly) {
@@ -189,10 +197,20 @@ function DrawingTool({ active, toolSettings, visible }: DrawingToolProps) {
       }
       if (isBrush && drawing && drawing.type === "path") {
         if (drawing.data.points.length > 1) {
-          act([{ type: "add", item: drawingItem(drawing, person.id, gridStrokeWidth) }]);
+          act([
+            {
+              type: "add",
+              item: drawingItem(drawing, person.id, gridStrokeWidth),
+            },
+          ]);
         }
       } else if (isShape && drawing) {
-        act([{ type: "add", item: drawingItem(drawing, person.id, gridStrokeWidth) }]);
+        act([
+          {
+            type: "add",
+            item: drawingItem(drawing, person.id, gridStrokeWidth),
+          },
+        ]);
       }
 
       eraseHoveredShapes();
@@ -214,7 +232,7 @@ function DrawingTool({ active, toolSettings, visible }: DrawingToolProps) {
 
   function handleShapeOver(id: string, isDown: boolean) {
     if (shouldHover && isDown && !readOnly) {
-      setErasingDrawings((ids) => ids.includes(id) ? ids : [...ids, id]);
+      setErasingDrawings((ids) => (ids.includes(id) ? ids : [...ids, id]));
     }
   }
 
@@ -225,19 +243,29 @@ function DrawingTool({ active, toolSettings, visible }: DrawingToolProps) {
 
   return (
     <World visible={visible} listening={shouldHover && !readOnly}>
-      {drawings.map((item) => (
+      {renderItems &&
+        drawings.map((item) => (
+          <SceneDrawing
+            item={
+              erasingDrawings.includes(item.id)
+                ? { ...item, color: "primary" }
+                : item
+            }
+            key={item.id}
+            onMouseMove={() => handleShapeOver(item.id, isBrushDown)}
+            onTouchMove={() => handleShapeOver(item.id, isBrushDown)}
+            onMouseDown={() => handleShapeOver(item.id, true)}
+            onTouchStart={() => handleShapeOver(item.id, true)}
+            onMouseUp={eraseHoveredShapes}
+            onTouchEnd={eraseHoveredShapes}
+          />
+        ))}
+      {drawing && (
         <SceneDrawing
-          item={erasingDrawings.includes(item.id) ? { ...item, color: "primary" } : item}
-          key={item.id}
-          onMouseMove={() => handleShapeOver(item.id, isBrushDown)}
-          onTouchMove={() => handleShapeOver(item.id, isBrushDown)}
-          onMouseDown={() => handleShapeOver(item.id, true)}
-          onTouchStart={() => handleShapeOver(item.id, true)}
-          onMouseUp={eraseHoveredShapes}
-          onTouchEnd={eraseHoveredShapes}
+          item={drawingItem(drawing, person.id, gridStrokeWidth)}
+          listening={false}
         />
-      ))}
-      {drawing && <SceneDrawing item={drawingItem(drawing, person.id, gridStrokeWidth)} listening={false} />}
+      )}
     </World>
   );
 }

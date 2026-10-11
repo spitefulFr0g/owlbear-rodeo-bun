@@ -17,6 +17,7 @@ import BrushCircleIcon from "../../icons/BrushCircleIcon";
 import BrushTriangleIcon from "../../icons/BrushTriangleIcon";
 import EraseIcon from "../../icons/EraseToolIcon";
 
+import MoveIcon from "../../icons/MoveToolIcon";
 import Divider from "../Divider";
 
 import { useKeyboard } from "../../contexts/KeyboardContext";
@@ -116,6 +117,13 @@ function DrawingToolSettings({
 
   return (
     <Flex sx={{ alignItems: "center" }}>
+      <RadioIconButton
+        title="Grab"
+        onClick={() => onSettingChange({ type: "grab" })}
+        isSelected={settings.type === "grab"}
+      >
+        <MoveIcon />
+      </RadioIconButton>
       <ColorControl
         color={settings.color}
         onColorChange={(color) => onSettingChange({ color })}

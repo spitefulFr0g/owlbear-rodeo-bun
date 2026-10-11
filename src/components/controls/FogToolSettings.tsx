@@ -15,6 +15,7 @@ import FogRectangleIcon from "../../icons/FogRectangleIcon";
 
 import ToolSection from "./shared/ToolSection";
 
+import MoveIcon from "../../icons/MoveToolIcon";
 import Divider from "../Divider";
 
 import { useKeyboard } from "../../contexts/KeyboardContext";
@@ -82,6 +83,13 @@ function FogToolSettings({ settings, onSettingChange }: FogToolSettingsProps) {
 
   return (
     <Flex sx={{ alignItems: "center" }}>
+      <RadioIconButton
+        title="Grab"
+        onClick={() => onSettingChange({ type: "grab" })}
+        isSelected={settings.type === "grab"}
+      >
+        <MoveIcon />
+      </RadioIconButton>
       <ToolSection
         tools={drawTools}
         onToolClick={(tool) =>

@@ -2,6 +2,7 @@ import Vector2 from "../helpers/Vector2";
 import { Color } from "../helpers/colors";
 
 export type FogToolType =
+  | "grab"
   | "polygon"
   | "rectangle"
   | "brush"
