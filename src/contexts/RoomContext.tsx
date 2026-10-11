@@ -1,6 +1,5 @@
 import React, { useContext, useEffect, useState } from "react";
 
-import { getToolPermissions } from "../helpers/roomControls";
 
 import Session from "../network/Session";
 
@@ -64,7 +63,3 @@ export function useRole() {
 }
 
 export default RoomContext;
-
-export function useToolPermissions() {
-  return getToolPermissions(useRole(), useRoom().switches);
-}

@@ -10,7 +10,7 @@ import { createMapFromFile } from "../../helpers/map";
 import { createTokenFromFile } from "../../helpers/token";
 import Vector2 from "../../helpers/Vector2";
 
-import { useToolPermissions, useRole } from "../../contexts/RoomContext";
+import { useRole } from "../../contexts/RoomContext";
 import { getRoleControls } from "../../helpers/roomControls";
 
 import { useUserId } from "../../contexts/UserIdContext";
@@ -21,7 +21,7 @@ import { useAssets } from "../../contexts/AssetsContext";
 import useImageDrop, { ImageDropEvent } from "../../hooks/useImageDrop";
 
 import { Map } from "../../types/Map";
-import { useAddTokens } from "../../scene/SceneContext";
+import { useAddTokens, useToolPermissions } from "../../scene/SceneContext";
 
 type GlobalImageDropProps = {
   children?: React.ReactNode;

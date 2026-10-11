@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef } from "react";
 import Konva from "konva";
 import { Group } from "react-konva";
 import { v4 as uuid } from "uuid";
-import { useScene } from "../../scene/SceneContext";
+import { useScene, useToolPermissions } from "../../scene/SceneContext";
 import { worldNodeId } from "../../scene/worldPosition";
 import {
   attachesTo,
@@ -15,7 +15,6 @@ import { useSetPreventMapInteraction } from "../../contexts/MapInteractionContex
 import { useKeyboard } from "../../contexts/KeyboardContext";
 import { useGridSnappingSensitivity } from "../../contexts/GridContext";
 import useSetting from "../../hooks/useSetting";
-import { useToolPermissions } from "../../contexts/RoomContext";
 import useSceneSnapping from "../../hooks/useSceneSnapping";
 import shortcuts from "../../shortcuts";
 import World from "./World";

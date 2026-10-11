@@ -52,7 +52,7 @@ export function sortScenes(scenes: ListedScene[]): ListedScene[] {
 }
 
 /** What the list says a scene is, beside its name */
-export type SceneMark = "open" | "viewed";
+export type SceneMark = "open" | "viewed" | "viewOnly";
 
 /** The marks of one scene of the list, in the order shown */
 export function sceneMarks(
@@ -63,5 +63,8 @@ export function sceneMarks(
   const marks: SceneMark[] = [];
   if (sceneId === list.openSceneId) marks.push("open");
   if (sceneId === viewedSceneId) marks.push("viewed");
+  if (list.scenes.some((scene) => scene.id === sceneId && scene.viewOnly)) {
+    marks.push("viewOnly");
+  }
   return marks;
 }
