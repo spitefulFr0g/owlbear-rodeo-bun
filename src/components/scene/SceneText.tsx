@@ -33,7 +33,7 @@ function SceneText({ item, ...props }: { item: TextItem } & Konva.NodeConfig) {
     <Group
       {...props}
       id={item.id}
-      name="scene-text"
+      name={props.name || "scene-text"}
       x={item.position.x}
       y={item.position.y}
       rotation={item.rotation}

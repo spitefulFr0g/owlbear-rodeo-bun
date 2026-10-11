@@ -44,13 +44,14 @@ import { Fog, FogToolSettings } from "../../types/Fog";
 import Tick from "../konva/Tick";
 
 type MapFogProps = {
+  visible?: boolean;
   onShapeError: (message: string) => void;
   active: boolean;
   toolSettings: FogToolSettings;
   editable: boolean;
 };
 
-function FogTool({ onShapeError, active, toolSettings, editable: permitted }: MapFogProps) {
+function FogTool({ onShapeError, active, toolSettings, editable: permitted, visible }: MapFogProps) {
   const { scene, person, readOnly, act } = useScene();
   const editable = permitted && !readOnly;
   const items = useMemo(() => scene ? fogItems(scene) : [], [scene]);
@@ -602,7 +603,7 @@ function FogTool({ onShapeError, active, toolSettings, editable: permitted }: Ma
   }, [shapes, items, editable, active, toolSettings, shouldRenderGuides]);
 
   return (
-    <World>
+    <World visible={visible}>
       <Group>{fogShapes.map(renderShape)}</Group>
       {shouldRenderGuides && renderGuides()}
       {drawingShape && renderDrawingShape(drawingShape)}
