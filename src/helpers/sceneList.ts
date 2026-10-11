@@ -37,6 +37,18 @@ export function awayFromOpenScene(
 }
 
 /**
+ * Whether Bring players here is offered: to a GM, who alone has a scene list,
+ * viewing the open scene during a session.
+ */
+export function mayBringPlayers(
+  list: SceneList | null,
+  viewedSceneId: string | undefined,
+  session: boolean | undefined
+): boolean {
+  return !!list && !!session && viewedSceneId === list.openSceneId;
+}
+
+/**
  * The scenes in the order the list shows them: by name, ignoring capitals and
  * comparing numbers as numbers. Scenes sharing a name keep one order between
  * lists, by id.

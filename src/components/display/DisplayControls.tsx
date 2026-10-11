@@ -4,6 +4,7 @@ import { useParams } from "react-router-dom";
 import { useToasts } from "react-toast-notifications";
 
 import RadioIconButton from "../RadioIconButton";
+import BringPlayersButton from "../scene/BringPlayersButton";
 
 import DisplayPopoutIcon from "../../icons/DisplayPopoutIcon";
 import DisplayLinkIcon from "../../icons/DisplayLinkIcon";
@@ -20,7 +21,10 @@ type DisplayControlsProps = {
   session: Session;
 };
 
-/** The cast display controls, available on every GM device */
+/**
+ * The GM's view controls, available on every GM device: Bring players here
+ * and the cast display controls
+ */
 function DisplayControls({ session }: DisplayControlsProps) {
   const { id: gameId }: { id: string } = useParams();
   const isGM = getRoleControls(useRole()).room;
@@ -169,6 +173,7 @@ function DisplayControls({ session }: DisplayControlsProps) {
           Display frozen
         </Text>
       )}
+      <BringPlayersButton />
       <RadioIconButton
         title={frozen ? "Unfreeze Display" : "Freeze Display"}
         onClick={handleFreeze}

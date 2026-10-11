@@ -124,6 +124,13 @@ type SceneStore = {
    * to start at. Not in the undo history.
    */
   showScene: (sceneId: string, view: MapRect) => Promise<SceneAnswer>;
+  /**
+   * Bring players here: moves every player and trusted player on the open
+   * scene to a view of it in world units, once. The server refuses it outside
+   * a session and from a GM connection viewing another scene. Nothing is
+   * saved, and it is not in the undo history.
+   */
+  bringPlayers: (view: MapRect) => Promise<SceneAnswer>;
   /** Puts stored files this browser holds on the server, for an item to name */
   share: (files: string[]) => Promise<void>;
 };
@@ -414,10 +421,10 @@ export function SceneProvider({
     [askForScene]
   );
 
-  // Changes to the scene list, which move this connection nowhere by asking
+  // Scene actions that move this connection nowhere by asking
   const askForList = useCallback(
     (
-      event: "scene_rename" | "scene_delete" | "scene_show",
+      event: "scene_rename" | "scene_delete" | "scene_show" | "scene_bring",
       payload: Record<string, unknown>
     ) =>
       new Promise<SceneAnswer>((resolve) => {
@@ -442,6 +449,12 @@ export function SceneProvider({
   const showScene = useCallback(
     (sceneId: string, { x, y, width, height }: MapRect) =>
       askForList("scene_show", { sceneId, view: { x, y, width, height } }),
+    [askForList]
+  );
+
+  const bringPlayers = useCallback(
+    ({ x, y, width, height }: MapRect) =>
+      askForList("scene_bring", { view: { x, y, width, height } }),
     [askForList]
   );
 
@@ -488,9 +501,10 @@ export function SceneProvider({
       renameScene,
       deleteScene,
       showScene,
+      bringPlayers,
       share,
     }),
-    [scene, selection, person, switches, role, sceneList, playerView, readOnly, act, undo, redo, canUndo, canRedo, canChange, canSelect, setSettings, viewScene, createScene, renameScene, deleteScene, showScene, share]
+    [scene, selection, person, switches, role, sceneList, playerView, readOnly, act, undo, redo, canUndo, canRedo, canChange, canSelect, setSettings, viewScene, createScene, renameScene, deleteScene, showScene, bringPlayers, share]
   );
 
   return (
@@ -534,6 +548,18 @@ export function useShowToPlayers() {
     const view = mapStageRef.current && visibleWorldRect(mapStageRef.current);
     if (!view) return { ok: false, error: "no_view" };
     return showScene(sceneId, view);
+  };
+}
+
+/** Bring players here, with this window's view of the open scene as the view carried */
+export function useBringPlayers() {
+  const { bringPlayers } = useScene();
+  const mapStageRef = useMapStage();
+
+  return async function bringPlayersHere(): Promise<SceneAnswer> {
+    const view = mapStageRef.current && visibleWorldRect(mapStageRef.current);
+    if (!view) return { ok: false, error: "no_view" };
+    return bringPlayers(view);
   };
 }
 
