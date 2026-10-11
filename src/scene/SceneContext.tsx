@@ -48,6 +48,7 @@ import {
   RelayedChanges,
   shownScene,
 } from "./shown";
+import { emptyHistory, History, remember, historyChanges, dropStep } from "./history";
 import { tokenItem } from "./tokenItem";
 import { clientPositionToWorld } from "./worldPosition";
 
@@ -69,9 +70,14 @@ type SceneStore = {
   readOnly: boolean;
   /**
    * One action: every change in it shows at once and goes to the server as
-   * one batch. False when nothing was sent, as the canvas is read-only.
+   * one batch. Map picking passes false to keep it out of history.
+   * False when nothing was sent, as the canvas is read-only.
    */
-  act: (changes: Change[]) => boolean;
+  act: (changes: Change[], recordHistory?: boolean) => boolean;
+  undo: () => void;
+  redo: () => void;
+  canUndo: boolean;
+  canRedo: boolean;
   canChange: (change: Change) => boolean;
   canSelect: (item: Item) => boolean;
   /**
@@ -113,14 +119,25 @@ export function SceneProvider({
 
   const [selection, setSelection] = useState<string[]>([]);
   const [held, setHeld] = useState(nothingHeld);
-  const sceneRef = useRef(held.server);
-  useEffect(() => {
-    sceneRef.current = held.server;
-  });
+  const heldRef = useRef(held);
+  const [history, setHistory] = useState<History>(emptyHistory);
+  const historyRef = useRef(history);
+  const pendingHistory = useRef<Record<string, string>>({});
+  function changeHistory(next: History) {
+    historyRef.current = next;
+    setHistory(next);
+  }
+  function changeHeld(update: (held: Held) => Held) {
+    heldRef.current = update(heldRef.current);
+    setHeld(heldRef.current);
+  }
+  const sceneRef = useRef<Scene | null>(held.server);
   const scene = useMemo(
     () => shownScene(held.server, held.unconfirmed),
     [held]
   );
+
+  sceneRef.current = scene;
 
   const [connected, setConnected] = useState(!!session.joinToken);
   useEffect(() => {
@@ -136,16 +153,22 @@ export function SceneProvider({
   useEffect(() => {
     function handleSnapshot({ scene }: { scene: Scene }) {
       setSelection([]);
-      setHeld({ server: scene, unconfirmed: [] });
+      changeHeld(() => ({ server: scene, unconfirmed: [] }));
+      changeHistory(emptyHistory);
+      pendingHistory.current = {};
     }
     function handleChanges(relayed: RelayedChanges) {
-      setHeld((held) => ({
+      changeHeld((held) => ({
         ...held,
         server: afterChanges(held.server, relayed),
       }));
     }
     function handleAnswer(answer: BatchAnswer) {
-      setHeld((held) => ({
+      if (heldRef.current.server?.id !== answer.sceneId) return;
+      const stepId = pendingHistory.current[answer.batchId];
+      if (stepId && answer.refused.length) changeHistory(dropStep(historyRef.current, stepId));
+      delete pendingHistory.current[answer.batchId];
+      changeHeld((held) => ({
         server: afterAnswer(held.server, answer),
         unconfirmed: held.unconfirmed.filter(
           (batch) => batch.id !== answer.batchId
@@ -153,7 +176,7 @@ export function SceneProvider({
       }));
     }
     function handleGrid(change: GridChange) {
-      setHeld((held) => ({ ...held, server: afterGrid(held.server, change) }));
+      changeHeld((held) => ({ ...held, server: afterGrid(held.server, change) }));
     }
     session.socket?.on("scene_snapshot", handleSnapshot);
     session.socket?.on("scene_changes", handleChanges);
@@ -171,7 +194,8 @@ export function SceneProvider({
   const waiting = role !== "gm" && room.session === false;
   useEffect(() => {
     if (waiting) {
-      setHeld(nothingHeld);
+      changeHeld(() => nothingHeld);
+      changeHistory(emptyHistory);
     }
   }, [waiting]);
 
@@ -229,26 +253,55 @@ export function SceneProvider({
   }, [scene, canSelect]);
 
   const act = useCallback(
-    (changes: Change[]) => {
-      const scene = sceneRef.current;
+    (changes: Change[], recordHistory = true) => {
+      const scene = shownScene(heldRef.current.server, heldRef.current.unconfirmed);
       // Nothing is queued while the connection is being restored
       if (!scene || !session.socket?.connected || !session.joinToken) {
         return false;
       }
-      changes = changes.filter(canChange);
+      changes = changes.filter(change => mayChange(person, { switches, knownImage: () => true },
+        change.type === "add" ? undefined : scene.items[change.id], change));
       if (changes.length === 0) {
         return false;
       }
       const batch: Batch = { id: uuid(), sceneId: scene.id, changes };
-      setHeld((held) => ({
+      changeHeld((held) => ({
         ...held,
         unconfirmed: [...held.unconfirmed, batch],
       }));
+      if (recordHistory) {
+        changeHistory(remember(historyRef.current, scene, changes, batch.id));
+        pendingHistory.current[batch.id] = batch.id;
+      }
       session.socket.emit("scene_changes", batch);
       return true;
     },
-    [session, canChange]
+    [session, person, switches]
   );
+
+  const replay = useCallback((direction: "undo" | "redo") => {
+    const scene = shownScene(heldRef.current.server, heldRef.current.unconfirmed);
+    if (!scene || !session.socket?.connected || !session.joinToken) return;
+    const opposite = direction === "undo" ? "redo" : "undo";
+    let next = historyRef.current;
+    while (next[direction].length) {
+      const step = next[direction][next[direction].length - 1];
+      next = { ...next, [direction]: next[direction].slice(0, -1) };
+      const changes = historyChanges(scene, step[direction]);
+      if (!changes.length) continue;
+      const batch: Batch = { id: uuid(), sceneId: scene.id, changes };
+      changeHistory({ ...next, [opposite]: [...next[opposite], step].slice(-50) });
+      pendingHistory.current[batch.id] = step.id;
+      changeHeld(held => ({ ...held, unconfirmed: [...held.unconfirmed, batch] }));
+      session.socket.emit("scene_changes", batch);
+      return;
+    }
+    changeHistory(next);
+  }, [session]);
+  const undo = useCallback(() => replay("undo"), [replay]);
+  const redo = useCallback(() => replay("redo"), [replay]);
+  const canUndo = !readOnly && history.undo.length > 0;
+  const canRedo = !readOnly && history.redo.length > 0;
 
   const setGrid = useCallback(
     (grid: SceneGrid) => {
@@ -301,12 +354,13 @@ export function SceneProvider({
       switches,
       readOnly,
       act,
+      undo, redo, canUndo, canRedo,
       canChange,
       canSelect,
       setGrid,
       share,
     }),
-    [scene, selection, person, switches, readOnly, act, canChange, canSelect, setGrid, share]
+    [scene, selection, person, switches, readOnly, act, undo, redo, canUndo, canRedo, canChange, canSelect, setGrid, share]
   );
 
   return (

@@ -39,9 +39,9 @@ export default function useSceneMap() {
           type: "add",
           item: mapItem(map, grid, uuid(), previous && mapTopLeft(previous)),
         });
-        if (act(changes)) setGrid(grid);
+        if (act(changes, false)) setGrid(grid);
       } else {
-        act(changes);
+        act(changes, false);
       }
     },
     edit(map: Map) {

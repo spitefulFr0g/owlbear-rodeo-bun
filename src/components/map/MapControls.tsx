@@ -42,22 +42,18 @@ import { getRoleControls } from "../../helpers/roomControls";
 import { useScene } from "../../scene/SceneContext";
 import { fogItems } from "../../scene/fogItem";
 import { drawingsInOrder } from "../../scene/drawingItem";
-import { MapActions } from "../../hooks/useMapActions";
 
 type MapControlsProps = {
   onMapChange: MapChangeEventHandler;
   onMapReset: MapResetEventHandler;
   map: Map | null;
   mapState: MapState | null;
-  mapActions: MapActions;
   allowMapChange: boolean;
   selectedToolId: MapToolId;
   onSelectedToolChange: (toolId: MapToolId) => void;
   toolSettings: Settings;
   onToolSettingChange: (change: Partial<Settings>) => void;
   onToolAction: (actionId: string) => void;
-  onUndo: () => void;
-  onRedo: () => void;
 };
 
 function MapContols({
@@ -65,21 +61,18 @@ function MapContols({
   onMapReset,
   map,
   mapState,
-  mapActions,
   allowMapChange,
   selectedToolId,
   onSelectedToolChange,
   toolSettings,
   onToolSettingChange,
   onToolAction,
-  onUndo,
-  onRedo,
 }: MapControlsProps) {
   const [isExpanded, setIsExpanded] = useState(true);
   const [fullScreen, setFullScreen] = useSetting("map.fullScreen");
 
   const permissions = useToolPermissions();
-  const { scene, readOnly, canChange } = useScene();
+  const { scene, readOnly, canChange, undo: onUndo, redo: onRedo, canUndo, canRedo } = useScene();
   const isGM = getRoleControls(useRole()).hidden;
 
   const disabledControls = useMemo(() => {
@@ -101,30 +94,10 @@ function MapContols({
     if (readOnly || !allowNoteEditing) {
       disabled.push("note");
     }
-    const allowed = (index: number) =>
-      (mapActions.actions[index] || []).every((action) =>
-        action.type === "drawings"
-          ? permissions.drawing
-          : action.type === "fogs"
-          ? permissions.fog
-          : permissions[action.type]
-      );
-    if (
-      !map ||
-      mapActions.actionIndex < 0 ||
-      !allowed(mapActions.actionIndex)
-    ) {
-      disabled.push("undo");
-    }
-    if (
-      !map ||
-      mapActions.actionIndex === mapActions.actions.length - 1 ||
-      !allowed(mapActions.actionIndex + 1)
-    ) {
-      disabled.push("redo");
-    }
+    if (!canUndo) disabled.push("undo");
+    if (!canRedo) disabled.push("redo");
     return disabled;
-  }, [map, mapActions, allowMapChange, permissions, readOnly]);
+  }, [allowMapChange, permissions, readOnly, canUndo, canRedo]);
 
   // Change back to move tool if selected tool becomes disabled
   useEffect(() => {
