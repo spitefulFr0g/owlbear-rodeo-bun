@@ -230,7 +230,7 @@ export default class GameServer {
             socket.emit("room_not_found");
             return;
           }
-          socket.data.playerId = typeof me?.playerId === "string" && me.playerId.length > 0 ? me.playerId : undefined;
+          socket.data.playerId = typeof me?.playerId === "string" && me.playerId.length > 0 && (role === "gm" || me.playerId !== gmOwner) ? me.playerId : undefined;
           socket.data.role = role;
           const usedColours = new Set([...this.io.sockets.adapter.rooms.get(gameId) || []]
             .map(id => this.io.sockets.sockets.get(id)?.data.color));

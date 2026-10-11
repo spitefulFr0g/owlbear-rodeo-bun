@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { CurveItem, Item, maxPoints } from "../../src/sceneRules";
+import { CurveItem, Item } from "../../src/sceneRules";
 import { createRoom, nextMessage, sendBatch, setupAdministrator, startTestServer } from "./testing/serverHelpers";
 
 const curve: CurveItem = {

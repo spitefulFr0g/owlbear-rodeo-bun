@@ -48,3 +48,28 @@ test("hidden items are withheld in snapshots, relays and refusals, and revealed 
     expect((await sendBatch(other.socket, batch([{ type: "update", id: token.id, fields: { hidden: true } }]))).applied).toEqual([]);
   } finally { await server.dispose(); }
 });
+
+
+test("a player cannot claim GM ownership through their browser id", async () => {
+  const server = await startTestServer();
+  try {
+    const { cookie } = await setupAdministrator(server);
+    const room = await createRoom(server, cookie, "Room");
+    const gm = await server.joinRoomAsGM(room.id, cookie);
+    const sceneId = gm.snapshot!.scene.id;
+    await sendBatch(gm.socket, { id: "secret", sceneId, changes: [
+      { type: "add", item: { ...token, hidden: true } },
+    ] });
+    await new Promise(resolve => gm.socket.emit("session", true, resolve));
+    const player = await server.joinRoom(room.id, "", "gm");
+    expect(player.snapshot!.scene.items).toEqual({});
+    const answer = await sendBatch(player.socket, { id: "guess", sceneId, changes: [
+      { type: "update", id: token.id, fields: { label: "Claimed" } },
+      { type: "add", item: { ...token, id: "forged-owner" } },
+    ] });
+    expect(answer.applied).toEqual([]);
+    expect(answer.refused).toEqual([
+      { id: token.id, item: null }, { id: "forged-owner", item: null },
+    ]);
+  } finally { await server.dispose(); }
+});
