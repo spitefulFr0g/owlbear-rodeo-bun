@@ -4,7 +4,7 @@ import { useToasts } from "react-toast-notifications";
 
 import MapControls from "./MapControls";
 import MapInteraction from "./MapInteraction";
-import MapGrid from "./MapGrid";
+import useSceneGrid from "../../hooks/useSceneGrid";
 
 import DrawingTool from "../tools/DrawingTool";
 import FogTool from "../tools/FogTool";
@@ -175,9 +175,11 @@ function Map({
       settings.select
     );
 
-  const { sceneImages, sceneDragOverlay } = useSceneImages(
+  const { sceneImages, sceneMapImages, sceneFogImages, sceneDragOverlay } = useSceneImages(
     selectedToolId === "move"
   );
+
+  const sceneGrid = useSceneGrid(map);
 
   return (
     <Box sx={{ flexGrow: 1 }}>
@@ -214,7 +216,8 @@ function Map({
         selectedToolId={selectedToolId}
         onSelectedToolChange={setSelectedToolId}
       >
-        {map && map.showGrid && <MapGrid map={map} />}
+        {sceneMapImages}
+        {sceneGrid}
         {propTokens}
         <DrawingTool
           map={map}
@@ -227,6 +230,8 @@ function Map({
         {notes}
         {tokens}
         {sceneImages}
+        <MeasureTool active={selectedToolId === "measure"} />
+        {sceneFogImages}
         <FogTool
           map={map}
           shapes={fogShapes}
@@ -246,7 +251,6 @@ function Map({
         {map && roleControls.room && (
           <NetworkedDisplayView session={session} mapId={map.id} />
         )}
-        <MeasureTool map={map} active={selectedToolId === "measure"} />
         {selectionTool}
       </MapInteraction>
     </Box>

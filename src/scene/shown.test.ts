@@ -2,6 +2,7 @@ import { Batch, Change, defaultSceneGrid, ImageItem, Scene } from "../sceneRules
 import {
   afterAnswer,
   afterChanges,
+  afterGrid,
   imageFiles,
   imagesInOrder,
   shownScene,
@@ -269,4 +270,24 @@ test("an image names every stored file it can be drawn from", () => {
     )
   ).toEqual(["full", "thumb", "low"]);
   expect(imageFiles(image("b"))).toEqual([]);
+});
+
+describe("a grid change the server accepted", () => {
+  const hex = { ...defaultSceneGrid, type: "hexVertical" as const };
+
+  test("replaces the grid of the scene it names and keeps the items", () => {
+    const before = scene(image("a"));
+    const after = afterGrid(before, { sceneId: "scene", grid: hex });
+    expect(after?.grid).toEqual(hex);
+    expect(after?.items).toEqual(before.items);
+  });
+
+  test("is ignored when it names another scene", () => {
+    const before = scene();
+    expect(afterGrid(before, { sceneId: "other", grid: hex })).toBe(before);
+  });
+
+  test("is ignored before the scene has arrived", () => {
+    expect(afterGrid(null, { sceneId: "scene", grid: hex })).toBeNull();
+  });
 });

@@ -3,6 +3,7 @@ import { IconButton, Flex, Box } from "theme-ui";
 
 import RadioIconButton from "../RadioIconButton";
 import Divider from "../Divider";
+import SceneGridControls from "../scene/SceneGridControls";
 
 import SelectMapButton from "./SelectMapButton";
 
@@ -89,8 +90,6 @@ function MapContols({
       disabled.push("map");
     }
     if (!map) {
-      disabled.push("move");
-      disabled.push("measure");
       disabled.push("pointer");
       disabled.push("select");
     }
@@ -214,6 +213,7 @@ function MapContols({
         />
       ),
     },
+    { id: "grid", component: <SceneGridControls /> },
     {
       id: "tools",
       component: tools.map((tool) => (

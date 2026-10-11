@@ -11,6 +11,11 @@ import { v4 as uuid } from "uuid";
 import { useAssets } from "../contexts/AssetsContext";
 import { useMapStage } from "../contexts/MapStageContext";
 import { useRole, useRoom } from "../contexts/RoomContext";
+import useSetting from "../hooks/useSetting";
+import { useKeyboard, useBlur } from "../contexts/KeyboardContext";
+import shortcuts from "../shortcuts";
+import { snapPosition } from "./grid";
+
 import { useUserId } from "../contexts/UserIdContext";
 
 import { defaultRoomSwitches } from "../helpers/roomControls";
@@ -18,7 +23,14 @@ import { defaultRoomSwitches } from "../helpers/roomControls";
 import { downloadAsset, hasAsset, uploadAsset } from "../network/assetStore";
 import Session, { SessionStatus } from "../network/Session";
 
-import { Batch, Change, gmOwner, Scene, Vector2 } from "../sceneRules";
+import {
+  Batch,
+  Change,
+  gmOwner,
+  Scene,
+  SceneGrid,
+  Vector2,
+} from "../sceneRules";
 
 import { RoomSwitches } from "../types/Room";
 import { Token } from "../types/Token";
@@ -26,7 +38,9 @@ import { Token } from "../types/Token";
 import {
   afterAnswer,
   afterChanges,
+  afterGrid,
   BatchAnswer,
+  GridChange,
   imageFiles,
   imagesInOrder,
   RelayedChanges,
@@ -54,6 +68,11 @@ type SceneStore = {
    * one batch. False when nothing was sent, as the canvas is read-only.
    */
   act: (changes: Change[]) => boolean;
+  /**
+   * Changes the scene's grid for everyone viewing it. It shows once the
+   * server has accepted it, which it does from a GM only.
+   */
+  setGrid: (grid: SceneGrid) => void;
   /** Puts stored files this browser holds on the server, for an item to name */
   share: (files: string[]) => Promise<void>;
 };
@@ -125,13 +144,18 @@ export function SceneProvider({
         ),
       }));
     }
+    function handleGrid(change: GridChange) {
+      setHeld((held) => ({ ...held, server: afterGrid(held.server, change) }));
+    }
     session.socket?.on("scene_snapshot", handleSnapshot);
     session.socket?.on("scene_changes", handleChanges);
     session.socket?.on("scene_answer", handleAnswer);
+    session.socket?.on("scene_grid", handleGrid);
     return () => {
       session.socket?.off("scene_snapshot", handleSnapshot);
       session.socket?.off("scene_changes", handleChanges);
       session.socket?.off("scene_answer", handleAnswer);
+      session.socket?.off("scene_grid", handleGrid);
     };
   }, [session.socket]);
 
@@ -194,6 +218,25 @@ export function SceneProvider({
     [session]
   );
 
+  const setGrid = useCallback(
+    (grid: SceneGrid) => {
+      const scene = sceneRef.current;
+      if (!scene || !session.socket?.connected || !session.joinToken) {
+        return;
+      }
+      session.socket.emit(
+        "scene_grid",
+        { sceneId: scene.id, grid },
+        (answer: { ok: boolean; error?: string }) => {
+          if (!answer.ok) {
+            console.error(`Unable to change the grid: ${answer.error}`);
+          }
+        }
+      );
+    },
+    [session]
+  );
+
   const share = useCallback(
     async (files: string[]) => {
       const token = session.joinToken;
@@ -226,8 +269,8 @@ export function SceneProvider({
   const switches = room.switches || defaultRoomSwitches;
 
   const store = useMemo(
-    () => ({ scene, person, switches, readOnly, act, share }),
-    [scene, person, switches, readOnly, act, share]
+    () => ({ scene, person, switches, readOnly, act, setGrid, share }),
+    [scene, person, switches, readOnly, act, setGrid, share]
   );
 
   return (
@@ -250,6 +293,13 @@ export function useScene() {
 export function useAddTokens() {
   const { scene, person, readOnly, act, share } = useScene();
   const mapStageRef = useMapStage();
+  const [sensitivity] = useSetting<number>("map.gridSnappingSensitivity");
+  const suspended = useRef(false);
+  useKeyboard(
+    (event) => { if (shortcuts.disableSnapping(event)) suspended.current = true; },
+    (event) => { if (shortcuts.disableSnapping(event)) suspended.current = false; }
+  );
+  useBlur(() => { suspended.current = false; });
 
   return async function addTokens(
     tokens: Token[],
@@ -272,7 +322,11 @@ export function useAddTokens() {
     const items = tokens.map((token, index) =>
       tokenItem(
         token,
-        { x: position.x + step * index, y: position.y + step * index },
+        snapPosition(
+          scene.grid,
+          { x: position.x + step * index, y: position.y + step * index },
+          scene.grid.snap && !suspended.current ? sensitivity : 0
+        ),
         scene.grid,
         person.id,
         uuid()

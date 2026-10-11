@@ -38,6 +38,14 @@ function useSceneImages(active: boolean) {
     }
   }
 
+  const imageProps = {
+    active,
+    dragging,
+    onDragStart: handleDragStart,
+    onDragEnd: handleDragEnd,
+  };
+  const sceneMapImages = <SceneImages placement="belowGrid" {...imageProps} />;
+  const sceneFogImages = <SceneImages placement="aboveRuler" {...imageProps} />;
   const sceneImages = (
     <SceneImages
       active={active}
@@ -51,7 +59,7 @@ function useSceneImages(active: boolean) {
     <DragOverlay dragging removeRef={removeRef} />
   );
 
-  return { sceneImages, sceneDragOverlay };
+  return { sceneImages, sceneMapImages, sceneFogImages, sceneDragOverlay };
 }
 
 export default useSceneImages;

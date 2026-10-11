@@ -1,7 +1,7 @@
 import { Box } from "theme-ui";
 
 import MapInteraction from "../map/MapInteraction";
-import MapGrid from "../map/MapGrid";
+import useSceneGrid from "../../hooks/useSceneGrid";
 
 import DrawingTool from "../tools/DrawingTool";
 import FogTool from "../tools/FogTool";
@@ -56,6 +56,8 @@ function DisplayMap({ map, mapState, view, session }: DisplayMapProps) {
     "pointer"
   );
 
+  const sceneGrid = useSceneGrid(map);
+
   return (
     <Box sx={{ flexGrow: 1, height: "100%" }}>
       <MapInteraction
@@ -66,7 +68,8 @@ function DisplayMap({ map, mapState, view, session }: DisplayMapProps) {
         onSelectedToolChange={ignore}
         followRect={view}
       >
-        {map && map.showGrid && <MapGrid map={map} />}
+        <SceneImages placement="belowGrid" />
+        {sceneGrid}
         {propTokens}
         <DrawingTool
           map={map}
@@ -79,6 +82,7 @@ function DisplayMap({ map, mapState, view, session }: DisplayMapProps) {
         {notes}
         {tokens}
         <SceneImages />
+        <SceneImages placement="aboveRuler" />
         <FogTool
           map={map}
           shapes={fogShapes}
