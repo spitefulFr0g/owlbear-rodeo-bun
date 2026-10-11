@@ -66,7 +66,7 @@ test("waiting players and cast displays receive party data but no prepared state
     gm.socket.emit("map_state", state);
     gm.socket.emit("manifest", manifest);
     gm.socket.emit("player_pointer", { x: 1, y: 2 });
-    gm.socket.emit("display_view", { mapId: "secret", x: 0, y: 0, width: 10, height: 10 });
+    gm.socket.emit("display_view", { sceneId: gm.snapshot!.scene.id, x: 0, y: 0, width: 10, height: 10 });
     gm.socket.emit("map_state_update", { id: "secret", changes: [{ kind: "N", path: ["notes", "prepared"], rhs: "Secret door" }] });
     gm.socket.emit("manifest_update", { id: "secret", changes: [{ kind: "N", path: ["assets", "prepared"], rhs: { id: "image" } }] });
     state.notes = { prepared: "Secret door" };

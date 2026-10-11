@@ -7,7 +7,7 @@ import { defaultRoomSwitches, getRoleControls } from "../helpers/roomControls";
 import Session from "../network/Session";
 import { RoomSwitches } from "../types/Room";
 
-const switchLabels: Record<keyof RoomSwitches, string> = {
+const switchLabels: Partial<Record<keyof RoomSwitches, string>> = {
   tokens: "Tokens",
   drawing: "Drawing",
   notes: "Notes and text",

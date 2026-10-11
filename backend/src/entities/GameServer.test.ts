@@ -6,6 +6,7 @@ let server: Awaited<ReturnType<typeof startTestServer>>;
 const sockets: Socket[] = [];
 let cookie: string;
 const rooms = new Map<string, string>();
+const scenes = new Map<string, string>();
 
 async function roomId(name: string, password = "") {
   if (!rooms.has(name)) rooms.set(name, (await createRoom(server, cookie, name, password)).id);
@@ -42,6 +43,7 @@ function next(socket: Socket, event: string): Promise<any[]> {
 }
 
 async function join(socket: Socket, gameId: string, password = "", playerId?: string) {
+  socket.on("scene_snapshot", ({ scene }) => { scenes.set(gameId, scene.id); });
   const frozen = next(socket, "display_frozen");
   const joined = next(socket, "joined_game");
   socket.emit("join_game", await roomId(gameId, password), password, undefined, { playerId });
@@ -278,10 +280,12 @@ test("a pending player join cannot also join as a cast display", async () => {
   expect(await received).toEqual([{ id: "player-room", owner: "gm" }]);
 });
 
-const view = { mapId: "map-1", x: -0.2, y: 0.3, width: 0.5, height: 0.4 };
+const worldView = { x: -300, y: 450, width: 750, height: 600 };
 
-test("only a GM connection's valid current-map views reach cast displays", async () => {
+test("only a GM connection's valid scene views reach cast displays without a map", async () => {
   const { socket: player, token } = await owner("display-follow");
+  const view = { ...worldView, sceneId: scenes.get("display-follow")! };
+  player.emit("map", null);
   const other = client();
   await join(other, "display-follow", "secret");
   other.emit("player_state", { userId: "other" });
@@ -291,9 +295,9 @@ test("only a GM connection's valid current-map views reach cast displays", async
   const playerEvents = record(player);
   const otherEvents = record(other);
   other.emit("display_view", view);
-  player.emit("display_view", { ...view, mapId: "old-map" });
+  player.emit("display_view", { ...view, sceneId: "other-scene" });
   for (const invalid of [
-    null, [], "view", { ...view, mapId: 1 },
+    null, [], "view", { ...view, sceneId: 1 },
     ...["x", "y", "width", "height"].flatMap((key) =>
       [NaN, Infinity, -Infinity, "1", null, undefined].map((value) => ({ ...view, [key]: value }))),
     { ...view, width: 0 }, { ...view, width: -1 },
@@ -311,6 +315,7 @@ test("only a GM connection's valid current-map views reach cast displays", async
 
 test("freeze holds the shown view for joining displays and unfreeze sends the latest view", async () => {
   const { socket: player, token } = await owner("display-freeze");
+  const view = { ...worldView, sceneId: scenes.get("display-freeze")! };
   const display = client();
   await joinDisplay(display, "display-freeze", token);
   const other = client();
@@ -356,81 +361,40 @@ test("freeze holds the shown view for joining displays and unfreeze sends the la
   expect(lateEvents.slice(-2)).toEqual([["display_frozen", false], ["display_view", latest]]);
 });
 
-test("switching maps through none broadcasts unfreeze only once and forgets unfrozen views", async () => {
-  const gameId = "display-map-switch";
-  const { socket: player, token } = await owner(gameId);
-  const display = client();
-  await joinDisplay(display, gameId, token);
-  player.emit("display_view", view);
-  player.emit("display_freeze", true);
-  await displayToken(player);
-  await pause();
-  const events = record(display);
-  const playerEvents = record(player);
-  player.emit("map", null);
-  player.emit("map", { id: "map-2", owner: "gm" });
-  await displayToken(player);
-  await pause();
-  expect(events.filter(([event]) => event === "display_frozen")).toEqual([["display_frozen", false]]);
-  expect(playerEvents).toEqual([["display_frozen", false]]);
-  player.emit("display_view", { ...view, mapId: "map-2" });
-  await displayToken(player);
-  player.emit("map", null);
-  player.emit("map", { id: "map-3", owner: "gm" });
-  await displayToken(player);
-  await pause();
-  expect(events.filter(([event]) => event === "display_frozen")).toEqual([["display_frozen", false]]);
-  const late = client();
-  const lateEvents = record(late);
-  await joinDisplay(late, gameId, token);
-  expect(lateEvents.filter(([event]) => event === "display_view")).toEqual([]);
-});
-
 for (const replacement of [null, { id: "map-2", owner: "gm" }]) {
-  test(`changing the map to ${replacement?.id || "none"} forgets views and resets freeze`, async () => {
-    const gameId = `display-reset-${replacement?.id || "none"}`;
-    const { socket: player, token } = await owner(gameId);
+  test(`changing the map to ${replacement?.id || "none"} preserves the scene view and freeze`, async () => {
+    const gameId = `display-preserve-${replacement?.id || "none"}`;
+    const { socket: gm, token } = await owner(gameId);
+    const view = { ...worldView, sceneId: scenes.get(gameId)! };
     const display = client();
     await joinDisplay(display, gameId, token);
-    player.emit("display_view", view);
-    player.emit("display_freeze", true);
-    player.emit("display_view", { ...view, x: 0.9 });
-    await displayToken(player);
+    gm.emit("display_view", view);
+    gm.emit("display_freeze", true);
+    const latest = { ...view, x: 900 };
+    gm.emit("display_view", latest);
+    await displayToken(gm);
     await pause();
     const events = record(display);
-    const playerEvents = record(player);
-    player.emit("map", { id: "map-1", owner: "gm", name: "renamed" });
-    await displayToken(player);
+    gm.emit("map", replacement);
+    await displayToken(gm);
     await pause();
     expect(events.filter(([event]) => event === "display_frozen")).toEqual([]);
-    player.emit("map", replacement);
-    await displayToken(player);
-    await pause();
-    expect(events.filter(([event]) => event === "display_frozen")).toEqual([["display_frozen", false]]);
-    expect(playerEvents).toEqual([["display_frozen", false]]);
-    // The frontend clears the map before selecting another, including the same id.
-    player.emit("map", null);
-    player.emit("map", { id: "map-1", owner: "gm" });
-    await displayToken(player);
     const late = client();
     const lateEvents = record(late);
     await joinDisplay(late, gameId, token);
-    expect(lateEvents.filter(([event]) => event === "display_frozen")).toEqual([["display_frozen", false]]);
-    expect(lateEvents.filter(([event]) => event === "display_view")).toEqual([]);
-    player.emit("display_freeze", false);
-    await displayToken(player);
-    await pause();
-    expect(lateEvents.filter(([event]) => event === "display_view")).toEqual([]);
-    player.emit("display_view", view);
-    await displayToken(player);
-    await pause();
+    expect(lateEvents.filter(([event]) => event === "display_frozen")).toEqual([["display_frozen", true]]);
     expect(lateEvents.filter(([event]) => event === "display_view")).toEqual([["display_view", view]]);
+    gm.emit("display_freeze", false);
+    await displayToken(gm);
+    await pause();
+    expect(lateEvents.slice(-2)).toEqual([["display_frozen", false], ["display_view", latest]]);
   });
 }
 
 test("the last GM device's view wins even when a player owns the map", async () => {
   const gameId = "display-gm-devices";
   const { socket: gm, token } = await owner(gameId);
+  const view = { ...worldView, sceneId: scenes.get(gameId)! };
   const player = client();
   await join(player, gameId, "secret");
   player.emit("player_state", { userId: "map-owner" });

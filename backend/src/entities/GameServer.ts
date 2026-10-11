@@ -1,4 +1,4 @@
-import { applyChange, checkChange, readBatch, topOrder, gmOwner, Change } from "../../../src/sceneRules";
+import { applyChange, mayChange, Person, checkChange, readBatch, topOrder, gmOwner, Change, SceneGrid } from "../../../src/sceneRules";
 import { allowsLegacyMapStateUpdateV1 } from "../helpers/roomSwitches";
 import { randomBytes } from "crypto";
 import Accounts from "../accounts/Accounts";
@@ -118,7 +118,7 @@ export default class GameServer {
         if (roomId && !this.gameRepo.games[roomId].session && socket.data.role !== "gm" &&
           ["map", "map_state", "map_state_update", "manifest", "manifest_update", "player_pointer"].includes(event)) return;
         if (
-          socket.data.castDisplay && !["get_display_token", "join_display", "room_switches", "room_trust", "room_password", "new_display_link", "session"].includes(event)
+          socket.data.castDisplay && !["get_display_token", "join_display", "scene_grid", "room_switches", "room_trust", "room_password", "new_display_link", "session"].includes(event)
         ) {
           const gameId = gameState.getGameId();
           if (gameId && (event === "map" || event === "map_state")) {
@@ -264,24 +264,68 @@ export default class GameServer {
         }
       });
 
+      socket.on("scene_grid", (value: unknown, answer?: (result: { ok: boolean; error?: string }) => void) => {
+        const gameId = gameState.getGameId();
+        if (!gameId || socket.data.castDisplay || socket.data.role !== "gm") {
+          if (typeof answer === "function") answer({ ok: false, error: "not_room_gm" });
+          return;
+        }
+        const game = this.gameRepo.games[gameId];
+        const payload = value as { sceneId?: unknown; grid?: SceneGrid } | null;
+        const grid = payload?.grid;
+        if (!payload || typeof payload !== "object" || Array.isArray(payload) ||
+            Object.keys(payload).some(key => !["sceneId", "grid"].includes(key)) ||
+            payload.sceneId !== game.scene.id || !grid || typeof grid !== "object" || Array.isArray(grid) ||
+            Object.keys(grid).some(key => !["type", "unitsPerCell", "measurement", "shown", "snap"].includes(key)) ||
+            !["square", "hexVertical", "hexHorizontal"].includes(grid.type) || grid.unitsPerCell !== 150 ||
+            typeof grid.shown !== "boolean" || typeof grid.snap !== "boolean" ||
+            !grid.measurement || typeof grid.measurement !== "object" || Array.isArray(grid.measurement) ||
+            Object.keys(grid.measurement).some(key => !["type", "scale"].includes(key)) ||
+            !["chebyshev", "alternating", "euclidean", "manhattan"].includes(grid.measurement.type) ||
+            typeof grid.measurement.scale !== "string") {
+          if (typeof answer === "function") answer({ ok: false, error: "invalid" });
+          return;
+        }
+        game.scene = { ...game.scene, grid };
+        this.gameRepo.changed(gameId);
+        socket.emit("scene_grid", { sceneId: game.scene.id, grid });
+        this.broadcastCanvas(socket, gameId, "scene_grid", { sceneId: game.scene.id, grid });
+        if (typeof answer === "function") answer({ ok: true });
+      });
+
       socket.on("scene_changes", (value: unknown) => {
         const batch = readBatch(value);
         const gameId = gameState.getGameId();
         if (!batch || !gameId || socket.data.castDisplay) return;
         const game = this.gameRepo.games[gameId];
+        const person: Person = { role: this.playerRole(socket, gameId),
+          id: socket.data.role === "gm" ? gmOwner : socket.data.playerId };
         const applied: Change[] = [];
         const refused: { id: string; item: import("../../../src/sceneRules").Item | null }[] = [];
         for (const change of batch.changes) {
           const id = change.type === "add" ? change.item.id : change.id;
           if (batch.sceneId !== game.scene.id || (socket.data.role !== "gm" && !game.session) ||
-              change.type !== "add" || checkChange(game.scene, change) ||
+              checkChange(game.scene, change) ||
+              !mayChange(person, { switches: game.switches },
+                change.type === "add" ? undefined :
+                  Object.hasOwn(game.scene.items, id) ? game.scene.items[id] : undefined, change) ||
               (socket.data.role !== "gm" && !socket.data.playerId)) {
             refused.push({ id, item: Object.hasOwn(game.scene.items, id) ? game.scene.items[id] : null });
             continue;
           }
-          const actual: Change = { type: "add", item: { ...change.item,
-            owner: socket.data.role === "gm" ? gmOwner : socket.data.playerId,
-            order: topOrder(game.scene, change.item.layer) } };
+          let actual: Change = change;
+          if (change.type === "add") {
+            actual = { type: "add", item: { ...change.item,
+              owner: socket.data.role === "gm" ? gmOwner : socket.data.playerId,
+              order: topOrder(game.scene, change.item.layer) } };
+          } else if (change.type === "update") {
+            const item = game.scene.items[change.id];
+            if (item && (change.fields.layer !== undefined ||
+                (change.fields.position !== undefined && item.kind === "image" && item.layer !== "map"))) {
+              const fields = { ...change.fields, order: topOrder(game.scene, change.fields.layer ?? item.layer) };
+              actual = { ...change, fields };
+            }
+          }
           const result = applyChange(game.scene, actual);
           if (!result.applied) {
             refused.push({ id, item: game.scene.items[id] ?? null });
@@ -311,8 +355,8 @@ export default class GameServer {
       socket.on("display_view", (view: DisplayView) => {
         const game = followedGame();
         if (
-          !game || !view || typeof view.mapId !== "string" ||
-          view.mapId !== (game.getState("map") as Map | undefined)?.id ||
+          !game || !view || typeof view !== "object" || Array.isArray(view) ||
+          typeof view.sceneId !== "string" || view.sceneId !== game.scene.id ||
           ![view.x, view.y, view.width, view.height].every(
             (value) => typeof value === "number" && Number.isFinite(value)
           ) || view.width <= 0 || view.height <= 0
@@ -456,16 +500,6 @@ export default class GameServer {
           if (socket.data.role !== "gm") {
             socket.emit("map", this.gameRepo.getState(gameId, "map"));
             return;
-          }
-          const game = this.gameRepo.games[gameId];
-          const previousMap = game.getState("map") as Map | undefined;
-          if (previousMap?.id !== map?.id) {
-            game.latestDisplayView = undefined;
-            game.shownDisplayView = undefined;
-            if (game.displayFrozen) {
-              game.displayFrozen = false;
-              this.io.to(gameId).emit("display_frozen", false);
-            }
           }
           this.gameRepo.setState(gameId, "map", map);
           const state = this.gameRepo.getState(gameId, "map");
