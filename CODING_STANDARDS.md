@@ -9,6 +9,8 @@ decide lives in the checks (`.githooks/pre-commit`, `.github/workflows/`).
   `startTestServer()` from `backend/src/testing/serverHelpers.ts` and talks to
   it with `fetch` and the socket client, the way a browser does. It opens no
   database and calls no module inside the server.
+- **Except the rules shared with the interface.** Pure rules that both sides
+  import are also tested directly, beside their code, with `bun test`.
 - **Time rules are tested by moving the test clock**, with no wall-clock wait.
 - **One executable.** The server stays a single `bun build --compile` file for
   Linux and Windows, so a new dependency has no native part. SQLite is

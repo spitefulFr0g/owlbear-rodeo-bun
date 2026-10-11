@@ -93,11 +93,11 @@ One thing placed on the canvas, such as an image, a shape or a piece of text. Ev
 _Avoid_: Object, element, node, entity
 
 **Owner**:
-The one person an item belongs to. It starts as whoever created the item, and the GM can give it to someone else.
+Who an item belongs to: the GM or one player. It starts as whoever created the item, and the GM can give it to someone else. An item the GM owns stays the GM's when the room passes to another account.
 _Avoid_: Creator, author
 
 **Owner Only**:
-A room switch that limits each player to moving the tokens they own. Off in a new room.
+A room switch that limits each player to changing the tokens they own, whether they added them or the GM gave them. Off in a new room.
 _Avoid_: Token lock, restricted movement
 
 **Locked item**:
