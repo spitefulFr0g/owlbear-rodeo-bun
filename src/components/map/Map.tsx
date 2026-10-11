@@ -76,7 +76,6 @@ type MapProps = {
 function Map({
   map,
   mapState,
-  mapActions,
   onMapTokenStateChange,
   onMapTokenStateRemove,
   onMapTokensStateCreate,
@@ -84,8 +83,6 @@ function Map({
   onMapReset,
   allowMapChange,
   session,
-  onUndo,
-  onRedo,
 }: MapProps) {
   const { addToast } = useToasts();
 
@@ -145,15 +142,12 @@ function Map({
               onMapReset={onMapReset}
               map={map}
               mapState={mapState}
-              mapActions={mapActions}
               allowMapChange={allowMapChange}
               onSelectedToolChange={setSelectedToolId}
               selectedToolId={selectedToolId}
               toolSettings={settings}
               onToolSettingChange={handleToolSettingChange}
               onToolAction={handleToolAction}
-              onUndo={onUndo}
-              onRedo={onRedo}
             />
             <DisplayControls session={session} />
             <SceneItemMenu

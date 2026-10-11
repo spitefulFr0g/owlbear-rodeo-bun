@@ -82,3 +82,5 @@ export { checkChange } from "./validation";
 export { mayChange } from "./permissions";
 
 export { visibleTo, changeFor } from "./visibility";
+
+export { invertChange } from "./invert";
