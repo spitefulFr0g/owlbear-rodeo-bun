@@ -7,7 +7,7 @@ import {
   MapFrame,
   MapRect,
 } from "../helpers/displayView";
-import { worldNodeId } from "../scene/worldPosition";
+import { worldFrame } from "../scene/worldPosition";
 import Vector2 from "../helpers/Vector2";
 
 // Time for the stage to cover about two thirds of the way to a new rectangle (ms)
@@ -54,8 +54,9 @@ function useFollowMapRect(
 
       const target = rectRef.current;
       const stage = stageRef.current;
-      const world = stage?.findOne(`#${worldNodeId}`);
-      if (!target || !stage || !world) {
+      // Read the world placement independently of the current stage pan and zoom
+      const worldLayout = stage && worldFrame(stage, frameRef.current);
+      if (!target || !stage || !worldLayout) {
         return;
       }
 
@@ -74,17 +75,7 @@ function useFollowMapRect(
         };
       }
 
-      // Read the world placement independently of the current stage pan and zoom
-      const local = stage.getAbsoluteTransform().copy().invert().multiply(world.getAbsoluteTransform());
-      const origin = local.point({ x: 0, y: 0 });
-      const unit = local.point({ x: 1, y: 1 });
-      const transform = fitMapRect(shown, {
-        ...frameRef.current,
-        mapWidth: unit.x - origin.x,
-        mapHeight: unit.y - origin.y,
-        layerX: origin.x,
-        layerY: origin.y,
-      });
+      const transform = fitMapRect(shown, worldLayout);
       if (
         !Number.isFinite(transform.scale) ||
         (Math.abs(stage.x() - transform.x) < 0.01 &&

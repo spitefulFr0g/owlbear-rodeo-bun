@@ -8,6 +8,7 @@ import usePreventOverscroll from "../../hooks/usePreventOverscroll";
 import useStageInteraction from "../../hooks/useStageInteraction";
 import usePreventContextMenu from "../../hooks/usePreventContextMenu";
 import useFollowMapRect from "../../hooks/useFollowMapRect";
+import useFitPlayerView from "../../hooks/useFitPlayerView";
 
 import { useScene } from "../../scene/SceneContext";
 
@@ -67,10 +68,19 @@ function MapInteraction({
   const mapWidth = stageWidth;
   const mapHeight = stageHeight;
 
-  const { scene } = useScene();
+  const { scene, playerView } = useScene();
   const isFollowing = followRect !== undefined;
   useFollowMapRect(
     followRect,
+    scene?.id,
+    mapStageRef,
+    { stageWidth, stageHeight },
+    stageTranslateRef,
+    setStageScale
+  );
+
+  useFitPlayerView(
+    playerView,
     scene?.id,
     mapStageRef,
     { stageWidth, stageHeight },

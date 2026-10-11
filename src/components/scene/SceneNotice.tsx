@@ -1,13 +1,28 @@
+import { useState } from "react";
 import { Button, Flex, Text } from "theme-ui";
+import { useToasts } from "react-toast-notifications";
 
-import { useScene } from "../../scene/SceneContext";
+import { useScene, useShowToPlayers } from "../../scene/SceneContext";
 import { awayFromOpenScene } from "../../helpers/sceneList";
 
 /** Stays on screen while the GM views a scene that is not the open scene */
 function SceneNotice() {
-  const { scene, sceneList, viewScene } = useScene();
+  const { scene, sceneList, readOnly, viewScene } = useScene();
+  const showToPlayers = useShowToPlayers();
+  const { addToast } = useToasts();
+  const [isSending, setIsSending] = useState(false);
   const away = awayFromOpenScene(sceneList, scene?.id);
-  if (!away) return null;
+  if (!away || !scene) return null;
+  const viewedSceneId = scene.id;
+
+  async function handleShow() {
+    setIsSending(true);
+    const answer = await showToPlayers(viewedSceneId);
+    setIsSending(false);
+    if (!answer.ok) addToast("Unable to show this scene to players. Try again in a moment.", {
+        appearance: "error",
+      });
+  }
 
   return (
     <Flex
@@ -30,6 +45,15 @@ function SceneNotice() {
         You are viewing {away.viewedName ? `“${away.viewedName}”` : "a scene"},
         which is not the open scene. Players do not see it.
       </Text>
+      <Button
+        type="button"
+        sx={{ flexShrink: 0, color: "inherit", borderColor: "currentcolor" }}
+        mr={2}
+        disabled={readOnly || isSending}
+        onClick={handleShow}
+      >
+        Show to players
+      </Button>
       <Button
         type="button"
         sx={{ flexShrink: 0, color: "inherit", borderColor: "currentcolor" }}
