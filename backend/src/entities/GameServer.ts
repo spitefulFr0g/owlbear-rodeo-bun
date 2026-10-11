@@ -1,5 +1,4 @@
 import { applyChange, visibleTo, changeFor, Item, Scene, mayChange, Person, checkChange, readBatch, topOrder, gmOwner, Change, SceneGrid } from "../../../src/sceneRules";
-import { allowsLegacyMapStateUpdateV1 } from "../helpers/roomSwitches";
 import { randomBytes } from "crypto";
 import Accounts from "../accounts/Accounts";
 import { clientAddress } from "../clientRequest";
@@ -14,12 +13,8 @@ import { DisplayView } from "../types/DisplayView";
 import GameRepository from "./GameRepository";
 import GameState from "./GameState";
 import JoinTokens from "./JoinTokens";
-import { applyChanges, isSafeUpdate, Update } from "../helpers/diff";
-import { Map } from "../types/Map";
-import { MapState } from "../types/MapState";
 import { PlayerState } from "../types/PlayerState";
 import { playerColours, isPlayerColour } from "../types/PlayerColour";
-import { Manifest } from "../types/Manifest";
 import { Pointer } from "../types/Pointer";
 
 export default class GameServer {
@@ -58,14 +53,6 @@ export default class GameServer {
     return { ...scene, items: Object.fromEntries(Object.entries(scene.items).filter(([, item]) => visibleTo(person, item))) };
   }
 
-  private allowsManifest(socket: Socket, gameId: string, manifest: Manifest): boolean {
-    if (this.playerRole(socket, gameId) !== "player" || this.gameRepo.games[gameId].switches.uploads) return true;
-    const current = this.gameRepo.getState(gameId, "manifest") as Manifest | undefined;
-    // Built-in images do not enter the manifest; compare stored image ids, not aliases.
-    const used = new Set(Object.values(current?.assets ?? {}).map(asset => asset.id));
-    return Object.values(manifest?.assets ?? {}).every(asset => used.has(asset.id));
-  }
-
   private broadcastCanvas(sender: Socket, gameId: string, event: string, value: unknown): void {
     for (const id of this.io.sockets.adapter.rooms.get(gameId) || []) {
       const peer = this.io.sockets.sockets.get(id);
@@ -87,9 +74,6 @@ export default class GameServer {
         const peer = this.io.sockets.sockets.get(id);
         if (!peer || peer.data.role === "gm") continue;
         peer.emit("scene_snapshot", { scene: this.sceneFor(peer, gameId) });
-        peer.emit("map", game.getState("map"));
-        peer.emit("map_state", game.getState("mapState"));
-        peer.emit("manifest", game.getState("manifest"));
         if (peer.data.castDisplay && game.shownDisplayView) peer.emit("display_view", game.shownDisplayView);
       }
     }
@@ -125,16 +109,12 @@ export default class GameServer {
       // refused here too, before any handler can change or forward state.
       socket.use(([event], next) => {
         const roomId = gameState.getGameId();
-        // Waiting connections must not receive even the full state used to refuse an edit.
+        // Pointers are private to GM connections outside a session.
         if (roomId && !this.gameRepo.games[roomId].session && socket.data.role !== "gm" &&
-          ["map", "map_state", "map_state_update", "manifest", "manifest_update", "player_pointer"].includes(event)) return;
+          event === "player_pointer") return;
         if (
           socket.data.castDisplay && !["get_display_token", "join_display", "scene_grid", "room_switches", "room_trust", "room_password", "new_display_link", "session"].includes(event)
         ) {
-          const gameId = gameState.getGameId();
-          if (gameId && (event === "map" || event === "map_state")) {
-            socket.emit(event, this.gameRepo.getState(gameId, event === "map" ? "map" : "mapState"));
-          }
           return;
         }
         next();
@@ -509,89 +489,6 @@ export default class GameServer {
         if (typeof answer === "function") answer({ ok: true, token: game.displayToken });
       });
 
-      socket.on("map", async (map: Map) => {
-        try {
-          let gameId: string;
-          if (_gameId) {
-            gameId = _gameId;
-          } else {
-            const result = gameState.getGameId();
-            if (result) {
-              gameId = result;
-              _gameId = result;
-            } else {
-              return;
-            }
-          }
-
-          if (socket.data.role !== "gm") {
-            socket.emit("map", this.gameRepo.getState(gameId, "map"));
-            return;
-          }
-          this.gameRepo.setState(gameId, "map", map);
-          const state = this.gameRepo.getState(gameId, "map");
-          this.broadcastCanvas(socket, gameId, "map", state);
-        } catch (error) {
-          console.error("MAP_ERROR", error);
-        }
-      });
-
-      socket.on("map_state", async (mapState: MapState) => {
-        try {
-          let gameId: string;
-          if (_gameId) {
-            gameId = _gameId;
-          } else {
-            const result = gameState.getGameId();
-            if (result) {
-              gameId = result;
-              _gameId = result;
-            } else {
-              return;
-            }
-          }
-
-          if (socket.data.role !== "gm") {
-            socket.emit("map_state", this.gameRepo.getState(gameId, "mapState"));
-            return;
-          }
-          this.gameRepo.setState(gameId, "mapState", mapState);
-          const state = this.gameRepo.getState(gameId, "mapState");
-          this.broadcastCanvas(socket, gameId, "map_state", state);
-        } catch (error) {
-          console.error("MAP_STATE_ERROR", error);
-        }
-      });
-
-      socket.on("map_state_update", async (update: Update<MapState>) => {
-        try {
-          let gameId: string;
-          if (_gameId) {
-            gameId = _gameId;
-          } else {
-            const result = gameState.getGameId();
-            if (result) {
-              gameId = result;
-              _gameId = result;
-            } else {
-              return;
-            }
-          }
-
-          if (!isSafeUpdate(update) || (socket.data.role !== "gm" && !allowsLegacyMapStateUpdateV1(update, this.playerRole(socket, gameId) === "trusted"
-            ? { tokens: true, drawing: true, notes: true, fog: true, uploads: true, ownerOnly: false }
-            : this.gameRepo.games[gameId].switches))) {
-            socket.emit("map_state", this.gameRepo.getState(gameId, "mapState"));
-            return;
-          }
-          if (await gameState.updateState(gameId, "mapState", update)) {
-            this.broadcastCanvas(socket, gameId, "map_state_update", update);
-          }
-        } catch (error) {
-          console.error("MAP_STATE_UPDATE_ERROR", error);
-        }
-      });
-
       socket.on("player_state", async (playerState: PlayerState) => {
         try {
           let gameId: string;
@@ -612,69 +509,6 @@ export default class GameServer {
           await gameState.broadcastPlayerState(gameId, socket, "party_state");
         } catch (error) {
           console.error("PLAYER_STATE_ERROR", error);
-        }
-      });
-
-      socket.on("manifest", async (manifest: Manifest) => {
-        try {
-          let gameId: string;
-          if (_gameId) {
-            gameId = _gameId;
-          } else {
-            const result = gameState.getGameId();
-            if (result) {
-              gameId = result;
-              _gameId = result;
-            } else {
-              return;
-            }
-          }
-
-          if (!this.allowsManifest(socket, gameId, manifest)) {
-            socket.emit("manifest", this.gameRepo.getState(gameId, "manifest"));
-            return;
-          }
-          this.gameRepo.setState(gameId, "manifest", manifest);
-          const state = this.gameRepo.getState(gameId, "manifest");
-          this.broadcastCanvas(socket, gameId, "manifest", state);
-        } catch (error) {
-          console.error("MANIFEST_ERROR", error);
-        }
-      });
-
-      socket.on("manifest_update", async (update: Update<Manifest>) => {
-        try {
-          let gameId: string;
-          if (_gameId) {
-            gameId = _gameId;
-          } else {
-            const result = gameState.getGameId();
-            if (result) {
-              gameId = result;
-              _gameId = result;
-            } else {
-              return;
-            }
-          }
-
-          const current = this.gameRepo.getState(gameId, "manifest") as Manifest;
-          if (!isSafeUpdate(update)) {
-            socket.emit("manifest", current);
-            return;
-          }
-          if (current && update.id === current.mapId) {
-            const proposed = structuredClone(current);
-            applyChanges(proposed, update.changes);
-            if (!this.allowsManifest(socket, gameId, proposed)) {
-              socket.emit("manifest", current);
-              return;
-            }
-          }
-          if (await gameState.updateState(gameId, "manifest", update)) {
-            this.broadcastCanvas(socket, gameId, "manifest_update", update);
-          }
-        } catch (error) {
-          console.error("MANIFEST_UPDATE_ERROR", error);
         }
       });
 

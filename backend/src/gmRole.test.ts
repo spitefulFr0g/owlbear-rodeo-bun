@@ -16,60 +16,6 @@ test("the room's signed-in GM joins on every device without the room password", 
   } finally { await server.dispose(); }
 });
 
-test("players cannot switch maps, edit map settings or replace state, but can update placed state", async () => {
-  const server = await startTestServer();
-  try {
-    const { cookie } = await setupAdministrator(server);
-    const room = await createRoom(server, cookie, "Table");
-    const gm = await server.joinRoomAsGM(room.id, cookie);
-    await new Promise(resolve => gm.socket.emit("session", true, resolve));
-    const player = await server.joinRoom(room.id);
-    expect(player.info.role).toBe("player");
-    const map = { id: "map", owner: "another browser", name: "Original", showGrid: true };
-    const state = { mapId: "map", tokens: {}, drawings: {}, notes: {}, fogs: {} };
-    for (const [event, value] of [["map", map], ["map_state", state]] as const) {
-      const forwarded = nextMessage(player.socket, event);
-      gm.socket.emit(event, value);
-      expect((await forwarded)[0]).toEqual(value);
-    }
-    const received: string[] = [];
-    gm.socket.on("map", () => received.push("map"));
-    gm.socket.on("map_state", () => received.push("map_state"));
-    for (const [event, value, original] of [
-      ["map", { ...map, id: "other" }, map],
-      ["map", { ...map, showGrid: false }, map],
-      ["map_state", { ...state, tokens: { stolen: {} } }, state],
-    ] as const) {
-      const refused = nextMessage(player.socket, event);
-      player.socket.emit(event, value);
-      expect((await refused)[0]).toEqual(original);
-    }
-    const update = { id: "map", changes: [{ kind: "N", path: ["notes", "hello"], rhs: "Welcome" }] };
-    const forwarded = nextMessage(gm.socket, "map_state_update");
-    player.socket.emit("map_state_update", update);
-    expect((await forwarded)[0]).toEqual(update);
-    expect(received).toEqual([]);
-    await new Promise(resolve => gm.socket.emit("room_switches", { uploads: true }, resolve));
-    for (const [event, value] of [["manifest", { mapId: "map", assets: {} }], ["manifest_update", { id: "map", changes: [{ kind: "N", path: ["assets", "image"], rhs: { id: "image" } }] }]] as const) {
-      const received = nextMessage(gm.socket, event);
-      player.socket.emit(event, value);
-      expect((await received)[0]).toEqual(value);
-    }
-    const settings = nextMessage(player.socket, "map");
-    gm.socket.emit("map", { ...map, showGrid: false });
-    expect((await settings)[0]).toEqual({ ...map, showGrid: false });
-    const secondDevice = await server.joinRoomAsGM(room.id, cookie);
-    expect(secondDevice.state.map).toEqual({ ...map, showGrid: false });
-    expect(secondDevice.state.mapState.notes).toEqual({ hello: "Welcome" });
-    for (const field of ["tokens", "drawings", "fogs", "notes"]) {
-      const update = { id: "map", changes: [{ kind: "N", path: [field, "secondDevice"], rhs: {} }] };
-      const received = nextMessage(player.socket, "map_state_update");
-      secondDevice.socket.emit("map_state_update", update);
-      expect((await received)[0]).toEqual(update);
-    }
-  } finally { await server.dispose(); }
-});
-
 test("party roles come from the server even when a browser claims to be GM", async () => {
   const server = await startTestServer();
   try {
@@ -208,25 +154,5 @@ test("HTTP use renews a socket's sign-in and lapse follows the renewed deadline"
     const ended = Promise.all([nextMessage(gm.socket, "signed_out"), nextMessage(gm.socket, "disconnect")]);
     await server.clock.advance(29 * day);
     expect((await ended)[0]).toEqual([]);
-  } finally { await server.dispose(); }
-});
-
-test("cast displays receive current map and state when they attempt GM changes", async () => {
-  const server = await startTestServer();
-  try {
-    const { cookie } = await setupAdministrator(server);
-    const room = await createRoom(server, cookie, "Table");
-    const gm = await server.joinRoomAsGM(room.id, cookie);
-    await new Promise(resolve => gm.socket.emit("session", true, resolve));
-    gm.socket.emit("player_state", { nickname: "GM", userId: "gm" });
-    gm.socket.emit("map", { id: "map", owner: "gm" });
-    gm.socket.emit("map_state", { mapId: "map", notes: {} });
-    const link = await new Promise<string>(resolve => gm.socket.emit("get_display_token", resolve));
-    const display = await server.joinDisplay(room.id, link);
-    for (const [event, original] of [["map", { id: "map", owner: "gm" }], ["map_state", { mapId: "map", notes: {} }]] as const) {
-      const refused = nextMessage(display.socket, event);
-      display.socket.emit(event, { id: "evil", mapId: "evil" });
-      expect((await refused)[0]).toEqual(original);
-    }
   } finally { await server.dispose(); }
 });

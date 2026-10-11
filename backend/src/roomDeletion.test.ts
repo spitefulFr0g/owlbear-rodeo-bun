@@ -1,8 +1,9 @@
+import { tokenItem } from "./testing/sceneFixtures";
 import { expect, test } from "bun:test";
 import { createHash } from "crypto";
 import { mkdir, rm, stat, writeFile } from "fs/promises";
 import { join } from "path";
-import { createRoom, inviteAccount, nextMessage, setupAdministrator, startTestServer } from "./testing/serverHelpers";
+import { sendBatch, createRoom, inviteAccount, nextMessage, setupAdministrator, startTestServer } from "./testing/serverHelpers";
 
 type Server = Awaited<ReturnType<typeof startTestServer>>;
 const remove = (server: Server, id: string, cookie?: string, origin?: string) => fetch(`${server.address}/api/rooms/${id}`, {
@@ -48,9 +49,7 @@ test("an administrator deleting another GM's room tells every player and cast di
     const party = nextMessage(player.socket, "party_state");
     writer.socket.emit("player_state", { userId: "gm" });
     await party;
-    const map = nextMessage(player.socket, "map");
-    writer.socket.emit("map", { id: "map", owner: "gm" });
-    await map;
+    await sendBatch(writer.socket, { id: "map", sceneId: writer.snapshot!.scene.id, changes: [{ type: "add", item: { ...tokenItem, layer: "map", locked: true } }] });
     const displayToken = await new Promise<string>(resolve => writer.socket.emit("get_display_token", resolve));
     const display = await server.joinDisplay(room.id, displayToken);
     const connections = [writer, player, display];

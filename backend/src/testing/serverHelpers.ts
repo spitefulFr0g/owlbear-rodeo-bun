@@ -74,12 +74,8 @@ export async function startTestServer(prepare?: (dataDir: string) => Promise<voi
   // Both helpers join rooms already created through POST /api/rooms.
   const joinConnection = async (roomId: string, credential: string, event: "join_game" | "join_display", cookie?: string, playerId?: string) => {
     const socket = connect(cookie);
-    const saved: any = {};
     let snapshot: { scene: Scene } | undefined;
     socket.on("scene_snapshot", value => { snapshot = value; });
-    socket.on("map", value => { saved.map = value; });
-    socket.on("map_state", value => { saved.mapState = value; });
-    socket.on("manifest", value => { saved.manifest = value; });
     const party = nextMessage(socket, "party_state");
     const joined = nextMessage(socket, event === "join_game" ? "joined_game" : "joined_display");
     const frozen = nextMessage(socket, "display_frozen");
@@ -87,7 +83,7 @@ export async function startTestServer(prepare?: (dataDir: string) => Promise<voi
     else socket.emit(event, roomId, credential);
     const [[, token, info], [displayFrozen]] = await Promise.all([joined, frozen]);
     const [partyState] = await party;
-    return { socket, info, snapshot, token: token as string, state: { ...saved, partyState }, displayFrozen };
+    return { socket, info, snapshot, token: token as string, state: { partyState }, displayFrozen };
   };
   return {
     clock,

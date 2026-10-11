@@ -2,9 +2,6 @@ import { Clock } from "../clock";
 import { OwlbearDatabase } from "../database";
 import { PlayerState } from "../types/PlayerState";
 import { PartyState } from "../types/PartyState";
-import { MapState } from "../types/MapState";
-import { Manifest } from "../types/Manifest";
-import { Map } from "../types/Map";
 import Game from "./Game";
 
 export default class GameRepository {
@@ -36,9 +33,6 @@ export default class GameRepository {
       if (record.documentVersion === 2) {
         const document = JSON.parse(record.document);
         game.scene = document.scenes[document.openSceneId];
-        game.state = document.legacy ?? {};
-      } else if (record.documentVersion === 1 || !record.documentVersion) {
-        game.state = JSON.parse(record.document || "{}");
       }
       this.games[gameId] = game;
     }
@@ -61,7 +55,7 @@ export default class GameRepository {
     this.database?.saveRoom({ id: game.gameId, passwordHash: game.passwordHash,
       name: game.name, gmAccountId: game.gmAccountId, hasPassword: Number(game.hasPassword),
       trustedPlayerIds: JSON.stringify([...game.trustedPlayerIds]),
-      switches: JSON.stringify(game.switches), displayToken: game.displayToken, documentVersion: 2, document: JSON.stringify({ openSceneId: game.scene.id, scenes: { [game.scene.id]: game.scene }, legacy: game.state }) });
+      switches: JSON.stringify(game.switches), displayToken: game.displayToken, documentVersion: 2, document: JSON.stringify({ openSceneId: game.scene.id, scenes: { [game.scene.id]: game.scene } }) });
     this.pending.get(gameId)?.cancel();
     this.pending.delete(gameId);
   }
@@ -117,30 +111,5 @@ export default class GameRepository {
   deletePlayer(gameId: string, playerId: string): void {
     const game = this.games[gameId];
     game.deletePlayer(playerId);
-  }
-
-  deleteGameData(gameId: string): void {
-    const game = this.games[gameId];
-    game.deleteGameData();
-    this.changed(gameId);
-  }
-
-  setState(
-    gameId: string,
-    field: "map" | "mapState" | "manifest",
-    value: any
-  ): void {
-    const game = this.games[gameId];
-    game.setState(field, value);
-    this.changed(gameId);
-  }
-
-  getState(
-    gameId: string,
-    field: "map" | "mapState" | "manifest"
-  ): MapState | Manifest | Map {
-    const game = this.games[gameId];
-    const result = game.getState(field);
-    return result;
   }
 }
