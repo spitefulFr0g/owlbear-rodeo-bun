@@ -7,7 +7,7 @@ import { defaultRoomSwitches, getRoleControls } from "../helpers/roomControls";
 import Session from "../network/Session";
 import { RoomSwitches } from "../types/Room";
 
-const switchLabels: Partial<Record<keyof RoomSwitches, string>> = {
+const switchLabels: Record<Exclude<keyof RoomSwitches, "ownerOnly">, string> = {
   tokens: "Tokens",
   drawing: "Drawing",
   notes: "Notes and text",
@@ -152,7 +152,7 @@ export default function RoomSettingsModal({
           sx={{ flexDirection: "column" }}
         >
           <Text id="room-switches" my={2}>Allow players to use:</Text>
-          {(Object.keys(switchLabels) as (keyof RoomSwitches)[]).map((key) => (
+          {(Object.keys(switchLabels) as (keyof typeof switchLabels)[]).map((key) => (
             <Label key={key} py={2}>
               <Checkbox
                 checked={switches[key]}
@@ -166,6 +166,18 @@ export default function RoomSettingsModal({
         <Text variant="caption" my={2}>
           The GM and trusted players can use every tool whatever these switches
           say.
+        </Text>
+        <Label py={2}>
+          <Checkbox
+            checked={switches.ownerOnly}
+            disabled={pending}
+            onChange={(e) => changeSwitch("ownerOnly", e.target.checked)}
+          />
+          Owner Only
+        </Label>
+        <Text variant="caption" mb={2}>
+          Limit players to changing the tokens they own. Players can still add
+          tokens, and trusted players are exempt.
         </Text>
         <Divider />
         <Label htmlFor="room-password" py={2}>Room password</Label>
