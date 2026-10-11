@@ -78,7 +78,7 @@ function SceneNameModal({
           </Text>
         </Box>
         {error && (
-          <Text as="p" variant="caption" sx={{ color: "highlight" }}>
+          <Text as="p" role="alert" variant="caption" sx={{ color: "highlight" }}>
             {error}
           </Text>
         )}

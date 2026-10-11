@@ -77,7 +77,13 @@ function ImportSceneModal({
     event.preventDefault();
     setIsSending(true);
     setError(undefined);
-    const failure = await onConfirm(await save(), name, fogFill);
+    let failure: string | undefined;
+    try {
+      failure = await onConfirm(await save(), name, fogFill);
+    } catch (error) {
+      console.error(error);
+      failure = "Unable to save the scene. Try again in a moment.";
+    }
     // Done, whoever opened the importer has closed it
     if (failure === undefined) return;
     setIsSending(false);
@@ -88,15 +94,17 @@ function ImportSceneModal({
 
   return (
     <Modal
+      contentLabel={label}
+      allowClose={!isSending}
       isOpen={isOpen}
-      onRequestClose={onCancel}
+      onRequestClose={isSending ? undefined : onCancel}
       style={{
         content: {
           maxWidth: layout.modalSize,
           width: "calc(100% - 16px)",
           padding: 0,
           display: "flex",
-          overflow: "hidden",
+          overflowY: "auto",
         },
       }}
     >
@@ -144,11 +152,11 @@ function ImportSceneModal({
           />
           <Label><Checkbox checked={fogFill} disabled={isSending} onChange={(event) => setFogFill(event.target.checked)} />Fog Fill</Label>
           {error && (
-            <Text as="p" variant="caption" sx={{ color: "highlight" }} my={1}>
+            <Text as="p" role="alert" variant="caption" sx={{ color: "highlight" }} my={1}>
               {error}
             </Text>
           )}
-          <Flex mt={2}>
+          <Flex mt={2} sx={{ flexWrap: "wrap", gap: 2 }}>
             <Button
               type="button"
               variant="secondary"

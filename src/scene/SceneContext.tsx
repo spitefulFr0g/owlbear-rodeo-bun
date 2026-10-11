@@ -400,9 +400,9 @@ export function SceneProvider({
         }
         const request = {};
         changeAsking(request);
-        session.socket.emit(event, payload, (answer: SceneAnswer) => {
+        session.socket.timeout(10000).emit(event, payload, (error: Error | null, answer: SceneAnswer) => {
           if (askingRef.current === request) changeAsking(null);
-          resolve(answer);
+          resolve(error ? { ok: false, error: "timeout" } : answer);
         });
       }),
     [session]
@@ -428,7 +428,9 @@ export function SceneProvider({
           resolve({ ok: false, error: "offline" });
           return;
         }
-        session.socket.emit(event, payload, resolve);
+        session.socket.timeout(10000).emit(event, payload, (error: Error | null, answer: SceneAnswer) => {
+          resolve(error ? { ok: false, error: "timeout" } : answer);
+        });
       }),
     [session]
   );
