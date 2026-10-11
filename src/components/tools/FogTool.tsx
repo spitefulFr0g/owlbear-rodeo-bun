@@ -390,8 +390,6 @@ function FogTool({ onShapeError, active, toolSettings, editable: permitted }: Ma
     drawingShape,
     onShapesCut,
     onShapesAdd,
-    onShapeError,
-    shapes,
   ]);
 
   // Add keyboard shortcuts
@@ -601,7 +599,7 @@ function FogTool({ onShapeError, active, toolSettings, editable: permitted }: Ma
     } else {
       setFogShapes(coveredFog(items));
     }
-  }, [shapes, editable, active, toolSettings, shouldRenderGuides]);
+  }, [shapes, items, editable, active, toolSettings, shouldRenderGuides]);
 
   return (
     <World>
