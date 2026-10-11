@@ -31,6 +31,7 @@ import {
   Item,
   mayChange,
   Scene,
+  SceneGrid,
   Vector2,
 } from "../sceneRules";
 
@@ -94,8 +95,14 @@ type SceneStore = {
    * its snapshot arrives. Not in the undo history.
    */
   viewScene: (sceneId: string) => Promise<SceneAnswer>;
-  /** Makes an empty scene and moves this GM connection to it, as viewScene does */
-  createScene: (name: string) => Promise<SceneAnswer>;
+  /**
+   * Makes a scene and moves this GM connection to it, as viewScene does. It is
+   * empty unless made from a map, whose files the server must already hold.
+   */
+  createScene: (
+    name: string,
+    from?: { grid: SceneGrid; map: Item }
+  ) => Promise<SceneAnswer>;
   /** Sets a scene's name. The scene list shows it once the server has */
   renameScene: (sceneId: string, name: string) => Promise<SceneAnswer>;
   /**
@@ -378,7 +385,8 @@ export function SceneProvider({
     [askForScene]
   );
   const createScene = useCallback(
-    (name: string) => askForScene("scene_create", { name }),
+    (name: string, from?: { grid: SceneGrid; map: Item }) =>
+      askForScene("scene_create", { name, ...from }),
     [askForScene]
   );
 

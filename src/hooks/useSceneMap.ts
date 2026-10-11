@@ -4,7 +4,6 @@ import { v4 as uuid } from "uuid";
 import { useScene } from "../scene/SceneContext";
 import { imageFiles } from "../scene/shown";
 import {
-  fitMap,
   mapItem,
   mapSceneGrid,
   mapTopLeft,
@@ -20,7 +19,6 @@ export default function useSceneMap() {
   latest.current = store;
   return {
     placed: pickedMap(store.scene),
-    readOnly: store.readOnly,
     async pick(map: Map | null) {
       const initial = latest.current;
       if (initial.readOnly || initial.person.role !== "gm" || !initial.scene) return;
@@ -43,20 +41,6 @@ export default function useSceneMap() {
       } else {
         act(changes, false);
       }
-    },
-    edit(map: Map) {
-      const { scene, person, readOnly, act, setSettings } = latest.current;
-      const previous = pickedMap(scene);
-      if (!scene || readOnly || person.role !== "gm" || previous?.metadata.pickerMapId !== map.id) return;
-      const grid = mapSceneGrid(map, scene.grid);
-      if (act([{
-        type: "update",
-        id: previous.id,
-        fields: {
-          ...fitMap(map, grid, mapTopLeft(previous)),
-          metadata: { mapQuality: map.type === "file" ? map.quality : "original" },
-        },
-      }])) setSettings({ grid });
     },
   };
 }

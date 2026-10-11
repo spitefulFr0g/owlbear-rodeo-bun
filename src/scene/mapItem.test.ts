@@ -1,7 +1,9 @@
-import { defaultSceneGrid, SceneGrid } from "../sceneRules";
+import { checkChange, checkGrid, defaultSceneGrid, SceneGrid } from "../sceneRules";
 import { Map } from "../types/Map";
 import { cellSize, snapPosition } from "./grid";
-import { fitMap, mapItem, mapSceneGrid, mapTopLeft, pickedMap } from "./mapItem";
+import {
+  fitMap, importedSceneName, mapItem, mapSceneGrid, mapTopLeft, pickedMap, sceneFromMap,
+} from "./mapItem";
 
 function savedMap(type: SceneGrid["type"] = "square"): Map {
   return { id: "library-map", name: "Map", owner: "browser", type: "default", key: "grass",
@@ -57,4 +59,31 @@ test("the picker image is locked, GM owned and retains all stored resolution ids
   expect(item.owner).toBe("gm");
   expect(item.metadata.mapQuality).toBe("low");
   expect(pickedMap({ id: "scene", grid: defaultSceneGrid, fogFill: false, viewOnly: false, items: { placed: item } })).toEqual(item);
+});
+
+test("a scene made from a map is one create the server's rules accept", () => {
+  const map = savedMap("hexVertical");
+  const create = sceneFromMap(map, undefined, "first");
+  expect(create.name).toBe("Map");
+  expect(create.grid).toEqual({ ...defaultSceneGrid, type: "hexVertical",
+    measurement: { type: "euclidean", scale: "10m" } });
+  expect(checkGrid(create.grid)).toBe(true);
+  expect(create.map).toEqual(mapItem(map, create.grid, "first"));
+  const empty = { id: "scene", grid: create.grid, fogFill: false, viewOnly: false, items: {} };
+  expect(checkChange(empty, { type: "add", item: create.map })).toBeUndefined();
+});
+
+test("the map of a new scene is scaled so its drawn cells match the scene's", () => {
+  const { grid, map } = sceneFromMap(savedMap(), undefined, "first");
+  expect(800 / 8 * map.scale.x).toBeCloseTo(cellSize(grid).width);
+  expect(600 / 6 * map.scale.y).toBeCloseTo(cellSize(grid).height);
+});
+
+test("a new scene is named after its map unless another name is typed", () => {
+  expect(importedSceneName(savedMap(), undefined)).toBe("Map");
+  expect(importedSceneName({ ...savedMap(), name: "  Keep  " }, undefined)).toBe("Keep");
+  expect(importedSceneName({ ...savedMap(), name: "x".repeat(140) }, undefined)).toBe("x".repeat(100));
+  expect(importedSceneName(savedMap(), " Ambush ")).toBe("Ambush");
+  expect(importedSceneName(savedMap(), "")).toBe("");
+  expect(sceneFromMap(savedMap(), "Ambush", "first").name).toBe("Ambush");
 });

@@ -1,5 +1,3 @@
-import useSceneMap from "../hooks/useSceneMap";
-import { useState } from "react";
 import { Button, Flex, Label, useThemeUI } from "theme-ui";
 import SimpleBar from "simplebar-react";
 
@@ -7,9 +5,7 @@ import Modal from "../components/Modal";
 import MapSettings from "../components/map/MapSettings";
 import MapEditor from "../components/map/MapEditor";
 
-import { isEmpty } from "../helpers/shared";
-import { getGridDefaultInset } from "../helpers/grid";
-
+import useMapEdits from "../hooks/useMapEdits";
 import useResponsiveLayout from "../hooks/useResponsiveLayout";
 import { Map } from "../types/Map";
 import { UpdateMapEventHanlder } from "../contexts/MapDataContext";
@@ -28,67 +24,17 @@ function EditMapModal({
   onUpdateMap,
 }: EditMapProps) {
   const { theme } = useThemeUI();
-  const sceneMap = useSceneMap();
+  const { edited, change, discard, save } = useMapEdits(map, onUpdateMap);
 
   function handleClose() {
-    setMapSettingChanges({});
+    discard();
     onDone();
   }
 
   async function handleSave() {
-    await applyMapChanges();
+    await save();
     onDone();
   }
-
-  /**
-   * Map settings
-   */
-  // Local cache of map setting changes
-  // Applied when done is clicked or map selection is changed
-  const [mapSettingChanges, setMapSettingChanges] = useState<Partial<Map>>({});
-
-  function handleMapSettingsChange(change: Partial<Map>) {
-    setMapSettingChanges((prevChanges) => ({
-      ...prevChanges,
-      ...change,
-    }));
-  }
-
-  async function applyMapChanges() {
-    if (!isEmpty(mapSettingChanges)) {
-      // Ensure grid values are positive
-      let verifiedChanges: Partial<Map> = { ...mapSettingChanges };
-      if (verifiedChanges.grid) {
-        verifiedChanges.grid.size.x = Math.max(1, verifiedChanges.grid.size.x || 1);
-        verifiedChanges.grid.size.y = Math.max(1, verifiedChanges.grid.size.y || 1);
-      }
-      // Ensure inset isn't flipped
-      if (verifiedChanges.grid) {
-        const inset = verifiedChanges.grid.inset;
-        if (
-          inset.topLeft.x >= inset.bottomRight.x ||
-          inset.topLeft.y >= inset.bottomRight.y
-        ) {
-          verifiedChanges.grid.inset = getGridDefaultInset(
-            { size: verifiedChanges.grid.size, type: verifiedChanges.grid.type },
-            map.width,
-            map.height
-          );
-        }
-      }
-      await onUpdateMap(map.id, verifiedChanges);
-      sceneMap.edit({ ...map, ...verifiedChanges } as Map);
-
-      setMapSettingChanges({});
-    }
-  }
-
-  const selectedMapWithChanges =
-    map &&
-    ({
-      ...map,
-      ...mapSettingChanges,
-    } as Map);
 
   const layout = useResponsiveLayout();
 
@@ -129,12 +75,12 @@ function EditMapModal({
           }}
         >
           <MapEditor
-            map={selectedMapWithChanges}
-            onSettingsChange={handleMapSettingsChange}
+            map={edited}
+            onSettingsChange={change}
           />
           <MapSettings
-            map={selectedMapWithChanges}
-            onSettingsChange={handleMapSettingsChange}
+            map={edited}
+            onSettingsChange={change}
           />
         </SimpleBar>
         <Button m={3} onClick={handleSave}>
