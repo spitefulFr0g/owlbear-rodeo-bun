@@ -11,7 +11,6 @@ import useImageCenter from "../../hooks/useImageCenter";
 import usePreventContextMenu from "../../hooks/usePreventContextMenu";
 import useFollowMapRect from "../../hooks/useFollowMapRect";
 
-import { getGridMaxZoom } from "../../helpers/grid";
 import { MapRect } from "../../helpers/displayView";
 import KonvaBridge from "../../helpers/KonvaBridge";
 
@@ -115,7 +114,7 @@ function MapInteraction({
     setStageScale,
     stageTranslateRef,
     mapLayerRef,
-    getGridMaxZoom(map?.grid),
+    10,
     selectedToolId,
     preventMapInteraction || isFollowing,
     {
@@ -149,7 +148,7 @@ function MapInteraction({
       // Stop active state on move icon from being selected
       event.preventDefault();
     }
-    if (map && shortcuts.move(event) && selectedToolId !== "move") {
+    if (shortcuts.move(event) && selectedToolId !== "move") {
       event.preventDefault();
       previousSelectedToolRef.current = selectedToolId;
       onSelectedToolChange("move");
@@ -246,7 +245,7 @@ function MapInteraction({
                   id="mapImage"
                   ref={mapImageRef}
                 />
-                {mapLoaded && children}
+                {children}
                 <Group id="portal" />
               </Layer>
             </KonvaBridge>

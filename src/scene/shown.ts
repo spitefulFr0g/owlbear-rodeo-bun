@@ -6,6 +6,7 @@ import {
   Item,
   layers,
   Scene,
+  SceneGrid,
   topOrder,
 } from "../sceneRules";
 
@@ -55,6 +56,15 @@ export function afterAnswer(
     else delete items[id];
   }
   return { ...scene, items };
+}
+
+/** What the server sends everyone viewing a scene when the GM changes its grid */
+export type GridChange = { sceneId: string; grid: SceneGrid };
+
+/** The scene once the server has accepted a change to its grid */
+export function afterGrid(scene: Scene | null, change: GridChange): Scene | null {
+  if (!scene || scene.id !== change.sceneId) return scene;
+  return { ...scene, grid: change.grid };
 }
 
 /** A change with the order the server will give it, so it shows where it will land */

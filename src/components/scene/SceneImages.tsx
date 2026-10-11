@@ -4,15 +4,13 @@ import useImage from "use-image";
 
 import { useDataURL } from "../../contexts/AssetsContext";
 import {
-  useGridCellPixelSize,
-  useGridOffset,
-} from "../../contexts/GridContext";
-import {
   leftMouseButton,
   useSetPreventMapInteraction,
 } from "../../contexts/MapInteractionContext";
 
 import TokenOutline from "../konva/TokenOutline";
+
+import useSceneSnapping from "../../hooks/useSceneSnapping";
 
 import { useScene } from "../../scene/SceneContext";
 import { imagesInOrder } from "../../scene/shown";
@@ -21,6 +19,8 @@ import { worldNodeId } from "../../scene/worldPosition";
 import { ImageItem } from "../../sceneRules";
 
 import { tokenSources } from "../../tokens";
+
+import World from "./World";
 
 export type SceneImageDragHandler = (item: ImageItem, node: Konva.Node) => void;
 
@@ -44,6 +44,8 @@ function SceneImage({
 
   const setPreventMapInteraction = useSetPreventMapInteraction();
 
+  const snapPositionToGrid = useSceneSnapping();
+
   // Keep the map still while an image that can be dragged is held
   function hold(held: boolean) {
     if (draggable) {
@@ -57,6 +59,13 @@ function SceneImage({
   ) {
     if (leftMouseButton(event)) {
       hold(held);
+    }
+  }
+
+  function handleDragMove(event: Konva.KonvaEventObject<DragEvent>) {
+    // Only the image itself is dragged, not something inside it
+    if (event.target === event.currentTarget) {
+      event.target.position(snapPositionToGrid(event.target.position()));
     }
   }
 
@@ -75,6 +84,7 @@ function SceneImage({
       onTouchStart={() => hold(true)}
       onTouchEnd={() => hold(false)}
       onDragStart={(event) => onDragStart?.(item, event.target)}
+      onDragMove={handleDragMove}
       onDragEnd={handleDragEnd}
     >
       <Group
@@ -111,6 +121,7 @@ function SceneImage({
 }
 
 type SceneImagesProps = {
+  placement?: "belowGrid" | "aboveGrid" | "aboveRuler";
   /** The images can be dragged: the move tool is in hand */
   active?: boolean;
   /** The id of the image being dragged, drawn on top of its layer */
@@ -120,41 +131,27 @@ type SceneImagesProps = {
   onDragEnd?: SceneImageDragHandler;
 };
 
-/**
- * Draws the scene's Image items layer by layer, each layer in its order.
- * Until the scene has its own grid, a world cell is a cell of the 1.0 map's
- * grid and the world's origin is that grid's top left corner.
- */
+/** Draws the scene's Image items layer by layer, each layer in its order */
 function SceneImages({
+  placement = "aboveGrid",
   active = false,
   dragging,
   onDragStart,
   onDragEnd,
 }: SceneImagesProps) {
   const { scene, readOnly } = useScene();
-  const gridCellPixelSize = useGridCellPixelSize();
-  const gridOffset = useGridOffset();
 
   if (!scene) {
     return null;
   }
 
-  const cellPixels = Math.min(
-    gridCellPixelSize.width,
-    gridCellPixelSize.height
-  );
-  const scale = cellPixels / scene.grid.unitsPerCell;
-
   return (
-    <Group
-      id={worldNodeId}
-      x={gridOffset.x}
-      y={gridOffset.y}
-      scaleX={scale}
-      scaleY={scale}
-      listening={active}
-    >
-      {imagesInOrder(scene, dragging).map((item) => (
+    <World id={placement === "aboveGrid" ? worldNodeId : undefined} listening={active}>
+      {imagesInOrder(scene, dragging).filter((item) =>
+        placement === "belowGrid" ? item.layer === "map" :
+        placement === "aboveRuler" ? item.layer === "fog" :
+        item.layer !== "map" && item.layer !== "fog"
+      ).map((item) => (
         <SceneImage
           item={item}
           labelSize={scene.grid.unitsPerCell / 6}
@@ -164,7 +161,7 @@ function SceneImages({
           key={item.id}
         />
       ))}
-    </Group>
+    </World>
   );
 }
 
