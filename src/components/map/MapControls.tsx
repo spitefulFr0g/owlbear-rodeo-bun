@@ -99,7 +99,7 @@ function MapContols({
     if (readOnly || !allowMapDrawing) {
       disabled.push("drawing");
     }
-    if (!map || !allowFogDrawing) {
+    if (readOnly || !allowFogDrawing) {
       disabled.push("fog");
     }
     if (!map || !allowNoteEditing) {

@@ -22,17 +22,12 @@ import { useToolPermissions, useRole } from "../../contexts/RoomContext";
 import { getRoleControls } from "../../helpers/roomControls";
 
 import Action from "../../actions/Action";
-import {
-  AddStatesAction,
-  CutFogAction,
-  EditStatesAction,
-  RemoveStatesAction,
-} from "../../actions";
+
 
 import Session from "../../network/Session";
 
 import { DrawingState } from "../../types/Drawing";
-import { Fog, FogState } from "../../types/Fog";
+import { FogState } from "../../types/Fog";
 import { Map as MapType, MapToolId } from "../../types/Map";
 import { MapState } from "../../types/MapState";
 import { Settings } from "../../types/Settings";
@@ -91,7 +86,6 @@ function Map({
   onSelectionItemsCreate,
   onMapChange,
   onMapReset,
-  onFogDraw,
   onMapNoteCreate,
   onMapNoteChange,
   onMapNoteRemove,
@@ -115,29 +109,13 @@ function Map({
     }));
   }
 
-  const fogShapes = Object.values(mapState?.fogs || {});
+
 
   const { scene, act, readOnly } = useScene();
   function handleToolAction(action: string) {
     if (action === "eraseAll" && scene && permissions.drawing && !readOnly) {
       deleteDrawings(drawingsInOrder(scene).map((item) => item.id), act);
     }
-  }
-
-  function handleFogShapesAdd(shapes: Fog[]) {
-    onFogDraw(new AddStatesAction(shapes));
-  }
-
-  function handleFogShapesCut(shapes: Fog[]) {
-    onFogDraw(new CutFogAction(shapes));
-  }
-
-  function handleFogShapesRemove(shapeIds: string[]) {
-    onFogDraw(new RemoveStatesAction(shapeIds));
-  }
-
-  function handleFogShapesEdit(shapes: Partial<Fog>[]) {
-    onFogDraw(new EditStatesAction(shapes));
   }
 
   const { tokens, propTokens, tokenMenu, tokenDragOverlay } = useMapTokens(
@@ -223,12 +201,6 @@ function Map({
         <MeasureTool active={selectedToolId === "measure"} />
         {sceneFogImages}
         <FogTool
-          map={map}
-          shapes={fogShapes}
-          onShapesAdd={handleFogShapesAdd}
-          onShapesCut={handleFogShapesCut}
-          onShapesRemove={handleFogShapesRemove}
-          onShapesEdit={handleFogShapesEdit}
           onShapeError={addToast}
           active={selectedToolId === "fog"}
           toolSettings={settings.fog}

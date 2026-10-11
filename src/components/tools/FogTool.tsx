@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import shortid from "shortid";
 import { Group, Line } from "react-konva";
 import useImage from "use-image";
@@ -9,97 +9,74 @@ import diagonalPattern from "../../images/DiagonalPattern.png";
 
 import {
   useDebouncedStageScale,
-  useMapWidth,
-  useMapHeight,
   useInteractionEmitter,
   MapDragEvent,
   leftMouseButton,
 } from "../../contexts/MapInteractionContext";
 import { useMapStage } from "../../contexts/MapStageContext";
-import {
-  useGrid,
-  useGridCellPixelSize,
-  useGridCellNormalizedSize,
-  useGridStrokeWidth,
-  useGridCellPixelOffset,
-  useGridOffset,
-  useGridSnappingSensitivity,
-} from "../../contexts/GridContext";
+import { useGridSnappingSensitivity } from "../../contexts/GridContext";
+import useWorldPlacement from "../../hooks/useWorldPlacement";
 import { useKeyboard } from "../../contexts/KeyboardContext";
 
 import Vector2, { BoundingBox } from "../../helpers/Vector2";
 import {
   simplifyPoints,
-  mergeFogShapes,
   getFogShapesBoundingBoxes,
   getGuidesFromBoundingBoxes,
-  getGuidesFromGridCell,
   findBestGuides,
   Guide,
 } from "../../helpers/drawing";
 import colors from "../../helpers/colors";
 import { getRelativePointerPosition } from "../../helpers/konva";
-import { keyBy } from "../../helpers/shared";
-
-import SubtractFogAction from "../../actions/SubtractFogAction";
-import CutFogAction from "../../actions/CutFogAction";
+import { useScene } from "../../scene/SceneContext";
+import { fogItems, fogItem, fogShape, coveredFog, clipFog, cutsFog } from "../../scene/fogItem";
+import SceneDrawing from "../scene/SceneDrawing";
+import World from "../scene/World";
+import { worldNodeId } from "../../scene/worldPosition";
+import useSceneSnapping from "../../hooks/useSceneSnapping";
 
 import useSetting from "../../hooks/useSetting";
 
 import shortcuts from "../../shortcuts";
 
-import { Map } from "../../types/Map";
 import { Fog, FogToolSettings } from "../../types/Fog";
 
-import FogShape from "../konva/Fog";
 import Tick from "../konva/Tick";
 
-type FogAddEventHandler = (fog: Fog[]) => void;
-type FogCutEventHandler = (fog: Fog[]) => void;
-type FogRemoveEventHandler = (fogId: string[]) => void;
-type FogEditEventHandler = (edit: Partial<Fog>[]) => void;
-type FogErrorEventHandler = (message: string) => void;
-
 type MapFogProps = {
-  map: Map | null;
-  shapes: Fog[];
-  onShapesAdd: FogAddEventHandler;
-  onShapesCut: FogCutEventHandler;
-  onShapesRemove: FogRemoveEventHandler;
-  onShapesEdit: FogEditEventHandler;
-  onShapeError: FogErrorEventHandler;
+  onShapeError: (message: string) => void;
   active: boolean;
   toolSettings: FogToolSettings;
   editable: boolean;
 };
 
-function FogTool({
-  map,
-  shapes,
-  onShapesAdd,
-  onShapesCut,
-  onShapesRemove,
-  onShapesEdit,
-  onShapeError,
-  active,
-  toolSettings,
-  editable,
-}: MapFogProps) {
+function FogTool({ onShapeError, active, toolSettings, editable: permitted }: MapFogProps) {
+  const { scene, person, readOnly, act } = useScene();
+  const editable = permitted && !readOnly;
+  const items = useMemo(() => scene ? fogItems(scene) : [], [scene]);
+  const shapes = useMemo(() => items.map(fogShape), [items]);
+  const snap = useSceneSnapping();
+  function addShapes(shapes: Fog[], cut: boolean) {
+    if (cut && !shapes.some(shape => cutsFog(shape, items))) { onShapeError("No fog to cut"); return; }
+    const clipped = toolSettings.multilayer ? shapes : shapes.flatMap(shape =>
+      clipFog(shape, cut ? items.filter(item => item.cut && !item.hidden).map(fogShape) : coveredFog(items)));
+    if (!clipped.length) { onShapeError(cut ? "Fog already cut" : "Fog already placed"); return; }
+    act(clipped.map(shape => ({ type: "add", item: fogItem(shape, person.id, cut, toolSettings.type === "brush") })));
+  }
+  const onShapesAdd = (shapes: Fog[]) => addShapes(shapes, false);
+  const onShapesCut = (shapes: Fog[]) => addShapes(shapes, true);
+  const onShapesRemove = (ids: string[]) => act(ids.map(id => ({ type: "delete", id })));
+  const onShapesEdit = (edits: Partial<Fog>[]) => act(edits.map(edit => ({ type: "update", id: edit.id!, fields: { hidden: !edit.visible } })));
   const stageScale = useDebouncedStageScale();
-  const mapWidth = useMapWidth();
-  const mapHeight = useMapHeight();
+  const placement = useWorldPlacement();
+  const mapWidth = 1;
+  const mapHeight = 1;
   const interactionEmitter = useInteractionEmitter();
 
-  const grid = useGrid();
-  const gridCellNormalizedSize = useGridCellNormalizedSize();
-  const gridCellPixelSize = useGridCellPixelSize();
-  const gridStrokeWidth = useGridStrokeWidth();
-  const gridCellPixelOffset = useGridCellPixelOffset();
-  const gridOffset = useGridOffset();
-
-  const snappingSensitivity = useGridSnappingSensitivity();
-  // Clamp snapping to 0 to accound for -1 snapping override
-  const gridSnappingSensitivity = Math.max(snappingSensitivity, 0);
+  const units = scene?.grid.unitsPerCell || 150;
+  const gridCellNormalizedSize = { x: units, y: units };
+  const gridStrokeWidth = units / 10;
+  const gridSnappingSensitivity = Math.max(useGridSnappingSensitivity(), 0);
 
   const [showFogGuides] = useSetting<boolean>("fog.showGuides");
   const [editOpacity] = useSetting<number>("fog.editOpacity");
@@ -132,6 +109,10 @@ function FogTool({
   const [patternImage] = useImage(diagonalPattern);
 
   useEffect(() => {
+    if (!active || !editable) { setDrawingShape(null); setHoveredShapes([]); setIsBrushDown(false); }
+  }, [active, editable]);
+
+  useEffect(() => {
     if (!active || !editable) {
       return;
     }
@@ -142,12 +123,14 @@ function FogTool({
       if (!mapStage) {
         return;
       }
-      const mapImage = mapStage.findOne("#mapImage");
+      const mapImage = mapStage.findOne(`#${worldNodeId}`);
+      if (!mapImage) return;
       let position = getRelativePointerPosition(mapImage);
       if (!position) {
         return;
       }
       if (shouldUseGuides && snapping) {
+        position = snap(position);
         for (let guide of guides) {
           if (guide.orientation === "vertical") {
             position.x = guide.start.x * mapWidth;
@@ -157,10 +140,7 @@ function FogTool({
           }
         }
       }
-      return Vector2.divide(position, {
-        x: mapImage.width(),
-        y: mapImage.height(),
-      });
+      return position;
     }
 
     function handleBrushDown(props: MapDragEvent) {
@@ -227,7 +207,7 @@ function FogTool({
             Vector2.compare(
               prevPoints[prevPoints.length - 1],
               brushPosition,
-              0.001
+              1 / (stageScale * placement.scale)
             )
           ) {
             return prevShape;
@@ -279,49 +259,13 @@ function FogTool({
         if (toolSettings.type === "brush") {
           simplifiedShape.data.points = simplifyPoints(
             simplifiedShape.data.points,
-            1 / 1000 / stageScale
+            1 / (stageScale * placement.scale)
           );
         }
         const cut = toolSettings.useFogCut;
         let drawingShapes = [simplifiedShape];
 
-        // Filter out hidden or visible shapes if single layer enabled
-        if (!toolSettings.multilayer) {
-          const shapesToSubtract = shapes.filter((shape) =>
-            cut ? !shape.visible : shape.visible
-          );
-          const subtractAction = new SubtractFogAction(shapesToSubtract);
-          const state = subtractAction.execute({
-            [simplifiedShape.id]: simplifiedShape,
-          });
-          drawingShapes = Object.values(state)
-            .filter((shape) => shape.data.points.length > 2)
-            .map((shape) => ({ ...shape, id: shortid.generate() }));
-        }
-
-        if (drawingShapes.length > 0) {
-          if (cut) {
-            // Run a pre-emptive cut action to check whether we've cut anything
-            const cutAction = new CutFogAction(drawingShapes);
-            const state = cutAction.execute(keyBy(shapes, "id"));
-
-            if (Object.keys(state).length === shapes.length) {
-              onShapeError("No fog to cut");
-            } else {
-              onShapesCut(drawingShapes);
-            }
-          } else {
-            onShapesAdd(
-              drawingShapes.map((shape) => ({ ...shape, color: "black" }))
-            );
-          }
-        } else {
-          if (cut) {
-            onShapeError("Fog already cut");
-          } else {
-            onShapeError("Fog already placed");
-          }
-        }
+        if (cut) onShapesCut(drawingShapes); else onShapesAdd(drawingShapes);
         setDrawingShape(null);
       }
 
@@ -369,24 +313,6 @@ function FogTool({
         let guides: Guide[] = [];
         const brushPosition = getBrushPosition(false);
         if (brushPosition) {
-          const absoluteBrushPosition = Vector2.multiply(brushPosition, {
-            x: mapWidth,
-            y: mapHeight,
-          });
-          if (map?.snapToGrid) {
-            guides.push(
-              ...getGuidesFromGridCell(
-                absoluteBrushPosition,
-                grid,
-                gridCellPixelSize,
-                gridOffset,
-                gridCellPixelOffset,
-                gridSnappingSensitivity,
-                { x: mapWidth, y: mapHeight }
-              )
-            );
-          }
-
           guides.push(
             ...getGuidesFromBoundingBoxes(
               brushPosition,
@@ -457,57 +383,13 @@ function FogTool({
     };
 
     let polygonShapes = [polygonShape];
-    // Filter out hidden or visible shapes if single layer enabled
-    if (!toolSettings.multilayer) {
-      const shapesToSubtract = shapes.filter((shape) =>
-        cut ? !shape.visible : shape.visible
-      );
-      const subtractAction = new SubtractFogAction(shapesToSubtract);
-      const state = subtractAction.execute({
-        [polygonShape.id]: polygonShape,
-      });
-      polygonShapes = Object.values(state)
-        .filter((shape) => shape.data.points.length > 2)
-        .map((shape) => ({ ...shape, id: shortid.generate() }));
-    }
-
-    if (polygonShapes.length > 0) {
-      if (cut) {
-        // Run a pre-emptive cut action to check whether we've cut anything
-        const cutAction = new CutFogAction(polygonShapes);
-        const state = cutAction.execute(keyBy(shapes, "id"));
-
-        if (Object.keys(state).length === shapes.length) {
-          onShapeError("No fog to cut");
-        } else {
-          onShapesCut(polygonShapes);
-        }
-      } else {
-        onShapesAdd(
-          polygonShapes.map((shape) => ({
-            ...drawingShape,
-            data: shape.data,
-            id: shape.id,
-            color: "black",
-          }))
-        );
-      }
-    } else {
-      if (cut) {
-        onShapeError("Fog already cut");
-      } else {
-        onShapeError("Fog already placed");
-      }
-    }
-
+    if (cut) onShapesCut(polygonShapes); else onShapesAdd(polygonShapes);
     setDrawingShape(null);
   }, [
     toolSettings,
     drawingShape,
     onShapesCut,
     onShapesAdd,
-    onShapeError,
-    shapes,
   ]);
 
   // Add keyboard shortcuts
@@ -605,9 +487,9 @@ function FogTool({
       .alpha(opacity)
       .string();
     return (
-      <FogShape
+      <SceneDrawing
         key={shape.id}
-        fog={shape}
+        item={fogItem(shape, person.id, false, false)}
         onMouseMove={(e: Konva.KonvaEventObject<MouseEvent>) =>
           (!isBrushDown || leftMouseButton(e)) &&
           handleShapeOver(shape, isBrushDown)
@@ -620,7 +502,6 @@ function FogTool({
         onMouseUp={eraseHoveredShapes}
         onTouchEnd={eraseHoveredShapes}
         stroke={stroke}
-        opacity={opacity}
         strokeWidth={gridStrokeWidth * shape.strokeWidth}
         fill={fill}
         fillPatternImage={patternImage}
@@ -650,11 +531,10 @@ function FogTool({
       .alpha(opacity)
       .string();
     return (
-      <FogShape
-        fog={shape}
+      <SceneDrawing
+        item={fogItem(shape, person.id, false, toolSettings.type === "brush")}
         fill={fill}
         stroke={stroke}
-        opacity={opacity}
         strokeWidth={gridStrokeWidth * shape.strokeWidth}
         hitFunc={() => {}}
       />
@@ -717,12 +597,12 @@ function FogTool({
       }
       setFogShapes(visibleShapes);
     } else {
-      setFogShapes(mergeFogShapes(shapes));
+      setFogShapes(coveredFog(items));
     }
-  }, [shapes, editable, active, toolSettings, shouldRenderGuides]);
+  }, [shapes, items, editable, active, toolSettings, shouldRenderGuides]);
 
   return (
-    <Group>
+    <World>
       <Group>{fogShapes.map(renderShape)}</Group>
       {shouldRenderGuides && renderGuides()}
       {drawingShape && renderDrawingShape(drawingShape)}
@@ -731,7 +611,7 @@ function FogTool({
         toolSettings.type === "polygon" &&
         renderPolygonAcceptTick(drawingShape)}
       {hoveredShapes.length > 0 && hoveredShapes.map(renderHoveredShape)}
-    </Group>
+    </World>
   );
 }
 

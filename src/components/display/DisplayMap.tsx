@@ -34,7 +34,7 @@ function ignore() {}
 function DisplayMap({ map, mapState, view, session }: DisplayMapProps) {
   const { settings } = useSettings();
 
-  const fogShapes = Object.values(mapState?.fogs || {});
+
 
   // The pointer tool leaves tokens and notes with nothing to drag or select
   const { tokens, propTokens } = useMapTokens(
@@ -79,12 +79,6 @@ function DisplayMap({ map, mapState, view, session }: DisplayMapProps) {
         <SceneImages />
         <SceneImages placement="aboveRuler" />
         <FogTool
-          map={map}
-          shapes={fogShapes}
-          onShapesAdd={ignore}
-          onShapesCut={ignore}
-          onShapesRemove={ignore}
-          onShapesEdit={ignore}
           onShapeError={ignore}
           active={false}
           toolSettings={settings.fog}
