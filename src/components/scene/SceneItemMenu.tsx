@@ -232,6 +232,12 @@ export default function SceneItemMenu({
             </Button>
           </>
         )}
+        <Button
+          disabled={!mayUpdate({ hidden: !items.every(item => item.hidden) })}
+          onClick={() => update({ hidden: !items.every(item => item.hidden) })}
+        >
+          {items.every(item => item.hidden) ? "Show" : "Hide"}
+        </Button>
         {all(
           (item) =>
             item.layer === "fog" &&

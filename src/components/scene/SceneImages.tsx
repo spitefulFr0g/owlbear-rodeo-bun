@@ -51,6 +51,7 @@ export function SceneImage({ item, labelSize }: SceneImageProps) {
       rotation={item.rotation}
       scaleX={item.scale.x}
       scaleY={item.scale.y}
+      opacity={item.hidden ? 0.5 : 1}
     >
       <Group offsetX={item.width / 2} offsetY={item.height / 2}>
         <TokenOutline outline={item.outline} hidden={!!image} />

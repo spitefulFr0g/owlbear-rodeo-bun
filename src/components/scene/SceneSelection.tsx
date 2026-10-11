@@ -420,11 +420,9 @@ export function SceneItems({
             opacity={
               item.layer === "fog" && permissions.fog
                 ? fogOpacity
-                : item.hidden
+                : item.blend
                   ? 0.5
-                  : item.blend
-                    ? 0.5
-                    : 1
+                  : 1
             }
           />
         )

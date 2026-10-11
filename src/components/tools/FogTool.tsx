@@ -508,7 +508,7 @@ function FogTool({ onShapeError, active, toolSettings, editable: permitted, visi
         strokeWidth={gridStrokeWidth * shape.strokeWidth}
         fill={fill}
         fillPatternImage={patternImage}
-        fillPriority={editable && !shape.visible ? "pattern" : "color"}
+        fillPriority={!shape.visible ? "pattern" : "color"}
         // Disable collision if the fog is transparent and we're not editing it
         // This allows tokens to be moved under the fog
         hitFunc={editable && !active ? () => {} : undefined}
@@ -587,7 +587,7 @@ function FogTool({ onShapeError, active, toolSettings, editable: permitted, visi
 
   useEffect(() => {
     function shapeVisible(shape: Fog) {
-      return (active && !toolSettings.preview) || shape.visible;
+      return !(active && toolSettings.preview) || shape.visible;
     }
 
     if (editable) {
@@ -600,7 +600,8 @@ function FogTool({ onShapeError, active, toolSettings, editable: permitted, visi
       }
       setFogShapes(visibleShapes);
     } else {
-      setFogShapes(coveredFog(items));
+      // Hidden shapes are an owner-only hint, never part of the fog cover.
+      setFogShapes([...coveredFog(items), ...shapes.filter(shape => !shape.visible && !toolSettings.preview)]);
     }
   }, [shapes, items, editable, active, toolSettings, shouldRenderGuides]);
 

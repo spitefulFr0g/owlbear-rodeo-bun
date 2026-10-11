@@ -48,7 +48,7 @@ function SceneDrawing({ item, ...props }: { item: DrawingItem } & Konva.NodeConf
     if (value !== undefined) config[key] = value;
   }
   return (
-    <Group {...nodeProps} id={item.id} x={item.position.x} y={item.position.y} rotation={item.rotation} scaleX={item.scale.x} scaleY={item.scale.y}>
+    <Group {...nodeProps} id={item.id} x={item.position.x} y={item.position.y} rotation={item.rotation} scaleX={item.scale.x} scaleY={item.scale.y} opacity={item.hidden ? 0.5 : 1}>
       {item.kind === "shape" ? <ShapeDrawing item={item} config={config} /> : item.kind === "curve" ? <CurveDrawing item={item} config={config} /> : <LineDrawing item={item} config={config} />}
     </Group>
   );
