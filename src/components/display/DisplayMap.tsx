@@ -5,6 +5,7 @@ import MapGrid from "../map/MapGrid";
 
 import DrawingTool from "../tools/DrawingTool";
 import FogTool from "../tools/FogTool";
+import SceneImages from "../scene/SceneImages";
 import NetworkedMapPointer from "../../network/NetworkedMapPointer";
 
 import { useSettings } from "../../contexts/SettingsContext";
@@ -77,6 +78,7 @@ function DisplayMap({ map, mapState, view, session }: DisplayMapProps) {
         />
         {notes}
         {tokens}
+        <SceneImages />
         <FogTool
           map={map}
           shapes={fogShapes}

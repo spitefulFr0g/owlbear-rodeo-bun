@@ -27,6 +27,7 @@ import { MapDataProvider } from "../contexts/MapDataContext";
 import { TokenDataProvider } from "../contexts/TokenDataContext";
 import { MapLoadingProvider } from "../contexts/MapLoadingContext";
 import { RoomProvider } from "../contexts/RoomContext";
+import { SceneProvider } from "../scene/SceneContext";
 
 import NetworkedMapAndTokens from "../network/NetworkedMapAndTokens";
 import NetworkedParty from "../network/NetworkedParty";
@@ -158,7 +159,9 @@ function Game() {
                         }}
                       >
                         <NetworkedParty session={session} gameId={gameId} />
-                        <NetworkedMapAndTokens session={session} />
+                        <SceneProvider session={session}>
+                          <NetworkedMapAndTokens session={session} />
+                        </SceneProvider>
                       </Flex>
                       <OfflineBanner isOpen={sessionStatus === "offline"} />
                       <ReconnectBanner

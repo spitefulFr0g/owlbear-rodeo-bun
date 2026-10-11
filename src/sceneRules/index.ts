@@ -1,7 +1,7 @@
-export * from "./types";
-export * from "./caps";
 import { Batch, Change, Scene, Layer, Item } from "./types";
 import { maxChanges } from "./caps";
+export * from "./types";
+export * from "./caps";
 export function readBatch(value: unknown): Batch | undefined {
   if (typeof value !== "object" || value === null || Array.isArray(value))
     return;

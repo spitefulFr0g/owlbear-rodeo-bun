@@ -394,7 +394,7 @@ function NetworkedMapAndTokens({ session }: { session: Session }) {
           onUndo={handleUndo}
           onRedo={handleRedo}
         />
-        <TokenBar onMapTokensStateCreate={handleMapTokensStateCreate} />
+        <TokenBar />
       </GlobalImageDrop>
     </RoomAssetsContext.Provider>
   );
