@@ -181,10 +181,10 @@ function SelectMapModal({
       setIsLoading(true);
       const map = (await getMap(mapId)) || null;
       const mapState = (await getMapState(mapId)) || null;
-      onMapChange(map, mapState);
+      await onMapChange(map, mapState);
       setIsLoading(false);
     } else {
-      onMapChange(null, null);
+      await onMapChange(null, null);
     }
     onDone();
   }

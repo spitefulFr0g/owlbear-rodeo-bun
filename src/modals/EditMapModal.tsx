@@ -1,3 +1,4 @@
+import useSceneMap from "../hooks/useSceneMap";
 import { useState } from "react";
 import { Button, Flex, Label, useThemeUI } from "theme-ui";
 import SimpleBar from "simplebar-react";
@@ -35,6 +36,7 @@ function EditMapModal({
   onUpdateMapState,
 }: EditMapProps) {
   const { theme } = useThemeUI();
+  const sceneMap = useSceneMap();
 
   function handleClose() {
     setMapSettingChanges({});
@@ -76,24 +78,25 @@ function EditMapModal({
       // Ensure grid values are positive
       let verifiedChanges: Partial<Map> = { ...mapSettingChanges };
       if (verifiedChanges.grid) {
-        verifiedChanges.grid.size.x = verifiedChanges.grid.size.x || 1;
-        verifiedChanges.grid.size.y = verifiedChanges.grid.size.y || 1;
+        verifiedChanges.grid.size.x = Math.max(1, verifiedChanges.grid.size.x || 1);
+        verifiedChanges.grid.size.y = Math.max(1, verifiedChanges.grid.size.y || 1);
       }
       // Ensure inset isn't flipped
       if (verifiedChanges.grid) {
         const inset = verifiedChanges.grid.inset;
         if (
-          inset.topLeft.x > inset.bottomRight.x ||
-          inset.topLeft.y > inset.bottomRight.y
+          inset.topLeft.x >= inset.bottomRight.x ||
+          inset.topLeft.y >= inset.bottomRight.y
         ) {
           verifiedChanges.grid.inset = getGridDefaultInset(
-            { size: verifiedChanges.grid.size, type: map.grid.type },
+            { size: verifiedChanges.grid.size, type: verifiedChanges.grid.type },
             map.width,
             map.height
           );
         }
       }
-      await onUpdateMap(map.id, mapSettingChanges);
+      await onUpdateMap(map.id, verifiedChanges);
+      sceneMap.edit({ ...map, ...verifiedChanges } as Map);
       await onUpdateMapState(map.id, mapStateSettingChanges);
 
       setMapSettingChanges({});

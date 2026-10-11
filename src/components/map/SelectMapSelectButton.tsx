@@ -16,7 +16,9 @@ function SelectMapSelectButton({
   const { activeGroups, selectedGroupIds } = useGroup();
 
   function handleSelectClick() {
-    if (selectedGroupIds.length === 1) {
+    if (selectedGroupIds.length === 0) {
+      onMapSelect("");
+    } else if (selectedGroupIds.length === 1) {
       const group = findGroup(activeGroups, selectedGroupIds[0]);
       if (group && group.type === "item") {
         onMapSelect(group.id);
@@ -31,7 +33,7 @@ function SelectMapSelectButton({
       onClick={handleSelectClick}
       mt={2}
     >
-      Select
+      {selectedGroupIds.length === 0 ? "No map" : "Select"}
     </Button>
   );
 }
