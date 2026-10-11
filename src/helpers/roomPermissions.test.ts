@@ -11,11 +11,12 @@ const off = {
   notes: false,
   fog: false,
   uploads: false,
+  ownerOnly: false,
 };
 
 test("new room tools use the room defaults when switches have not arrived", () => {
   expect(getToolPermissions("player")).toEqual({
-    ...defaultRoomSwitches,
+    tokens: true, drawing: true, notes: true, fog: false, uploads: false,
     measure: true,
     pointer: true,
   });

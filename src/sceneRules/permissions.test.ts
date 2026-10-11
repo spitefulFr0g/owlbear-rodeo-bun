@@ -1,5 +1,5 @@
 import { mayChange, TextItem, RoomRules, Person, Change } from "./index";
-const rules: RoomRules = { switches: { tokens: true, drawing: true, notes: true, fog: true, uploads: true } };
+const rules: RoomRules = { switches: { tokens: true, drawing: true, notes: true, fog: true, uploads: true, ownerOnly: false } };
 const map: TextItem = { id: "map", kind: "text", layer: "map", position: { x: 0, y: 0 }, rotation: 0,
   scale: { x: 1, y: 1 }, order: 0, owner: "gm", locked: true, hidden: false, metadata: {},
   text: "Map", color: "red", size: 150, square: true };
@@ -30,7 +30,7 @@ for (const example of examples) {
     const governingSwitch = layer === "fog" ? "fog" : example.kind === "image" ? "tokens" : example.kind === "text" ? "notes" : "drawing";
     test(`${example.kind} on ${layer} follows ${layer === "map" ? "GM only" : governingSwitch} for add, change and delete`, () => {
       for (const on of [false, true]) {
-        const switches = { tokens: !on, drawing: !on, notes: !on, fog: !on, uploads: true, [governingSwitch]: on };
+        const switches = { tokens: !on, drawing: !on, notes: !on, fog: !on, uploads: true, ownerOnly: false, [governingSwitch]: on };
         for (const role of ["gm", "trusted", "player", "display"] as const) {
           for (const owner of ["player", "other"]) {
             const item = { ...example, layer, owner };
@@ -88,6 +88,24 @@ test("drawing, text and fog tools follow their switch for every editable field",
             for (const [field, value] of Object.entries({ ...fields, position: { x: 10, y: 20 }, scale: { x: 2, y: 2 }, rotation: 90, metadata: { custom: true } })) {
               expect(mayChange({ role, id: "player" }, { switches: { ...rules.switches, [governingSwitch]: on } }, { ...item, owner }, { type: "update", id: item.id, fields: { [field]: value } })).toBe(role === "gm" || role === "trusted" || (role === "player" && on && (fog || owner === "player")));
             }
+          }
+        }
+      }
+    }
+  }
+});
+
+test("Owner Only limits token edits to their owner, leaves adds allowed and exempts trusted players", () => {
+  for (const ownerOnly of [false, true]) {
+    for (const tokens of [false, true]) {
+      for (const owner of ["player", "other", "gm"]) {
+        const item = { ...examples[0], layer: "character" as const, owner };
+        const currentRules = { switches: { ...rules.switches, ownerOnly, tokens } };
+        for (const role of ["player", "trusted"] as const) {
+          const person = { role, id: "player" };
+          expect(mayChange(person, currentRules, undefined, { type: "add", item })).toBe(role === "trusted" || tokens);
+          for (const fields of [{ position: { x: 1, y: 2 } }, { scale: { x: 2, y: 2 } }, { rotation: 90 }, { label: "Hero" }, { metadata: { statusRings: ["red"] } }]) {
+            expect(mayChange(person, currentRules, item, { type: "update", id: item.id, fields })).toBe(role === "trusted" || (tokens && (!ownerOnly || owner === person.id)));
           }
         }
       }

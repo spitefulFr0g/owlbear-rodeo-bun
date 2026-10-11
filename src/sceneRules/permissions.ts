@@ -1,7 +1,7 @@
 import { Person, RoomRules, Item, Change, statusRingsKey } from "./types";
 
-/** Item permissions; shape validation is separate. Locks, visibility and
- * Owner Only are extended by their respective permission rows. */
+/** Item permissions; shape validation is separate. Locks and visibility
+ * are extended by their respective permission rows. */
 export function mayChange(
   person: Person,
   rules: RoomRules,
@@ -28,6 +28,7 @@ export function mayChange(
   if (change.type === "add") return true;
   if (governingSwitch === "fog") return true;
   if (governingSwitch !== "tokens" || change.type === "delete") return target.owner === person.id;
+  if (rules.switches.ownerOnly && target.owner !== person.id) return false;
   // Players can transform and label any token, but cannot replace its image
   // or use the metadata bag to change anything besides status rings.
   return Object.keys(change.fields).every(field =>

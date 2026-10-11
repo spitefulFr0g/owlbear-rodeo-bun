@@ -49,3 +49,34 @@ test("socket permissions return real items and use the latest switches and trust
     expect((scene.items.token as ImageItem).label).toBe("Trusted edit");
   } finally { await server.dispose(); }
 });
+
+test("Owner Only refuses another's token, permits added and assigned tokens, and exempts trusted players", async () => {
+  const server = await startTestServer();
+  try {
+    const { cookie } = await setupAdministrator(server);
+    const room = await createRoom(server, cookie, "Owner Only");
+    const gm = await server.joinRoomAsGM(room.id, cookie);
+    await new Promise(resolve => gm.socket.emit("session", true, resolve));
+    const player = await server.joinRoom(room.id, "", "player");
+    const sceneId = gm.snapshot!.scene.id;
+    await sendBatch(gm.socket, { id: "prepare", sceneId, changes: [{ type: "add", item: token }] });
+    await new Promise(resolve => gm.socket.emit("room_switches", { ownerOnly: true }, resolve));
+    const move = { type: "update" as const, id: token.id, fields: { position: { x: 100, y: 100 } } };
+    const refused = await sendBatch(player.socket, { id: "refused", sceneId, changes: [move] });
+    expect(refused.applied).toEqual([]);
+    expect(refused.refused).toEqual([{ id: token.id, item: token }]);
+    const own = await sendBatch(player.socket, { id: "own", sceneId, changes: [
+      { type: "add", item: { ...token, id: "own" } }, { ...move, id: "own" },
+    ] });
+    expect(own.refused).toEqual([]);
+    expect(own.applied).toHaveLength(2);
+    await sendBatch(gm.socket, { id: "assign", sceneId, changes: [{ type: "update", id: token.id, fields: { owner: "player" } }] });
+    expect((await sendBatch(player.socket, { id: "assigned", sceneId, changes: [move] })).refused).toEqual([]);
+    await sendBatch(gm.socket, { id: "reclaim", sceneId, changes: [{ type: "update", id: token.id, fields: { owner: "gm" } }] });
+    await new Promise(resolve => gm.socket.emit("room_trust", "player", true, resolve));
+    expect((await sendBatch(player.socket, { id: "trusted", sceneId, changes: [move] })).refused).toEqual([]);
+    await new Promise(resolve => gm.socket.emit("room_trust", "player", false, resolve));
+    await new Promise(resolve => gm.socket.emit("room_switches", { ownerOnly: false }, resolve));
+    expect((await sendBatch(player.socket, { id: "off", sceneId, changes: [move] })).refused).toEqual([]);
+  } finally { await server.dispose(); }
+});

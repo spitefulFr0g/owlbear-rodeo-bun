@@ -155,7 +155,7 @@ export type RoomSwitches = {
   notes: boolean;
   fog: boolean;
   uploads: boolean;
-  ownerOnly?: boolean;
+  ownerOnly: boolean;
 };
 export type RoomRules = {
   switches: RoomSwitches;
