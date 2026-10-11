@@ -1,17 +1,36 @@
 import { useEffect, useRef, useState } from "react";
 import { Box, IconButton } from "theme-ui";
+import Konva from "konva";
 
 import RemoveTokenIcon from "../../icons/RemoveTokenIcon";
 import { useMapStage } from "../../contexts/MapStageContext";
 
 type DragOverlayProps = {
   dragging: boolean;
-  onRemove: () => void;
+  /** Called when a drag ends over the remove icon */
+  onRemove?: () => void;
+  /** Given the remove icon, for a caller that decides for itself where a drag ended */
+  removeRef?: React.RefObject<HTMLDivElement>;
 };
 
-function DragOverlay({ dragging, onRemove }: DragOverlayProps) {
+/** Whether the map stage's pointer is over an element of the page */
+export function isPointerOver(mapStage: Konva.Stage, element: Element | null) {
+  const map = document.querySelector(".map");
+  const pointerPosition = mapStage.getPointerPosition();
+  if (!map || !pointerPosition || !element) {
+    return false;
+  }
+  const mapRect = map.getBoundingClientRect();
+  const x = pointerPosition.x + mapRect.left;
+  const y = pointerPosition.y + mapRect.top;
+  const rect = element.getBoundingClientRect();
+  return x > rect.left && y > rect.top && x < rect.right && y < rect.bottom;
+}
+
+function DragOverlay({ dragging, onRemove, removeRef }: DragOverlayProps) {
   const [isRemoveHovered, setIsRemoveHovered] = useState(false);
-  const removeTokenRef = useRef<HTMLDivElement>(null);
+  const ownRemoveRef = useRef<HTMLDivElement>(null);
+  const removeTokenRef = removeRef || ownRemoveRef;
 
   const mapStageRef = useMapStage();
 
@@ -22,32 +41,9 @@ function DragOverlay({ dragging, onRemove }: DragOverlayProps) {
       if (!mapStage || !dragging || !removeTokenRef.current) {
         return;
       }
-      const map = document.querySelector(".map");
-      if (!map) {
-        return;
-      }
-      const mapRect = map.getBoundingClientRect();
-      const pointerPosition = mapStage.getPointerPosition();
-      if (!pointerPosition) {
-        return;
-      }
-      const screenSpacePointerPosition = {
-        x: pointerPosition.x + mapRect.left,
-        y: pointerPosition.y + mapRect.top,
-      };
-      const removeIconPosition = removeTokenRef.current.getBoundingClientRect();
-
-      if (
-        screenSpacePointerPosition.x > removeIconPosition.left &&
-        screenSpacePointerPosition.y > removeIconPosition.top &&
-        screenSpacePointerPosition.x < removeIconPosition.right &&
-        screenSpacePointerPosition.y < removeIconPosition.bottom
-      ) {
-        if (!isRemoveHovered) {
-          setIsRemoveHovered(true);
-        }
-      } else if (isRemoveHovered) {
-        setIsRemoveHovered(false);
+      const hovered = isPointerOver(mapStage, removeTokenRef.current);
+      if (hovered !== isRemoveHovered) {
+        setIsRemoveHovered(hovered);
       }
     }
 
@@ -61,12 +57,12 @@ function DragOverlay({ dragging, onRemove }: DragOverlayProps) {
         clearInterval(handler);
       }
     };
-  }, [isRemoveHovered, dragging, mapStageRef]);
+  }, [isRemoveHovered, dragging, mapStageRef, removeTokenRef]);
 
   // Detect drag end of token image and remove it if it is over the remove icon
   useEffect(() => {
     if (!dragging && isRemoveHovered) {
-      onRemove();
+      onRemove?.();
     }
   });
 

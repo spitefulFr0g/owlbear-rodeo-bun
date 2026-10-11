@@ -1,5 +1,11 @@
-import { defaultSceneGrid, ImageItem, Scene } from "../sceneRules";
-import { afterAnswer, afterChanges, imageFiles, imagesInOrder } from "./shown";
+import { Batch, Change, defaultSceneGrid, ImageItem, Scene } from "../sceneRules";
+import {
+  afterAnswer,
+  afterChanges,
+  imageFiles,
+  imagesInOrder,
+  shownScene,
+} from "./shown";
 
 function image(id: string, fields: Partial<ImageItem> = {}): ImageItem {
   return {
@@ -105,6 +111,115 @@ describe("the server's answer to a batch", () => {
   });
 });
 
+function batch(id: string, ...changes: Change[]): Batch {
+  return { id, sceneId: "scene", changes };
+}
+
+function move(id: string, x: number, y: number): Change {
+  return { type: "update", id, fields: { position: { x, y } } };
+}
+
+describe("what the store shows", () => {
+  test("is the server's scene when nothing is unconfirmed", () => {
+    const held = scene(image("a"));
+    expect(shownScene(held, [])).toBe(held);
+  });
+
+  test("is nothing before the first snapshot", () => {
+    expect(shownScene(null, [batch("one", move("a", 1, 1))])).toBeNull();
+  });
+
+  test("has an unconfirmed change on top of the server's scene", () => {
+    const held = scene(image("a"));
+    const shown = shownScene(held, [batch("one", move("a", 30, 40))]);
+    expect(shown!.items.a.position).toEqual({ x: 30, y: 40 });
+    expect(held.items.a.position).toEqual({ x: 0, y: 0 });
+  });
+
+  test("keeps an unconfirmed change on top of what the server sends meanwhile", () => {
+    const unconfirmed = [batch("one", move("a", 30, 40))];
+    const held = afterChanges(scene(image("a")), {
+      sceneId: "scene",
+      changes: [
+        {
+          type: "update",
+          id: "a",
+          fields: { position: { x: 7, y: 7 }, label: "theirs" },
+        },
+      ],
+    });
+    const shown = shownScene(held, unconfirmed);
+    expect(shown!.items.a.position).toEqual({ x: 30, y: 40 });
+    expect(shown!.items.a).toMatchObject({ label: "theirs" });
+  });
+
+  test("applies unconfirmed batches in the order they were made", () => {
+    const shown = shownScene(scene(image("a")), [
+      batch("one", move("a", 1, 1), { type: "add", item: image("b") }),
+      batch("two", move("a", 2, 2), { type: "delete", id: "b" }),
+    ]);
+    expect(shown!.items.a.position).toEqual({ x: 2, y: 2 });
+    expect(Object.keys(shown!.items)).toEqual(["a"]);
+  });
+
+  test("skips an unconfirmed change to an item that is gone, and shows the rest", () => {
+    const shown = shownScene(scene(image("b")), [
+      batch("one", move("a", 1, 1), move("b", 2, 2)),
+    ]);
+    expect(Object.keys(shown!.items)).toEqual(["b"]);
+    expect(shown!.items.b.position).toEqual({ x: 2, y: 2 });
+  });
+
+  test("puts a moved image on top of its layer, as the server will", () => {
+    const shown = shownScene(
+      scene(image("a", { order: 0 }), image("b", { order: 4 })),
+      [batch("one", move("a", 1, 1))]
+    );
+    expect(imagesInOrder(shown!).map((item) => item.id)).toEqual(["b", "a"]);
+  });
+
+  test("leaves a moved image on the Map layer in its order", () => {
+    const shown = shownScene(
+      scene(
+        image("a", { layer: "map", order: 0 }),
+        image("b", { layer: "map", order: 4 })
+      ),
+      [batch("one", move("a", 1, 1))]
+    );
+    expect(shown!.items.a.order).toBe(0);
+  });
+
+  test("puts an added item and an item that changed layer on top of the layer", () => {
+    const shown = shownScene(
+      scene(image("a", { order: 3 }), image("p", { layer: "prop", order: 6 })),
+      [
+        batch(
+          "one",
+          { type: "add", item: image("new") },
+          { type: "update", id: "a", fields: { layer: "prop" } }
+        ),
+      ]
+    );
+    expect(shown!.items.new.order).toBe(4);
+    expect(shown!.items.a.order).toBe(7);
+  });
+
+  test("goes back to what the server holds once a refused batch is answered", () => {
+    const unconfirmed = [batch("one", move("a", 30, 40))];
+    const held = afterAnswer(scene(image("a")), {
+      batchId: "one",
+      sceneId: "scene",
+      applied: [],
+      refused: [{ id: "a", item: image("a") }],
+    });
+    const shown = shownScene(
+      held,
+      unconfirmed.filter((sent) => sent.id !== "one")
+    );
+    expect(shown!.items.a.position).toEqual({ x: 0, y: 0 });
+  });
+});
+
 test("images draw layer by layer, each layer in its order", () => {
   const drawn = imagesInOrder(
     scene(
@@ -120,6 +235,22 @@ test("images draw layer by layer, each layer in its order", () => {
     "mount",
     "character-bottom",
     "character-top",
+    "attachment",
+  ]);
+});
+
+test("an image being dragged draws on top of its own layer only", () => {
+  const drawn = imagesInOrder(
+    scene(
+      image("dragged", { order: 0 }),
+      image("character", { order: 5 }),
+      image("attachment", { layer: "attachment", order: 0 })
+    ),
+    "dragged"
+  );
+  expect(drawn.map((item) => item.id)).toEqual([
+    "character",
+    "dragged",
     "attachment",
   ]);
 });
