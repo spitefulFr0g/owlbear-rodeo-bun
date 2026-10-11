@@ -16,7 +16,7 @@ The table plays with a shared screen, so a player view on a second display is wa
 
 - The same display link works in the popout, in a browser on another device, and later as the address handed to the Presentation API.
 - The server must accept a connection that can read and never write. This overlaps with the roles work.
-- Nobody controls a cast display, so it follows the GM's view all the time. The GM can freeze it while they look elsewhere.
+- Nobody controls a cast display, so it follows the GM's view all the time. The GM can freeze it while they look elsewhere. Once a room holds several scenes, it follows the GM only on the open scene, and holds its last view while the GM views another.
 - It is built on today's canvas in the first release, before the item model and scenes, and the view code is partly redone when they land.
 
 Full detail: [Screen grid, fog, drawing, text and presentation features (sections H, I, K, L, M)](https://github.com/spitefulFr0g/owlbear-rodeo-bun/issues/18).
