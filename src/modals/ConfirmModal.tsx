@@ -21,6 +21,7 @@ function ConfirmModal({
 }: ConfirmModalProps) {
   return (
     <Modal
+      contentLabel={label}
       isOpen={isOpen}
       onRequestClose={onRequestClose}
       style={{ content: { maxWidth: "300px" } }}

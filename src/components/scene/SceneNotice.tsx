@@ -29,7 +29,8 @@ function SceneNotice() {
       role="status"
       sx={{
         position: "absolute",
-        bottom: [56, 56, 0],
+        bottom: 56,
+        "@media (min-width: 1024px)": { bottom: 0 },
         left: "50%",
         transform: "translateX(-50%)",
         alignItems: "center",
@@ -41,7 +42,7 @@ function SceneNotice() {
         color: "hsl(210, 50%, 96%)",
         borderRadius: "4px",
       }}
-      m={2}
+      my={2}
       p={2}
     >
       <Text as="p" variant="body2" sx={{ overflowWrap: "anywhere", flexBasis: "100%", minWidth: 0 }} mr={2}>
@@ -50,7 +51,7 @@ function SceneNotice() {
       </Text>
       <Button
         type="button"
-        sx={{ flexShrink: 0, color: "inherit", borderColor: "currentcolor" }}
+        sx={{ flexShrink: 1, maxWidth: "100%", whiteSpace: "normal", color: "inherit", borderColor: "currentcolor" }}
         mr={2}
         disabled={readOnly || isSending}
         onClick={handleShow}
@@ -59,7 +60,7 @@ function SceneNotice() {
       </Button>
       <Button
         type="button"
-        sx={{ flexShrink: 0, color: "inherit", borderColor: "currentcolor" }}
+        sx={{ flexShrink: 1, maxWidth: "100%", whiteSpace: "normal", color: "inherit", borderColor: "currentcolor" }}
         disabled={readOnly || isSending}
         onClick={async () => {
           const answer = await viewScene(away.openSceneId);
