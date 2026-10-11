@@ -16,9 +16,7 @@ function SelectMapSelectButton({
   const { activeGroups, selectedGroupIds } = useGroup();
 
   function handleSelectClick() {
-    if (selectedGroupIds.length === 0) {
-      onMapSelect("");
-    } else if (selectedGroupIds.length === 1) {
+    if (selectedGroupIds.length === 1) {
       const group = findGroup(activeGroups, selectedGroupIds[0]);
       if (group && group.type === "item") {
         onMapSelect(group.id);
@@ -29,11 +27,11 @@ function SelectMapSelectButton({
   return (
     <Button
       variant="primary"
-      disabled={disabled || selectedGroupIds.length > 1}
+      disabled={disabled || selectedGroupIds.length !== 1}
       onClick={handleSelectClick}
       mt={2}
     >
-      {selectedGroupIds.length === 0 ? "No map" : "Select"}
+      Select
     </Button>
   );
 }
