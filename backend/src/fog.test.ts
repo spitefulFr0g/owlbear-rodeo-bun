@@ -9,7 +9,7 @@ const curve: CurveItem = {
   closed: false, color: "red", strokeWidth: 15, fill: false, blend: false, cut: false,
 };
 
-test("fog shapes, holes, cuts and hidden flags survive restart and remove for everyone", async () => {
+test("fog shapes, holes, cuts and hidden flags survive restart and remove only for connections that saw them", async () => {
   const server = await startTestServer();
   try {
     const { cookie } = await setupAdministrator(server);
@@ -35,10 +35,11 @@ test("fog shapes, holes, cuts and hidden flags survive restart and remove for ev
     expect(rejoined.snapshot!.scene).toEqual(saved);
     await new Promise(resolve => rejoined.socket.emit("session", true, resolve));
     const player = await server.joinRoom(room.id);
+    expect(player.snapshot!.scene.items["shape-1"]).toBeUndefined();
     const relay = nextMessage(player.socket, "scene_changes");
     const erased = await sendBatch(rejoined.socket, { id: "erase", sceneId, changes: items.map(item => ({ type: "delete", id: item.id })) });
     expect(erased.refused).toEqual([]);
-    expect((await relay)[0]).toEqual({ sceneId, changes: erased.applied });
+    expect((await relay)[0]).toEqual({ sceneId, changes: items.filter(item => !item.hidden).map(item => ({ type: "delete", id: item.id })) });
     await server.restart();
     expect((await server.joinRoomAsGM(room.id, cookie)).snapshot!.scene.items).toEqual({});
   } finally { await server.dispose(); }

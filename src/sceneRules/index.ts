@@ -80,3 +80,5 @@ export function topOrder(scene: Scene, layer: Layer): number {
 export { checkChange } from "./validation";
 
 export { mayChange } from "./permissions";
+
+export { visibleTo, changeFor } from "./visibility";

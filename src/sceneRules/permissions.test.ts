@@ -56,7 +56,7 @@ test("players transform and label others' tokens and set only status ring metada
 });
 test("one forbidden field refuses a whole update and only trusted owners can change layers", () => {
   for (const role of ["gm", "trusted", "player"] as const) {
-    for (const field of ["kind", "owner", "locked", "hidden"]) {
+    for (const field of ["kind", "owner", "locked"]) {
       const fields = { position: { x: 10, y: 20 }, [field]: field === "kind" ? "text" : field === "owner" ? "other" : true };
       expect(mayChange({ role, id: "player" }, rules, base, { type: "update", id: base.id, fields })).toBe(role === "gm");
     }

@@ -11,12 +11,14 @@ export function mayChange(
   if (person.role === "gm") return true;
   const target = change.type === "add" ? change.item : item;
   if (!target || target.layer === "map") return false;
+  if (change.type !== "add" && target.hidden && target.owner !== person.id) return false;
   if (change.type !== "add" && target.locked) return false;
   if (change.type === "add") {
     if (target.locked || target.hidden) return false;
   } else if (change.type === "update") {
     for (const field of Object.keys(change.fields)) {
-      if (["id", "kind", "order", "owner", "locked", "hidden"].includes(field)) return false;
+      if (["id", "kind", "order", "owner", "locked"].includes(field)) return false;
+      if (field === "hidden" && (person.role !== "trusted" || target.owner !== person.id)) return false;
       if (field === "layer" && (person.role !== "trusted" ||
           target.owner !== person.id || change.fields.layer === "map")) return false;
     }
