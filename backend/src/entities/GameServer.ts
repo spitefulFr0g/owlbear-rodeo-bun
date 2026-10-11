@@ -1,4 +1,4 @@
-import { applyChange, visibleTo, changeFor, Item, Scene, mayChange, Person, checkChange, readBatch, topOrder, gmOwner, Change, SceneGrid, checkGrid, defaultSceneGrid } from "../../../src/sceneRules";
+import { applyChange, visibleTo, changeFor, Item, Scene, mayChange, Person, checkChange, readBatch, topOrder, gmOwner, Change, SceneGrid, checkGrid, defaultSceneGrid, checkSceneName, maxScenes } from "../../../src/sceneRules";
 import { randomBytes } from "crypto";
 import Accounts from "../accounts/Accounts";
 import { clientAddress } from "../clientRequest";
@@ -126,7 +126,7 @@ export default class GameServer {
         if (roomId && !this.gameRepo.games[roomId].session && socket.data.role !== "gm" &&
           event === "player_pointer") return;
         if (
-          socket.data.castDisplay && !["get_display_token", "join_display", "scene_grid", "room_switches", "room_trust", "room_password", "new_display_link", "session", "scene_create", "scene_view"].includes(event)
+          socket.data.castDisplay && !["get_display_token", "join_display", "scene_grid", "room_switches", "room_trust", "room_password", "new_display_link", "session", "scene_create", "scene_view", "scene_rename", "scene_delete"].includes(event)
         ) {
           return;
         }
@@ -279,14 +279,17 @@ export default class GameServer {
         }
         const payload = value as { name?: unknown } | null;
         if (!payload || typeof payload !== "object" || Array.isArray(payload) ||
-          Object.keys(payload).some(key => key !== "name") || typeof payload.name !== "string" ||
-          !payload.name.trim().length || payload.name.trim().length > 100) {
+          Object.keys(payload).some(key => key !== "name") || checkSceneName(payload.name) === undefined) {
           if (typeof answer === "function") answer({ ok: false, error: "invalid" });
           return;
         }
         const game = this.gameRepo.games[gameId];
+        if (Object.keys(game.scenes).length >= maxScenes) {
+          if (typeof answer === "function") answer({ ok: false, error: "cap" });
+          return;
+        }
         const sceneId = randomBytes(16).toString("hex");
-        game.scenes[sceneId] = { id: sceneId, name: payload.name.trim(), grid: { ...defaultSceneGrid },
+        game.scenes[sceneId] = { id: sceneId, name: checkSceneName(payload.name)!, grid: { ...defaultSceneGrid },
           fogFill: false, viewOnly: false, items: {} };
         socket.data.viewedSceneId = sceneId;
         this.gameRepo.save(gameId);
@@ -294,6 +297,47 @@ export default class GameServer {
         this.broadcastSceneList(gameId);
         if (typeof answer === "function") answer({ ok: true, sceneId });
       });
+
+      for (const event of ["scene_rename", "scene_delete"] as const) {
+        socket.on(event, (value: unknown, answer?: (result: { ok: boolean; error?: string }) => void) => {
+          const gameId = gameState.getGameId();
+          if (!gameId || socket.data.castDisplay || socket.data.role !== "gm") {
+            if (typeof answer === "function") answer({ ok: false, error: "not_room_gm" });
+            return;
+          }
+          const payload = value as { sceneId?: unknown; name?: unknown } | null;
+          if (!payload || typeof payload !== "object" || Array.isArray(payload) ||
+            Object.keys(payload).some(key => key !== "sceneId" && !(event === "scene_rename" && key === "name")) ||
+            typeof payload.sceneId !== "string" || (event === "scene_rename" && checkSceneName(payload.name) === undefined)) {
+            if (typeof answer === "function") answer({ ok: false, error: "invalid" });
+            return;
+          }
+          const game = this.gameRepo.games[gameId];
+          if (!Object.hasOwn(game.scenes, payload.sceneId)) {
+            if (typeof answer === "function") answer({ ok: false, error: "not_found" });
+            return;
+          }
+          if (event === "scene_delete" && payload.sceneId === game.openSceneId) {
+            if (typeof answer === "function") answer({ ok: false, error: "open_scene" });
+            return;
+          }
+          if (event === "scene_rename") game.scenes[payload.sceneId].name = checkSceneName(payload.name)!;
+          else {
+            delete game.scenes[payload.sceneId];
+            if (game.welcomeSceneId === payload.sceneId) game.welcomeSceneId = null;
+            for (const id of this.io.sockets.adapter.rooms.get(gameId) || []) {
+              const peer = this.io.sockets.sockets.get(id);
+              if (peer?.data.role === "gm" && peer.data.viewedSceneId === payload.sceneId) {
+                peer.data.viewedSceneId = game.openSceneId;
+                peer.emit("scene_snapshot", { scene: this.sceneFor(peer, gameId) });
+              }
+            }
+          }
+          this.gameRepo.save(gameId);
+          this.broadcastSceneList(gameId);
+          if (typeof answer === "function") answer({ ok: true });
+        });
+      }
 
       socket.on("scene_view", (value: unknown, answer?: (result: { ok: boolean; error?: string }) => void) => {
         const gameId = gameState.getGameId();

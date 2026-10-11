@@ -12,3 +12,7 @@ export const maxMetadataBytes = 16 * 1024;
 // Grid lines range from one tenth to ten world units.
 export const minGridLineWidth = 0.1;
 export const maxGridLineWidth = 10;
+
+// One hundred scenes in one room, with names up to one hundred characters.
+export const maxScenes = 100;
+export const maxSceneNameLength = 100;
