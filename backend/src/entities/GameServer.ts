@@ -355,8 +355,8 @@ export default class GameServer {
       socket.on("display_view", (view: DisplayView) => {
         const game = followedGame();
         if (
-          !game || !view || typeof view.mapId !== "string" ||
-          view.mapId !== (game.getState("map") as Map | undefined)?.id ||
+          !game || !view || typeof view !== "object" || Array.isArray(view) ||
+          typeof view.sceneId !== "string" || view.sceneId !== game.scene.id ||
           ![view.x, view.y, view.width, view.height].every(
             (value) => typeof value === "number" && Number.isFinite(value)
           ) || view.width <= 0 || view.height <= 0
@@ -500,16 +500,6 @@ export default class GameServer {
           if (socket.data.role !== "gm") {
             socket.emit("map", this.gameRepo.getState(gameId, "map"));
             return;
-          }
-          const game = this.gameRepo.games[gameId];
-          const previousMap = game.getState("map") as Map | undefined;
-          if (previousMap?.id !== map?.id) {
-            game.latestDisplayView = undefined;
-            game.shownDisplayView = undefined;
-            if (game.displayFrozen) {
-              game.displayFrozen = false;
-              this.io.to(gameId).emit("display_frozen", false);
-            }
           }
           this.gameRepo.setState(gameId, "map", map);
           const state = this.gameRepo.getState(gameId, "map");

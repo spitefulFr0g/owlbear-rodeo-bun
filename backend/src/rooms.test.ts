@@ -94,13 +94,13 @@ test("a room's password still gates new connections after a restart", async () =
 test("the old display link joins after restart without restoring presence, dice, timers, view or freeze", async () => {
   const server = await startRoomServer();
   try {
-    const { owner, observer, map } = await change(server);
+    const { owner, observer } = await change(server);
     const party = nextMessage(observer.socket, "party_state");
     owner.socket.emit("player_state", { userId: "gm", nickname: "GM", dice: { roll: 20 }, timer: { remaining: 60 } });
     await party;
     const token = await new Promise<string>((resolve) => owner.socket.emit("get_display_token", resolve));
     expect(token).toBeString();
-    owner.socket.emit("display_view", { mapId: map.id, x: 1, y: 2, width: 3, height: 4 });
+    owner.socket.emit("display_view", { sceneId: owner.snapshot!.scene.id, x: 1, y: 2, width: 3, height: 4 });
     const frozen = nextMessage(observer.socket, "display_frozen");
     owner.socket.emit("display_freeze", true);
     await frozen;

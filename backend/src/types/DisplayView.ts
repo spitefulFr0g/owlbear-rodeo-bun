@@ -1,5 +1,5 @@
 export interface DisplayView {
-  mapId: string;
+  sceneId: string;
   x: number;
   y: number;
   width: number;
