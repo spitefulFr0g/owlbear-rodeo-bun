@@ -13,8 +13,8 @@ test("a GM joins an empty scene and adds an item with server owner and order", a
     const { cookie } = await setupAdministrator(server);
     const room = await createRoom(server, cookie, "Room");
     const gm = await server.joinRoomAsGM(room.id, cookie);
-    expect(gm.snapshot?.scene.items).toEqual({});
-    const sceneId = gm.snapshot!.scene.id;
+    expect(gm.snapshot?.scene?.items).toEqual({});
+    const sceneId = gm.snapshot!.scene!.id;
     await new Promise(resolve => gm.socket.emit("session", true, resolve));
     const player = await server.joinRoom(room.id);
     const relay = nextMessage(player.socket, "scene_changes");
@@ -23,11 +23,11 @@ test("a GM joins an empty scene and adds an item with server owner and order", a
     expect((await relay)[0].changes[0].item).toEqual({ ...token, owner: "gm", order: 0 });
     expect((await answer)[0].applied).toHaveLength(1);
     await server.restart();
-    expect((await server.joinRoomAsGM(room.id, cookie)).snapshot!.scene.items.hero).toEqual({ ...token, owner: "gm", order: 0 });
+    expect((await server.joinRoomAsGM(room.id, cookie)).snapshot!.scene!.items.hero).toEqual({ ...token, owner: "gm", order: 0 });
   } finally { await server.dispose(); }
 });
 
-test("players and cast displays receive scenes only during a session", async () => {
+test("players and cast displays receive no scene outside a session without a welcome scene", async () => {
   const server = await startTestServer();
   try {
     const { cookie } = await setupAdministrator(server);
@@ -36,9 +36,9 @@ test("players and cast displays receive scenes only during a session", async () 
     const player = await server.joinRoom(room.id, "", "anonymous-browser");
     const displayToken = await new Promise<string>(resolve => gm.socket.emit("get_display_token", resolve));
     const display = await server.joinDisplay(room.id, displayToken);
-    expect(player.snapshot).toBeUndefined();
-    expect(display.snapshot).toBeUndefined();
-    const sceneId = gm.snapshot!.scene.id;
+    expect(player.snapshot).toEqual({ scene: null });
+    expect(display.snapshot).toEqual({ scene: null });
+    const sceneId = gm.snapshot!.scene!.id;
     const send = async (item: typeof token, id = "batch", namedScene = sceneId) => {
       const answer = nextMessage(player.socket, "scene_answer");
       player.socket.emit("scene_changes", { id, sceneId: namedScene, changes: [{ type: "add", item }] });
@@ -69,7 +69,7 @@ test("players and cast displays receive scenes only during a session", async () 
     expect(malformedAnswers).toEqual([]);
     expect(events).toEqual([]);
     const rejoined = await server.joinRoom(room.id);
-    expect(rejoined.snapshot!.scene.items.hero.owner).toBe("anonymous-browser");
+    expect(rejoined.snapshot!.scene!.items.hero.owner).toBe("anonymous-browser");
   } finally { await server.dispose(); }
 });
 
@@ -79,7 +79,7 @@ test("scene adds reach durable storage after the save delay and within eight sec
     const { cookie } = await setupAdministrator(server);
     const room = await createRoom(server, cookie, "Room");
     const gm = await server.joinRoomAsGM(room.id, cookie);
-    const sceneId = gm.snapshot!.scene.id;
+    const sceneId = gm.snapshot!.scene!.id;
     for (let index = 0; index < 8; index++) {
       const answer = nextMessage(gm.socket, "scene_answer");
       gm.socket.emit("scene_changes", { id: `batch-${index}`, sceneId, changes: [{ type: "add", item: { ...token, id: `hero-${index}` } }] });
@@ -87,11 +87,11 @@ test("scene adds reach durable storage after the save delay and within eight sec
       await server.clock.advance(1000);
     }
     const copy = await server.durableCopy();
-    try { expect(Object.keys((await copy.joinRoomAsGM(room.id, cookie)).snapshot!.scene.items)).toHaveLength(8); }
+    try { expect(Object.keys((await copy.joinRoomAsGM(room.id, cookie)).snapshot!.scene!.items)).toHaveLength(8); }
     finally { await copy.dispose(); }
     await server.clock.advance(3000);
     const delayed = await server.durableCopy();
-    try { expect((await delayed.joinRoomAsGM(room.id, cookie)).snapshot!.scene.id).toBe(sceneId); }
+    try { expect((await delayed.joinRoomAsGM(room.id, cookie)).snapshot!.scene!.id).toBe(sceneId); }
     finally { await delayed.dispose(); }
   } finally { await server.dispose(); }
 });
@@ -103,14 +103,14 @@ test("one add is saved after three seconds without waiting for a clean stop", as
     const { cookie } = await setupAdministrator(server);
     const room = await createRoom(server, cookie, "Room");
     const gm = await server.joinRoomAsGM(room.id, cookie);
-    await sendBatch(gm.socket, { id: "add", sceneId: gm.snapshot!.scene.id, changes: [{ type: "add", item: token }] });
+    await sendBatch(gm.socket, { id: "add", sceneId: gm.snapshot!.scene!.id, changes: [{ type: "add", item: token }] });
     await server.clock.advance(2999);
     const before = await server.durableCopy();
-    try { expect((await before.joinRoomAsGM(room.id, cookie)).snapshot!.scene.items).toEqual({}); }
+    try { expect((await before.joinRoomAsGM(room.id, cookie)).snapshot!.scene!.items).toEqual({}); }
     finally { await before.dispose(); }
     await server.clock.advance(1);
     const after = await server.durableCopy();
-    try { expect((await after.joinRoomAsGM(room.id, cookie)).snapshot!.scene.items.hero.owner).toBe("gm"); }
+    try { expect((await after.joinRoomAsGM(room.id, cookie)).snapshot!.scene!.items.hero.owner).toBe("gm"); }
     finally { await after.dispose(); }
   } finally { await server.dispose(); }
 });
@@ -121,7 +121,7 @@ test("mixed updates and deletes relay applied changes and answer with real refus
     const { cookie } = await setupAdministrator(server);
     const room = await createRoom(server, cookie, "Room");
     const gm = await server.joinRoomAsGM(room.id, cookie);
-    const sceneId = gm.snapshot!.scene.id;
+    const sceneId = gm.snapshot!.scene!.id;
     await sendBatch(gm.socket, { id: "add", sceneId, changes: [{ type: "add", item: token }] });
     await new Promise(resolve => gm.socket.emit("session", true, resolve));
     const player = await server.joinRoom(room.id, "", "player-browser");
@@ -141,7 +141,7 @@ test("mixed updates and deletes relay applied changes and answer with real refus
     expect(answer.refused).toEqual([{ id: "hero", item: moved }, { id: "hero", item: moved }, { id: "hero", item: null }]);
     expect((await relay)[0]).toEqual({ sceneId, changes: answer.applied });
     await server.restart();
-    expect((await server.joinRoomAsGM(room.id, cookie)).snapshot!.scene.items).toEqual({});
+    expect((await server.joinRoomAsGM(room.id, cookie)).snapshot!.scene!.items).toEqual({});
   } finally { await server.dispose(); }
 });
 
@@ -151,7 +151,7 @@ test("connections retain independent fields and converge on the server's last wr
     const { cookie } = await setupAdministrator(server);
     const room = await createRoom(server, cookie, "Room");
     const gm = await server.joinRoomAsGM(room.id, cookie);
-    const sceneId = gm.snapshot!.scene.id;
+    const sceneId = gm.snapshot!.scene!.id;
     await sendBatch(gm.socket, { id: "seed", sceneId, changes: [
       { type: "add", item: token },
       { type: "add", item: { ...token, id: "prop", layer: "prop" } },
@@ -183,7 +183,7 @@ test("connections retain independent fields and converge on the server's last wr
       { type: "update", id: "hero", fields: { layer: "prop" } },
     ] });
     expect(layer.applied as unknown).toEqual([{ type: "update", id: "hero", fields: { layer: "prop", order: 1 } }]);
-    const current = (await server.joinRoomAsGM(room.id, cookie)).snapshot!.scene;
+    const current = (await server.joinRoomAsGM(room.id, cookie)).snapshot!.scene!;
     expect(current.items.hero).toEqual({ ...token, owner: "gm", layer: "prop", order: 1,
       position: { x: 900, y: 750 }, label: "Player label" });
     expect(playerEvents).toEqual([{ sceneId, changes: move.applied }, { sceneId, changes: layer.applied }]);

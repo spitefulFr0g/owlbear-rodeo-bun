@@ -44,7 +44,7 @@ function next(socket: Socket, event: string): Promise<any[]> {
 }
 
 async function join(socket: Socket, gameId: string, password = "", playerId?: string) {
-  socket.on("scene_snapshot", ({ scene }) => { scenes.set(gameId, scene.id); });
+  socket.on("scene_snapshot", ({ scene }) => { if (scene) scenes.set(gameId, scene.id); });
   const frozen = next(socket, "display_frozen");
   const joined = next(socket, "joined_game");
   socket.emit("join_game", await roomId(gameId, password), password, undefined, { playerId });

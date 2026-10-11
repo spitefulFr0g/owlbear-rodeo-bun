@@ -15,7 +15,7 @@ test("settings on any named scene reach only its viewers and are saved immediate
     const room = await createRoom(server, cookie, "Room");
     const gm = await server.joinRoomAsGM(room.id, cookie);
     const other = await server.joinRoomAsGM(room.id, cookie);
-    const openId = gm.snapshot!.scene.id;
+    const openId = gm.snapshot!.scene!.id;
     await action(gm.socket, "session", true);
     const player = await server.joinRoom(room.id);
     const token = await new Promise<string>(resolve => gm.socket.emit("get_display_token", resolve));
@@ -62,7 +62,7 @@ test("players, trusted players and cast displays cannot change scene settings", 
       for (const event of ["scene_settings", "scene_list"]) peer.socket.on(event, value => messages.push(value));
     }
     for (const peer of [player, trusted, display]) {
-      expect(await action(peer.socket, "scene_settings", { sceneId: gm.snapshot!.scene.id, grid, fogFill: true, viewOnly: true }))
+      expect(await action(peer.socket, "scene_settings", { sceneId: gm.snapshot!.scene!.id, grid, fogFill: true, viewOnly: true }))
         .toEqual({ ok: false, error: "not_room_gm" });
     }
     for (const peer of [gm, player, trusted, display]) await barrier(peer.socket);
@@ -77,7 +77,7 @@ test("invalid or missing scene settings are refused atomically without sending s
     const { cookie } = await setupAdministrator(server);
     const room = await createRoom(server, cookie, "Room");
     const gm = await server.joinRoomAsGM(room.id, cookie);
-    const sceneId = gm.snapshot!.scene.id;
+    const sceneId = gm.snapshot!.scene!.id;
     const messages: unknown[] = [];
     for (const event of ["scene_settings", "scene_list"]) gm.socket.on(event, value => messages.push(value));
     for (const value of [
@@ -102,7 +102,7 @@ test("partial settings preserve other values and refresh the list only when view
     const { cookie } = await setupAdministrator(server);
     const room = await createRoom(server, cookie, "Room");
     const gm = await server.joinRoomAsGM(room.id, cookie);
-    const sceneId = gm.snapshot!.scene.id;
+    const sceneId = gm.snapshot!.scene!.id;
     const lists: unknown[] = [];
     gm.socket.on("scene_list", value => lists.push(value));
     const settings = [

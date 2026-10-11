@@ -21,11 +21,11 @@ test("the v0.3.0 scene grid action is gone: nobody is answered or sent anything 
     for (const peer of [gm, player, display]) {
       for (const event of ["scene_grid", "scene_settings"]) peer.socket.on(event, value => messages.push(value));
     }
-    const payload = { sceneId: gm.snapshot!.scene.id, grid: { ...defaultSceneGrid, type: "hexVertical" } };
+    const payload = { sceneId: gm.snapshot!.scene!.id, grid: { ...defaultSceneGrid, type: "hexVertical" } };
     expect(await Promise.all([gm, player, display].map(peer => action(peer.socket, "scene_grid", payload))))
       .toEqual(["timeout", "timeout", "timeout"]);
     for (const peer of [gm, player]) await barrier(peer.socket);
     expect(messages).toEqual([]);
-    expect((await server.joinRoomAsGM(room.id, cookie)).snapshot!.scene.grid).toEqual(defaultSceneGrid);
+    expect((await server.joinRoomAsGM(room.id, cookie)).snapshot!.scene!.grid).toEqual(defaultSceneGrid);
   } finally { await server.dispose(); }
 });
