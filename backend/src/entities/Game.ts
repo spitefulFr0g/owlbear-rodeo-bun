@@ -1,3 +1,4 @@
+import { Scene, defaultSceneGrid } from "../../../src/sceneRules";
 import { RoomSwitches } from "../types/RoomSwitches";
 import { randomBytes } from "crypto";
 import { DisplayView } from "../types/DisplayView";
@@ -8,6 +9,7 @@ import { Manifest } from "../types/Manifest";
 import { Map } from "../types/Map";
 
 export default class Game {
+  scene: Scene = { id: randomBytes(16).toString("hex"), grid: JSON.parse(JSON.stringify(defaultSceneGrid)), items: {} };
   name = "";
   session = false;
   cancelSessionCountdown?: () => void;

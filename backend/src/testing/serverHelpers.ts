@@ -3,6 +3,7 @@ import { tmpdir } from "os";
 import { join } from "path";
 import { io, Socket } from "socket.io-client";
 import msgParser from "socket.io-msgpack-parser";
+import { Batch, Change, Item, Scene } from "../../../src/sceneRules";
 import { Clock } from "../clock";
 import { RunningServer, startServer } from "../server";
 
@@ -71,25 +72,28 @@ export async function startTestServer(prepare?: (dataDir: string) => Promise<voi
     return socket;
   };
   // Both helpers join rooms already created through POST /api/rooms.
-  const joinConnection = async (roomId: string, credential: string, event: "join_game" | "join_display", cookie?: string) => {
+  const joinConnection = async (roomId: string, credential: string, event: "join_game" | "join_display", cookie?: string, playerId?: string) => {
     const socket = connect(cookie);
     const saved: any = {};
+    let snapshot: { scene: Scene } | undefined;
+    socket.on("scene_snapshot", value => { snapshot = value; });
     socket.on("map", value => { saved.map = value; });
     socket.on("map_state", value => { saved.mapState = value; });
     socket.on("manifest", value => { saved.manifest = value; });
     const party = nextMessage(socket, "party_state");
     const joined = nextMessage(socket, event === "join_game" ? "joined_game" : "joined_display");
     const frozen = nextMessage(socket, "display_frozen");
-    socket.emit(event, roomId, credential);
+    if (event === "join_game") socket.emit(event, roomId, credential, undefined, { playerId });
+    else socket.emit(event, roomId, credential);
     const [[, token, info], [displayFrozen]] = await Promise.all([joined, frozen]);
     const [partyState] = await party;
-    return { socket, info, token: token as string, state: { ...saved, partyState }, displayFrozen };
+    return { socket, info, snapshot, token: token as string, state: { ...saved, partyState }, displayFrozen };
   };
   return {
     clock,
     connect,
     get address() { return server.address; },
-    joinRoom: (roomId: string, password = "") => joinConnection(roomId, password, "join_game"),
+    joinRoom: (roomId: string, password = "", playerId?: string) => joinConnection(roomId, password, "join_game", undefined, playerId),
     joinRoomAsGM: (roomId: string, cookie: string) => joinConnection(roomId, "", "join_game", cookie),
     joinDisplay: (roomId: string, displayToken: string) => joinConnection(roomId, displayToken, "join_display"),
     // Capture durable files without invoking the clean-stop flush. The tests
@@ -165,4 +169,11 @@ export async function inviteAccount(server: Pick<RunningServer, "address">, admi
   const { account } = await response.json() as { account: import("../accounts/Accounts").Account };
   const cookie = response.headers.get("set-cookie")!.split(";")[0];
   return { account, cookie };
+}
+
+/** Sends one browser batch and captures its ordered server answer. */
+export async function sendBatch(socket: Socket, batch: Batch): Promise<{ batchId: string; sceneId: string; applied: Change[]; refused: { id: string; item: Item | null }[] }> {
+  const answer = nextMessage(socket, "scene_answer");
+  socket.emit("scene_changes", batch);
+  return (await answer)[0];
 }

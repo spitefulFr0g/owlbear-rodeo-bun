@@ -67,13 +67,15 @@ async function post(address: string, path: string, body: unknown, cookie?: strin
 /** Joins the room as its GM and answers with the socket and the token for assets. */
 async function joinAsGM(address: string, roomId: string, cookie: string) {
   const socket = io(address, { parser: msgParser, transports: ["websocket"], reconnection: false, extraHeaders: { Cookie: cookie } });
+  let snapshot: { scene: import("../../src/sceneRules").Scene } | undefined;
+  socket.on("scene_snapshot", value => { snapshot = value; });
   const token = await new Promise<string>((resolve, reject) => {
     socket.once("joined_game", (_id: string, token: string) => resolve(token));
     socket.once("connect_error", reject);
     setTimeout(() => reject(new Error("The GM did not join the room within 10 seconds")), 10000).unref();
     socket.emit("join_game", roomId, "");
   });
-  return { socket, token };
+  return { socket, token, get snapshot() { return snapshot; } };
 }
 
 const image = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 1, 2, 3, 4]);
@@ -101,6 +103,12 @@ try {
   const { rooms } = await list.json() as { rooms: { id: string }[] };
   if (!rooms.some(saved => saved.id === room.id)) throw new Error("The room was not there after the restart");
   const second = await joinAsGM(server.address, room.id, cookie);
+  // The acknowledgement follows the join snapshot on the same connection.
+  await new Promise(resolve => second.socket.emit("get_display_token", resolve));
+  if (!second.snapshot || Object.keys(second.snapshot.scene.items).length !== 0 ||
+      second.snapshot.scene.grid.type !== "square") {
+    throw new Error("The restarted or upgraded room did not open with an empty square-grid scene");
+  }
   const kept = await fetch(`${server.address}/assets/smoke-image`, { headers: { Authorization: `Bearer ${second.token}` } });
   if (kept.status !== 200 || !Buffer.from(await kept.arrayBuffer()).equals(Buffer.from(image))) {
     throw new Error(`The image was not there after the restart: ${kept.status}`);
