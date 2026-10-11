@@ -19,7 +19,7 @@ function GameExpiredModal({ isOpen, onRequestClose }: GameExpiredModalProps) {
       <Box>
         <Label py={2}>Game Timed Out</Label>
         <Text as="p" mb={2} variant="caption">
-          Reselect your map to pick up where you left off.
+          Reconnect to the room to return to your scene.
         </Text>
         <Flex py={2}>
           <Button sx={{ flexGrow: 1 }} m={1} ml={0} onClick={onRequestClose}>
