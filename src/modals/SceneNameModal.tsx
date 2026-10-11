@@ -3,8 +3,7 @@ import { Box, Button, Flex, Input, Label, Text } from "theme-ui";
 
 import Modal from "../components/Modal";
 
-// The server's cap on a scene's name
-export const sceneNameMaxLength = 100;
+import { maxSceneNameLength } from "../sceneRules";
 
 type SceneNameModalProps = {
   isOpen: boolean;
@@ -70,12 +69,12 @@ function SceneNameModal({
             onChange={(event: ChangeEvent<HTMLInputElement>) =>
               setName(event.target.value)
             }
-            maxLength={sceneNameMaxLength}
+            maxLength={maxSceneNameLength}
             autoComplete="off"
             ref={inputRef}
           />
           <Text as="p" variant="caption" mt={1}>
-            Up to {sceneNameMaxLength} characters. The list is sorted by name.
+            Up to {maxSceneNameLength} characters. The list is sorted by name.
           </Text>
         </Box>
         {error && (

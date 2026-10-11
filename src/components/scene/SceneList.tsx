@@ -5,7 +5,7 @@ import ChangeNicknameIcon from "../../icons/ChangeNicknameIcon";
 import RemoveMapIcon from "../../icons/RemoveMapIcon";
 
 import ConfirmModal from "../../modals/ConfirmModal";
-import SceneNameModal, { sceneNameMaxLength } from "../../modals/SceneNameModal";
+import SceneNameModal from "../../modals/SceneNameModal";
 
 import { useScene, SceneAnswer } from "../../scene/SceneContext";
 import {
@@ -14,6 +14,7 @@ import {
   sceneMarks,
   sortScenes,
 } from "../../helpers/sceneList";
+import { maxSceneNameLength } from "../../sceneRules";
 
 function refusal(answer: SceneAnswer) {
   switch (answer.error) {
@@ -210,7 +211,7 @@ function SceneList({ onDone }: SceneListProps) {
             onChange={(event: ChangeEvent<HTMLInputElement>) =>
               setName(event.target.value)
             }
-            maxLength={sceneNameMaxLength}
+            maxLength={maxSceneNameLength}
             autoComplete="off"
             mr={2}
           />
