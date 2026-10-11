@@ -8,7 +8,6 @@ import MapGrid from "./MapGrid";
 
 import DrawingTool from "../tools/DrawingTool";
 import FogTool from "../tools/FogTool";
-import SceneImages from "../scene/SceneImages";
 import MeasureTool from "../tools/MeasureTool";
 import NetworkedMapPointer from "../../network/NetworkedMapPointer";
 import NetworkedDisplayView from "../../network/NetworkedDisplayView";
@@ -52,6 +51,7 @@ import useMapTokens from "../../hooks/useMapTokens";
 import useMapNotes from "../../hooks/useMapNotes";
 import { MapActions } from "../../hooks/useMapActions";
 import useMapSelection from "../../hooks/useMapSelection";
+import useSceneImages from "../../hooks/useSceneImages";
 
 type MapProps = {
   map: MapType | null;
@@ -175,6 +175,10 @@ function Map({
       settings.select
     );
 
+  const { sceneImages, sceneDragOverlay } = useSceneImages(
+    selectedToolId === "move"
+  );
+
   return (
     <Box sx={{ flexGrow: 1 }}>
       <MapInteraction
@@ -204,6 +208,7 @@ function Map({
             {tokenDragOverlay}
             {noteDragOverlay}
             {selectionDragOverlay}
+            {sceneDragOverlay}
           </>
         }
         selectedToolId={selectedToolId}
@@ -221,7 +226,7 @@ function Map({
         />
         {notes}
         {tokens}
-        <SceneImages />
+        {sceneImages}
         <FogTool
           map={map}
           shapes={fogShapes}

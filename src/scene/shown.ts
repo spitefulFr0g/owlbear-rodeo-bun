@@ -1,10 +1,12 @@
 import {
   applyChange,
+  Batch,
   Change,
   ImageItem,
   Item,
   layers,
   Scene,
+  topOrder,
 } from "../sceneRules";
 
 /** What the server sends the other connections when a batch is applied */
@@ -55,14 +57,62 @@ export function afterAnswer(
   return { ...scene, items };
 }
 
-/** The scene's Image items in the order they are drawn, bottom first */
-export function imagesInOrder(scene: Scene): ImageItem[] {
+/** A change with the order the server will give it, so it shows where it will land */
+function withServerOrder(scene: Scene, change: Change): Change {
+  if (change.type === "add") {
+    const order = topOrder(scene, change.item.layer);
+    return { type: "add", item: { ...change.item, order } };
+  }
+  if (change.type !== "update") return change;
+  const item = Object.prototype.hasOwnProperty.call(scene.items, change.id)
+    ? scene.items[change.id]
+    : undefined;
+  const raised =
+    change.fields.layer !== undefined ||
+    (change.fields.position !== undefined &&
+      item?.kind === "image" &&
+      item.layer !== "map");
+  if (!item || !raised) return change;
+  // Only the server's own changes carry an order, so the type has no room for it
+  const fields = {
+    ...change.fields,
+    order: topOrder(scene, change.fields.layer || item.layer),
+  };
+  return { ...change, fields };
+}
+
+/**
+ * What the store shows: the server's scene with this connection's unconfirmed
+ * batches on top, in the order they were made. A change that no longer fits,
+ * such as an update to an item the server has since deleted, is skipped.
+ */
+export function shownScene(
+  server: Scene | null,
+  unconfirmed: Batch[]
+): Scene | null {
+  if (!server) return null;
+  let shown = server;
+  for (const batch of unconfirmed) {
+    if (batch.sceneId !== server.id) continue;
+    for (const change of batch.changes)
+      shown = applyChange(shown, withServerOrder(shown, change)).scene;
+  }
+  return shown;
+}
+
+/**
+ * The scene's Image items in the order they are drawn, bottom first. The
+ * item named by `raised`, one being dragged, draws on top of its layer.
+ */
+export function imagesInOrder(scene: Scene, raised?: string): ImageItem[] {
   const images: ImageItem[] = [];
   for (const item of Object.values(scene.items))
     if (item.kind === "image") images.push(item);
   return images.sort(
     (a, b) =>
-      layers.indexOf(a.layer) - layers.indexOf(b.layer) || a.order - b.order
+      layers.indexOf(a.layer) - layers.indexOf(b.layer) ||
+      Number(a.id === raised) - Number(b.id === raised) ||
+      a.order - b.order
   );
 }
 

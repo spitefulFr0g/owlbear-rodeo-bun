@@ -30,6 +30,7 @@ import {
   imageFiles,
   imagesInOrder,
   RelayedChanges,
+  shownScene,
 } from "./shown";
 import { tokenItem } from "./tokenItem";
 import { clientPositionToWorld } from "./worldPosition";
@@ -48,8 +49,11 @@ type SceneStore = {
   switches: RoomSwitches;
   /** Not connected, or no snapshot yet */
   readOnly: boolean;
-  /** One action: every change in it goes to the server as one batch */
-  act: (changes: Change[]) => void;
+  /**
+   * One action: every change in it shows at once and goes to the server as
+   * one batch. False when nothing was sent, as the canvas is read-only.
+   */
+  act: (changes: Change[]) => boolean;
   /** Puts stored files this browser holds on the server, for an item to name */
   share: (files: string[]) => Promise<void>;
 };
@@ -63,7 +67,15 @@ type SceneProviderProps = {
   children: React.ReactNode;
 };
 
-/** Holds the scene of the room this session has joined, as the server last sent it */
+/** What the server last sent, and this connection's batches it has not answered yet */
+type Held = { server: Scene | null; unconfirmed: Batch[] };
+
+const nothingHeld: Held = { server: null, unconfirmed: [] };
+
+/**
+ * Holds the scene of the room this session has joined: what the server last
+ * sent, with this connection's unconfirmed changes shown on top
+ */
 export function SceneProvider({
   session,
   display = false,
@@ -74,11 +86,15 @@ export function SceneProvider({
   const room = useRoom();
   const { getAsset, putAsset } = useAssets();
 
-  const [scene, setScene] = useState<Scene | null>(null);
-  const sceneRef = useRef(scene);
+  const [held, setHeld] = useState(nothingHeld);
+  const sceneRef = useRef(held.server);
   useEffect(() => {
-    sceneRef.current = scene;
+    sceneRef.current = held.server;
   });
+  const scene = useMemo(
+    () => shownScene(held.server, held.unconfirmed),
+    [held]
+  );
 
   const [connected, setConnected] = useState(!!session.joinToken);
   useEffect(() => {
@@ -93,13 +109,21 @@ export function SceneProvider({
 
   useEffect(() => {
     function handleSnapshot({ scene }: { scene: Scene }) {
-      setScene(scene);
+      setHeld({ server: scene, unconfirmed: [] });
     }
     function handleChanges(relayed: RelayedChanges) {
-      setScene((scene) => afterChanges(scene, relayed));
+      setHeld((held) => ({
+        ...held,
+        server: afterChanges(held.server, relayed),
+      }));
     }
     function handleAnswer(answer: BatchAnswer) {
-      setScene((scene) => afterAnswer(scene, answer));
+      setHeld((held) => ({
+        server: afterAnswer(held.server, answer),
+        unconfirmed: held.unconfirmed.filter(
+          (batch) => batch.id !== answer.batchId
+        ),
+      }));
     }
     session.socket?.on("scene_snapshot", handleSnapshot);
     session.socket?.on("scene_changes", handleChanges);
@@ -115,7 +139,7 @@ export function SceneProvider({
   const waiting = role !== "gm" && room.session === false;
   useEffect(() => {
     if (waiting) {
-      setScene(null);
+      setHeld(nothingHeld);
     }
   }, [waiting]);
 
@@ -152,11 +176,20 @@ export function SceneProvider({
   const act = useCallback(
     (changes: Change[]) => {
       const scene = sceneRef.current;
-      if (!scene || !session.joinToken || changes.length === 0) {
-        return;
+      // Nothing is queued while the connection is being restored
+      if (!scene || !session.socket?.connected || !session.joinToken) {
+        return false;
+      }
+      if (changes.length === 0) {
+        return true;
       }
       const batch: Batch = { id: uuid(), sceneId: scene.id, changes };
-      session.socket?.emit("scene_changes", batch);
+      setHeld((held) => ({
+        ...held,
+        unconfirmed: [...held.unconfirmed, batch],
+      }));
+      session.socket.emit("scene_changes", batch);
+      return true;
     },
     [session]
   );
