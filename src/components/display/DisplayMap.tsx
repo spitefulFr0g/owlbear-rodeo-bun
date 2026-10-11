@@ -46,14 +46,7 @@ function DisplayMap({ map, mapState, view, session }: DisplayMapProps) {
     "pointer"
   );
 
-  const { notes } = useMapNotes(
-    map,
-    mapState,
-    ignore,
-    ignore,
-    ignore,
-    "pointer"
-  );
+  const { notes } = useMapNotes("pointer");
 
   const sceneGrid = useSceneGrid(map);
 
@@ -74,9 +67,9 @@ function DisplayMap({ map, mapState, view, session }: DisplayMapProps) {
           active={false}
           toolSettings={settings.drawing}
         />
-        {notes}
         {tokens}
         <SceneImages />
+        {notes}
         <SceneImages placement="aboveRuler" />
         <FogTool
           onShapeError={ignore}
