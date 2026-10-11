@@ -1,6 +1,7 @@
 import {
   awayFromOpenScene,
   ListedScene,
+  mayBringPlayers,
   SceneList,
   sceneMarks,
   sortScenes,
@@ -42,6 +43,29 @@ describe("awayFromOpenScene", () => {
       openSceneId: "road",
       openName: "2 Road",
     });
+  });
+});
+
+describe("mayBringPlayers", () => {
+  test("is offered to a GM viewing the open scene during a session", () => {
+    expect(mayBringPlayers(list, "road", true)).toBe(true);
+  });
+
+  test("is not offered outside a session", () => {
+    expect(mayBringPlayers(list, "road", false)).toBe(false);
+    expect(mayBringPlayers(list, "road", undefined)).toBe(false);
+  });
+
+  test("is not offered while the GM views a scene that is not the open scene", () => {
+    expect(mayBringPlayers(list, "keep", true)).toBe(false);
+  });
+
+  test("is not offered to anyone who was sent no scene list", () => {
+    expect(mayBringPlayers(null, "road", true)).toBe(false);
+  });
+
+  test("is not offered before a scene has arrived", () => {
+    expect(mayBringPlayers(list, undefined, true)).toBe(false);
   });
 });
 

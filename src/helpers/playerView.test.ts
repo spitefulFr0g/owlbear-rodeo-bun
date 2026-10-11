@@ -21,6 +21,16 @@ const wideWindow = {
   layerY: 250,
 };
 
+// A tall window whose world origin is off to one side, as after panning
+const tallWindow = {
+  stageWidth: 400,
+  stageHeight: 800,
+  mapWidth: 1,
+  mapHeight: 1,
+  layerX: -150,
+  layerY: 60,
+};
+
 const view = { sceneId: "scene-1", x: 200, y: 100, width: 500, height: 500 };
 
 describe("fitPlayerView", () => {
@@ -43,6 +53,23 @@ describe("fitPlayerView", () => {
     expect(visible.width).toBeCloseTo(2000);
     // Centred on the same point of the scene
     expect(visible.x + visible.width / 2).toBeCloseTo(450);
+  });
+
+  test("brings a player to all of the GM's view in a narrower window, with more above and below", () => {
+    const transform = fitPlayerView(view, "scene-1", tallWindow);
+    const visible = getVisibleMapRect(transform!, tallWindow);
+    expect(visible.x).toBeCloseTo(200);
+    expect(visible.width).toBeCloseTo(500);
+    expect(visible.height).toBeCloseTo(1000);
+    // Centred on the same point of the scene
+    expect(visible.y + visible.height / 2).toBeCloseTo(350);
+  });
+
+  test("brings a player to the same place wherever they had panned and zoomed to", () => {
+    // The view taken depends on the window alone, not on the view it replaces
+    const first = fitPlayerView(view, "scene-1", window1000);
+    const again = fitPlayerView({ ...view }, "scene-1", window1000);
+    expect(again).toEqual(first);
   });
 
   test("leaves the view alone when it is of a scene this window does not hold", () => {

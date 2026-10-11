@@ -2,7 +2,8 @@ import { DisplayView, fitMapRect, MapFrame, StageTransform } from "./displayView
 
 /**
  * The view a GM carries to players and trusted players, in world units: on
- * Show to players, where they start on the new open scene
+ * Show to players, where they start on the new open scene, and on Bring
+ * players here, where they are moved to on the open scene
  */
 export type PlayerView = DisplayView;
 
