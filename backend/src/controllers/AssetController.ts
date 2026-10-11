@@ -67,6 +67,7 @@ export default class AssetController extends Controller {
       return;
     }
     res.locals.roomId = this.joinTokens.verify(token);
+    res.locals.canRecordAsset = this.joinTokens.canUpload(token);
     next();
   }
 
@@ -84,7 +85,8 @@ export default class AssetController extends Controller {
         res.sendStatus(404);
         return;
       }
-      this.database?.recordRoomAsset(res.locals.roomId, assetId);
+      // Reads still work with uploads off, but cannot make a foreign image placeable.
+      if (res.locals.canRecordAsset) this.database?.recordRoomAsset(res.locals.roomId, assetId);
       const { record } = asset;
       res.status(200).set({
         "Content-Type": record.mime,

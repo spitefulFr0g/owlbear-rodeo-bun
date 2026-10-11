@@ -184,7 +184,7 @@ test("file cleanup failure leaves the room and exclusive image records deleted w
     const first = await createRoom(server, cookie, "First");
     const second = await createRoom(server, cookie, "Second");
     const writer = await server.joinRoomAsGM(first.id, cookie);
-    const reader = await server.joinRoom(second.id);
+    const reader = await server.joinRoomAsGM(second.id, cookie);
     for (const id of ["exclusive", "shared"]) {
       const uploaded = await fetch(`${server.address}/assets/${id}`, { method: "PUT", headers: imageHeaders(writer.token), body: id });
       expect(uploaded.status).toBe(201);

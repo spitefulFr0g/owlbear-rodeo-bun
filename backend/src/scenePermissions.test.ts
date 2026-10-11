@@ -120,3 +120,55 @@ test("socket lock refusals return the real state and assigned owners can delete"
     expect((await sendBatch(player.socket, { id: "delete", sceneId, changes: [{ type: "delete", id: token.id }] })).refused).toEqual([]);
   } finally { await server.dispose(); }
 });
+
+test("uploads off admits only built-in images and every file already used by this room", async () => {
+  const server = await startTestServer();
+  try {
+    const { cookie } = await setupAdministrator(server);
+    const room = await createRoom(server, cookie, "Images");
+    const otherRoom = await createRoom(server, cookie, "Other images");
+    const gm = await server.joinRoomAsGM(room.id, cookie);
+    const otherGM = await server.joinRoomAsGM(otherRoom.id, cookie);
+    await new Promise(resolve => gm.socket.emit("session", true, resolve));
+    const player = await server.joinRoom(room.id, "", "player");
+    const put = (joinToken: string, id: string) => fetch(`${server.address}/assets/${id}`, {
+      method: "PUT", body: "image", headers: { Authorization: `Bearer ${joinToken}`,
+        "Content-Type": "image/png", "X-Asset-Width": "1", "X-Asset-Height": "1", "X-Asset-Owner": "player" },
+    });
+    for (const id of ["known", "thumbnail", "low", "medium", "high", "ultra"]) expect((await put(gm.token, id)).status).toBe(201);
+    expect((await put(otherGM.token, "foreign")).status).toBe(201);
+    const add = async (id: string, image: ImageItem["image"], peer = player) => sendBatch(peer.socket, {
+      id, sceneId: gm.snapshot!.scene.id, changes: [{ type: "add", item: { ...token, id, image } }],
+    });
+    expect((await add("built-in", token.image)).refused).toEqual([]);
+    const known: ImageItem["image"] = { type: "file", file: "known", thumbnail: "thumbnail",
+      resolutions: { low: "low", medium: "medium", high: "high", ultra: "ultra" } };
+    expect((await add("known-image", known)).refused).toEqual([]);
+    for (const method of ["GET", "HEAD"]) {
+      expect((await fetch(`${server.address}/assets/foreign`, {
+        method, headers: { Authorization: `Bearer ${player.token}` },
+      })).status).toBe(200);
+      expect((await add(`foreign-${method}`, { type: "file", file: "foreign" })).refused).toEqual([{ id: `foreign-${method}`, item: null }]);
+    }
+    for (const image of [
+      { ...known, thumbnail: "foreign" },
+      ...["low", "medium", "high", "ultra"].map(resolution => ({ ...known, resolutions: { ...known.resolutions, [resolution]: "foreign" } })),
+    ]) expect((await add("unknown-part", image)).refused).toEqual([{ id: "unknown-part", item: null }]);
+    // The legacy manifest cannot make a file known.
+    gm.socket.emit("manifest", { mapId: "map", assets: { foreign: { id: "foreign", owner: "gm" } } });
+    expect((await add("manifest-only", { type: "file", file: "foreign" })).refused).toEqual([{ id: "manifest-only", item: null }]);
+    expect((await add("gm-image", { type: "file", file: "foreign" }, gm)).refused).toEqual([]);
+    await new Promise(resolve => gm.socket.emit("room_trust", "player", true, resolve));
+    expect((await add("trusted-image", { type: "file", file: "foreign" })).refused).toEqual([]);
+    await new Promise(resolve => gm.socket.emit("room_trust", "player", false, resolve));
+    await new Promise(resolve => gm.socket.emit("room_switches", { uploads: true }, resolve));
+    expect((await put(player.token, "uploaded")).status).toBe(201);
+    expect((await add("uploads-on", { type: "file", file: "uploaded" })).refused).toEqual([]);
+    await new Promise(resolve => gm.socket.emit("room_switches", { uploads: false }, resolve));
+    expect((await add("reused-upload", { type: "file", file: "uploaded" })).refused).toEqual([]);
+    expect((await fetch(`${server.address}/assets/foreign`, {
+      method: "HEAD", headers: { Authorization: `Bearer ${gm.token}` },
+    })).status).toBe(200);
+    expect((await add("gm-fetched", { type: "file", file: "foreign" })).refused).toEqual([]);
+  } finally { await server.dispose(); }
+});

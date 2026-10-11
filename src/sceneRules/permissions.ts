@@ -27,7 +27,11 @@ export function mayChange(
   const governingSwitch = target.layer === "fog" ? "fog" :
     target.kind === "image" ? "tokens" : target.kind === "text" ? "notes" : "drawing";
   if (!rules.switches[governingSwitch]) return false;
-  if (change.type === "add") return true;
+  if (change.type === "add") {
+    if (target.kind === "image" && !rules.switches.uploads &&
+        target.image.type !== "default" && !rules.knownImage?.(target.image)) return false;
+    return true;
+  }
   if (governingSwitch === "fog") return true;
   if (governingSwitch !== "tokens" || change.type === "delete") return target.owner === person.id;
   if (rules.switches.ownerOnly && target.owner !== person.id) return false;
