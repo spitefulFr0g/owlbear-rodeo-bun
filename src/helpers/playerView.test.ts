@@ -65,11 +65,16 @@ describe("fitPlayerView", () => {
     expect(visible.y + visible.height / 2).toBeCloseTo(350);
   });
 
-  test("brings a player to the same place wherever they had panned and zoomed to", () => {
-    // The view taken depends on the window alone, not on the view it replaces
-    const first = fitPlayerView(view, "scene-1", window1000);
-    const again = fitPlayerView({ ...view }, "scene-1", window1000);
-    expect(again).toEqual(first);
+  test("brings a player to a view across the world's origin", () => {
+    const acrossOrigin = { ...view, x: -250, y: -150 };
+    const transform = fitPlayerView(acrossOrigin, "scene-1", window1000);
+    expect(transform).toEqual({ x: 500, y: 300, scale: 2 });
+    expect(getVisibleMapRect(transform!, window1000)).toEqual({
+      x: -250,
+      y: -150,
+      width: 500,
+      height: 500,
+    });
   });
 
   test("leaves the view alone when it is of a scene this window does not hold", () => {
