@@ -34,7 +34,6 @@ function ignore() {}
 function DisplayMap({ map, mapState, view, session }: DisplayMapProps) {
   const { settings } = useSettings();
 
-  const drawShapes = Object.values(mapState?.drawings || {});
   const fogShapes = Object.values(mapState?.fogs || {});
 
   // The pointer tool leaves tokens and notes with nothing to drag or select
@@ -72,10 +71,6 @@ function DisplayMap({ map, mapState, view, session }: DisplayMapProps) {
         {sceneGrid}
         {propTokens}
         <DrawingTool
-          map={map}
-          drawings={drawShapes}
-          onDrawingAdd={ignore}
-          onDrawingsRemove={ignore}
           active={false}
           toolSettings={settings.drawing}
         />

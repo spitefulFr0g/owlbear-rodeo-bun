@@ -40,7 +40,8 @@ import { useKeyboard } from "../../contexts/KeyboardContext";
 import shortcuts from "../../shortcuts";
 import { useToolPermissions, useRole } from "../../contexts/RoomContext";
 import { getRoleControls } from "../../helpers/roomControls";
-import { isEmpty } from "../../helpers/shared";
+import { useScene } from "../../scene/SceneContext";
+import { drawingsInOrder } from "../../scene/drawingItem";
 import { MapActions } from "../../hooks/useMapActions";
 
 type MapControlsProps = {
@@ -78,6 +79,7 @@ function MapContols({
   const [fullScreen, setFullScreen] = useSetting("map.fullScreen");
 
   const permissions = useToolPermissions();
+  const { scene, readOnly } = useScene();
   const isGM = getRoleControls(useRole()).hidden;
 
   const disabledControls = useMemo(() => {
@@ -94,7 +96,7 @@ function MapContols({
       disabled.push("select");
     }
     if (!permissions.tokens && !permissions.notes) disabled.push("select");
-    if (!map || !allowMapDrawing) {
+    if (readOnly || !allowMapDrawing) {
       disabled.push("drawing");
     }
     if (!map || !allowFogDrawing) {
@@ -131,6 +133,7 @@ function MapContols({
     mapActions,
     allowMapChange,
     permissions,
+    readOnly,
   ]);
 
   // Change back to move tool if selected tool becomes disabled
@@ -144,11 +147,11 @@ function MapContols({
     const disabled: Partial<Record<keyof Settings, string[]>> = {
       drawing: [],
     };
-    if (mapState && isEmpty(mapState.drawings)) {
+    if (!scene || drawingsInOrder(scene).length === 0) {
       disabled.drawing?.push("erase");
     }
     return disabled;
-  }, [mapState]);
+  }, [scene]);
 
   const toolsById: Record<string, MapTool> = {
     move: {

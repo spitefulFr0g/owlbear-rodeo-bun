@@ -1,20 +1,13 @@
 import { useState, useEffect } from "react";
 import shortid from "shortid";
-import { Group } from "react-konva";
 
 import {
   useDebouncedStageScale,
-  useMapWidth,
-  useMapHeight,
   useInteractionEmitter,
   leftMouseButton,
   MapDragEvent,
 } from "../../contexts/MapInteractionContext";
 import { useMapStage } from "../../contexts/MapStageContext";
-import {
-  useGridCellNormalizedSize,
-  useGridStrokeWidth,
-} from "../../contexts/GridContext";
 
 import Vector2 from "../../helpers/Vector2";
 import {
@@ -24,11 +17,15 @@ import {
 } from "../../helpers/drawing";
 import { getRelativePointerPosition } from "../../helpers/konva";
 
-import useGridSnapping from "../../hooks/useGridSnapping";
+import useSceneSnapping from "../../hooks/useSceneSnapping";
+import useWorldPlacement from "../../hooks/useWorldPlacement";
+import { useScene } from "../../scene/SceneContext";
+import { drawingItem, drawingsInOrder, deleteDrawings } from "../../scene/drawingItem";
+import SceneDrawing from "../scene/SceneDrawing";
+import World from "../scene/World";
+import { worldNodeId } from "../../scene/worldPosition";
 
-import DrawingShape from "../konva/Drawing";
 
-import { Map } from "../../types/Map";
 import {
   Drawing,
   DrawingToolSettings,
@@ -36,38 +33,22 @@ import {
   Shape,
 } from "../../types/Drawing";
 
-export type DrawingAddEventHanlder = (drawing: Drawing) => void;
-export type DrawingsRemoveEventHandler = (drawingIds: string[]) => void;
-
-type MapDrawingProps = {
-  map: Map | null;
-  drawings: Drawing[];
-  onDrawingAdd: DrawingAddEventHanlder;
-  onDrawingsRemove: DrawingsRemoveEventHandler;
+type DrawingToolProps = {
   active: boolean;
   toolSettings: DrawingToolSettings;
 };
 
-function DrawingTool({
-  map,
-  drawings,
-  onDrawingAdd: onShapeAdd,
-  onDrawingsRemove: onShapesRemove,
-  active,
-  toolSettings,
-}: MapDrawingProps) {
+function DrawingTool({ active, toolSettings }: DrawingToolProps) {
+  const { scene, person, readOnly, act } = useScene();
+  const drawings = scene ? drawingsInOrder(scene) : [];
+  const placement = useWorldPlacement();
   const stageScale = useDebouncedStageScale();
-  const mapWidth = useMapWidth();
-  const mapHeight = useMapHeight();
   const interactionEmitter = useInteractionEmitter();
-
-  const gridCellNormalizedSize = useGridCellNormalizedSize();
-  const gridStrokeWidth = useGridStrokeWidth();
-
+  const gridStrokeWidth = (scene?.grid.unitsPerCell || 150) / 10;
   const mapStageRef = useMapStage();
   const [drawing, setDrawing] = useState<Drawing | null>(null);
   const [isBrushDown, setIsBrushDown] = useState(false);
-  const [erasingDrawings, setErasingDrawings] = useState<Drawing[]>([]);
+  const [erasingDrawings, setErasingDrawings] = useState<string[]>([]);
 
   const shouldHover = toolSettings.type === "erase" && active;
 
@@ -79,30 +60,37 @@ function DrawingTool({
     toolSettings.type === "circle" ||
     toolSettings.type === "triangle";
 
-  const snapPositionToGrid = useGridSnapping();
+  const snapPositionToGrid = useSceneSnapping();
 
   useEffect(() => {
-    if (!active) {
+    if (!active || readOnly) {
+      setDrawing(null);
+      setIsBrushDown(false);
+      setErasingDrawings([]);
+    }
+  }, [active, readOnly]);
+
+
+  useEffect(() => {
+    if (!active || readOnly) {
       return;
     }
     const mapStage = mapStageRef.current;
 
     function getBrushPosition() {
-      if (!mapStage || !map) {
+      if (!mapStage || !scene) {
         return;
       }
-      const mapImage = mapStage.findOne("#mapImage");
+      const mapImage = mapStage.findOne(`#${worldNodeId}`);
+      if (!mapImage) return;
       let position = getRelativePointerPosition(mapImage);
       if (!position) {
         return;
       }
-      if (map.snapToGrid && isShape) {
+      if (isShape) {
         position = snapPositionToGrid(position);
       }
-      return Vector2.divide(position, {
-        x: mapImage.width(),
-        y: mapImage.height(),
-      });
+      return position;
     }
 
     function handleBrushDown(props: MapDragEvent) {
@@ -159,14 +147,14 @@ function DrawingTool({
               Vector2.compare(
                 prevPoints[prevPoints.length - 1],
                 brushPosition,
-                0.001
+                1 / (stageScale * placement.scale)
               )
             ) {
               return prevShape;
             }
             const simplified = simplifyPoints(
               [...prevPoints, brushPosition],
-              1 / 1000 / stageScale
+              1 / (stageScale * placement.scale)
             );
             return {
               ...prevShape,
@@ -184,9 +172,9 @@ function DrawingTool({
                 prevShape.shapeType,
                 prevShape.data,
                 brushPosition,
-                gridCellNormalizedSize,
-                mapWidth,
-                mapHeight
+                { x: 1, y: 1 },
+                1,
+                1
               ),
             } as Shape;
           });
@@ -200,10 +188,10 @@ function DrawingTool({
       }
       if (isBrush && drawing && drawing.type === "path") {
         if (drawing.data.points.length > 1) {
-          onShapeAdd(drawing);
+          act([{ type: "add", item: drawingItem(drawing, person.id, gridStrokeWidth) }]);
         }
       } else if (isShape && drawing) {
-        onShapeAdd(drawing);
+        act([{ type: "add", item: drawingItem(drawing, person.id, gridStrokeWidth) }]);
       }
 
       eraseHoveredShapes();
@@ -223,51 +211,33 @@ function DrawingTool({
     };
   });
 
-  function handleShapeOver(shape: Drawing, isDown: boolean) {
-    if (shouldHover && isDown) {
-      if (erasingDrawings.findIndex((s) => s.id === shape.id) === -1) {
-        setErasingDrawings((prevShapes) => [...prevShapes, shape]);
-      }
+  function handleShapeOver(id: string, isDown: boolean) {
+    if (shouldHover && isDown && !readOnly) {
+      setErasingDrawings((ids) => ids.includes(id) ? ids : [...ids, id]);
     }
   }
 
   function eraseHoveredShapes() {
-    if (erasingDrawings.length > 0) {
-      onShapesRemove(erasingDrawings.map((shape) => shape.id));
-      setErasingDrawings([]);
-    }
-  }
-
-  function renderDrawing(shape: Drawing) {
-    return (
-      <DrawingShape
-        drawing={shape}
-        key={shape.id}
-        onMouseMove={() => handleShapeOver(shape, isBrushDown)}
-        onTouchOver={() => handleShapeOver(shape, isBrushDown)}
-        onMouseDown={() => handleShapeOver(shape, true)}
-        onTouchStart={() => handleShapeOver(shape, true)}
-        onMouseUp={eraseHoveredShapes}
-        onTouchEnd={eraseHoveredShapes}
-        strokeWidth={gridStrokeWidth * shape.strokeWidth}
-      />
-    );
-  }
-
-  function renderErasingDrawing(drawing: Drawing) {
-    const eraseShape: Drawing = {
-      ...drawing,
-      color: "primary",
-    };
-    return renderDrawing(eraseShape);
+    deleteDrawings(erasingDrawings, act);
+    setErasingDrawings([]);
   }
 
   return (
-    <Group>
-      {drawings.map(renderDrawing)}
-      {drawing && renderDrawing(drawing)}
-      {erasingDrawings.length > 0 && erasingDrawings.map(renderErasingDrawing)}
-    </Group>
+    <World listening={shouldHover && !readOnly}>
+      {drawings.map((item) => (
+        <SceneDrawing
+          item={erasingDrawings.includes(item.id) ? { ...item, color: "primary" } : item}
+          key={item.id}
+          onMouseMove={() => handleShapeOver(item.id, isBrushDown)}
+          onTouchMove={() => handleShapeOver(item.id, isBrushDown)}
+          onMouseDown={() => handleShapeOver(item.id, true)}
+          onTouchStart={() => handleShapeOver(item.id, true)}
+          onMouseUp={eraseHoveredShapes}
+          onTouchEnd={eraseHoveredShapes}
+        />
+      ))}
+      {drawing && <SceneDrawing item={drawingItem(drawing, person.id, gridStrokeWidth)} listening={false} />}
+    </World>
   );
 }
 

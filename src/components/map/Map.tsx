@@ -6,6 +6,9 @@ import MapControls from "./MapControls";
 import MapInteraction from "./MapInteraction";
 import useSceneGrid from "../../hooks/useSceneGrid";
 
+import { useScene } from "../../scene/SceneContext";
+import { drawingsInOrder, deleteDrawings } from "../../scene/drawingItem";
+
 import DrawingTool from "../tools/DrawingTool";
 import FogTool from "../tools/FogTool";
 import MeasureTool from "../tools/MeasureTool";
@@ -28,7 +31,7 @@ import {
 
 import Session from "../../network/Session";
 
-import { Drawing, DrawingState } from "../../types/Drawing";
+import { DrawingState } from "../../types/Drawing";
 import { Fog, FogState } from "../../types/Fog";
 import { Map as MapType, MapToolId } from "../../types/Map";
 import { MapState } from "../../types/MapState";
@@ -88,7 +91,6 @@ function Map({
   onSelectionItemsCreate,
   onMapChange,
   onMapReset,
-  onMapDraw,
   onFogDraw,
   onMapNoteCreate,
   onMapNoteChange,
@@ -113,21 +115,13 @@ function Map({
     }));
   }
 
-  const drawShapes = Object.values(mapState?.drawings || {});
   const fogShapes = Object.values(mapState?.fogs || {});
 
+  const { scene, act, readOnly } = useScene();
   function handleToolAction(action: string) {
-    if (action === "eraseAll") {
-      onMapDraw(new RemoveStatesAction(drawShapes.map((s) => s.id)));
+    if (action === "eraseAll" && scene && permissions.drawing && !readOnly) {
+      deleteDrawings(drawingsInOrder(scene).map((item) => item.id), act);
     }
-  }
-
-  function handleMapShapeAdd(shape: Drawing) {
-    onMapDraw(new AddStatesAction([shape]));
-  }
-
-  function handleMapShapesRemove(shapeIds: string[]) {
-    onMapDraw(new RemoveStatesAction(shapeIds));
   }
 
   function handleFogShapesAdd(shapes: Fog[]) {
@@ -220,11 +214,7 @@ function Map({
         {sceneGrid}
         {propTokens}
         <DrawingTool
-          map={map}
-          drawings={drawShapes}
-          onDrawingAdd={handleMapShapeAdd}
-          onDrawingsRemove={handleMapShapesRemove}
-          active={selectedToolId === "drawing"}
+          active={selectedToolId === "drawing" && permissions.drawing}
           toolSettings={settings.drawing}
         />
         {notes}
