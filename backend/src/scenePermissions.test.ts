@@ -80,3 +80,43 @@ test("Owner Only refuses another's token, permits added and assigned tokens, and
     expect((await sendBatch(player.socket, { id: "off", sceneId, changes: [move] })).refused).toEqual([]);
   } finally { await server.dispose(); }
 });
+
+test("socket lock refusals return the real state and assigned owners can delete", async () => {
+  const server = await startTestServer();
+  try {
+    const { cookie } = await setupAdministrator(server);
+    const room = await createRoom(server, cookie, "Locks");
+    const gm = await server.joinRoomAsGM(room.id, cookie);
+    await new Promise(resolve => gm.socket.emit("session", true, resolve));
+    const player = await server.joinRoom(room.id, "", "player");
+    const sceneId = gm.snapshot!.scene.id;
+    await sendBatch(gm.socket, { id: "prepare", sceneId, changes: [{ type: "add", item: token }] });
+    expect((await sendBatch(gm.socket, { id: "lock", sceneId, changes: [
+      { type: "update", id: token.id, fields: { locked: true } },
+    ] })).refused).toEqual([]);
+    for (const trusted of [false, true]) {
+      await new Promise(resolve => gm.socket.emit("room_trust", "player", trusted, resolve));
+      const answer = await sendBatch(player.socket, { id: `locked-${trusted}`, sceneId, changes: [
+        { type: "update", id: token.id, fields: { label: "Forbidden" } },
+        { type: "delete", id: token.id },
+        { type: "update", id: token.id, fields: { locked: false, owner: "player" } },
+      ] });
+      expect(answer.applied).toEqual([]);
+      expect(answer.refused).toEqual(Array(3).fill({ id: token.id, item: { ...token, locked: true } }));
+    }
+    expect((await sendBatch(gm.socket, { id: "assign", sceneId, changes: [
+      { type: "update", id: token.id, fields: { locked: false, owner: "player" } },
+    ] })).refused).toEqual([]);
+    for (const trusted of [true, false]) {
+      await new Promise(resolve => gm.socket.emit("room_trust", "player", trusted, resolve));
+      const answer = await sendBatch(player.socket, { id: `flags-${trusted}`, sceneId, changes: [
+        { type: "update", id: token.id, fields: { label: "Forbidden", locked: true } },
+        { type: "update", id: token.id, fields: { locked: false } },
+        { type: "update", id: token.id, fields: { owner: "gm" } },
+      ] });
+      expect(answer.applied).toEqual([]);
+      expect(answer.refused).toEqual(Array(3).fill({ id: token.id, item: { ...token, owner: "player" } }));
+    }
+    expect((await sendBatch(player.socket, { id: "delete", sceneId, changes: [{ type: "delete", id: token.id }] })).refused).toEqual([]);
+  } finally { await server.dispose(); }
+});
