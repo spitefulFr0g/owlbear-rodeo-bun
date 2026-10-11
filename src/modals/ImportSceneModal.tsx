@@ -1,7 +1,6 @@
 import { ChangeEvent, FormEvent, useState } from "react";
 import { Box, Button, Flex, Input, Label, Text, useThemeUI } from "theme-ui";
 import SimpleBar from "simplebar-react";
-import { v4 as uuid } from "uuid";
 
 import Modal from "../components/Modal";
 import LoadingOverlay from "../components/LoadingOverlay";
@@ -12,69 +11,74 @@ import useMapEdits from "../hooks/useMapEdits";
 import useResponsiveLayout from "../hooks/useResponsiveLayout";
 
 import { useMapData } from "../contexts/MapDataContext";
-import { SceneAnswer, useScene } from "../scene/SceneContext";
-import { importedSceneName, sceneFromMap } from "../scene/mapItem";
+import { importedSceneName } from "../scene/mapItem";
 import { maxSceneNameLength } from "../sceneRules";
-import { imageFiles } from "../scene/shown";
 
 import { Map } from "../types/Map";
 
 type ImportSceneProps = {
   isOpen: boolean;
-  /** A map of the browser library */
-  map: Map;
-  /** Back to the map picker */
+  /** What the importer is doing, said at its top */
+  label: string;
+  /** A map of the browser library, or none for a scene left without a map */
+  map: Map | undefined;
+  /** Said where the map would be when there is none */
+  noMapText?: string;
+  /** The name to start from. Without one the scene is named after the map until the GM types */
+  startName?: string;
+  confirmText: string;
+  pickText: string;
+  /** To the map picker */
   onPickAnother: () => void;
+  /** Takes the map off. Not offered without it */
+  onRemoveMap?: () => void;
   onCancel: () => void;
-  /** The scene was made and this GM connection moved to it */
-  onCreated: () => void;
-  /** Says why the server refused */
-  refusal: (answer: SceneAnswer) => string;
+  /**
+   * Given the map as it is now saved and the scene's name. Resolves with
+   * nothing once done, or with what to tell the GM went wrong.
+   */
+  onConfirm: (map: Map | undefined, name: string) => Promise<string | undefined>;
 };
 
 /**
- * The importer: aligns a map to the grid, names the scene and makes it with
- * the map on it. The alignment is saved on the map's own record.
+ * The importer: aligns a map to the grid and names the scene. The alignment
+ * is saved on the map's own record. What confirming does with the two is up
+ * to whoever opened it: making a scene or editing one.
  */
 function ImportSceneModal({
   isOpen,
+  label,
   map,
+  noMapText,
+  startName,
+  confirmText,
+  pickText,
   onPickAnother,
+  onRemoveMap,
   onCancel,
-  onCreated,
-  refusal,
+  onConfirm,
 }: ImportSceneProps) {
   const { theme } = useThemeUI();
   const { updateMap } = useMapData();
-  const { createScene, share } = useScene();
   const { edited, change, save } = useMapEdits(map, updateMap);
 
-  // Undefined until the GM types a name, the scene is named after the map till then
-  const [typedName, setTypedName] = useState<string>();
+  // Undefined until the GM types a name
+  const [typedName, setTypedName] = useState(startName);
+  const name = edited
+    ? importedSceneName(edited, typedName)
+    : (typedName || "").trim();
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState<string>();
 
-  async function handleCreate(event: FormEvent<HTMLElement>) {
+  async function handleConfirm(event: FormEvent<HTMLElement>) {
     event.preventDefault();
     setIsSending(true);
     setError(undefined);
-    const create = sceneFromMap(await save(), typedName, uuid());
-    try {
-      // The server must hold an image's bytes before an item names them
-      await share(imageFiles(create.map));
-    } catch (error) {
-      console.error(error);
-      setIsSending(false);
-      setError("The map's images could not be sent to the room.");
-      return;
-    }
-    const answer = await createScene(create.name, {
-      grid: create.grid,
-      map: create.map,
-    });
+    const failure = await onConfirm(await save(), name);
+    // Done, whoever opened the importer has closed it
+    if (failure === undefined) return;
     setIsSending(false);
-    if (answer.ok) onCreated();
-    else setError(refusal(answer));
+    setError(failure);
   }
 
   const layout = useResponsiveLayout();
@@ -100,7 +104,7 @@ function ImportSceneModal({
         }}
       >
         <Label pt={2} pb={1} px={3}>
-          New scene from a map
+          {label}
         </Label>
         <SimpleBar
           style={{
@@ -111,15 +115,23 @@ function ImportSceneModal({
             height: "100%",
           }}
         >
-          <MapEditor map={edited} onSettingsChange={change} />
-          <MapSettings map={edited} onSettingsChange={change} />
+          {edited ? (
+            <>
+              <MapEditor key={edited.id} map={edited} onSettingsChange={change} />
+              <MapSettings map={edited} onSettingsChange={change} />
+            </>
+          ) : (
+            <Text as="p" variant="body2" sx={{ textAlign: "center" }} my={4}>
+              {noMapText}
+            </Text>
+          )}
         </SimpleBar>
-        <Box as="form" onSubmit={handleCreate} m={3}>
+        <Box as="form" onSubmit={handleConfirm} m={3}>
           <Label htmlFor="importedSceneName">Scene name</Label>
           <Input
             id="importedSceneName"
             name="importedSceneName"
-            value={typedName ?? importedSceneName(edited, undefined)}
+            value={typedName ?? name}
             onChange={(event: ChangeEvent<HTMLInputElement>) =>
               setTypedName(event.target.value)
             }
@@ -141,13 +153,22 @@ function ImportSceneModal({
               disabled={isSending}
               onClick={onPickAnother}
             >
-              Choose another map
+              {pickText}
             </Button>
-            <Button
-              sx={{ flexGrow: 1 }}
-              disabled={isSending || !importedSceneName(edited, typedName)}
-            >
-              Create scene
+            {onRemoveMap && (
+              <Button
+                type="button"
+                variant="secondary"
+                sx={{ flexGrow: 1 }}
+                mr={2}
+                disabled={isSending}
+                onClick={onRemoveMap}
+              >
+                Remove map
+              </Button>
+            )}
+            <Button sx={{ flexGrow: 1 }} disabled={isSending || !name}>
+              {confirmText}
             </Button>
           </Flex>
         </Box>
