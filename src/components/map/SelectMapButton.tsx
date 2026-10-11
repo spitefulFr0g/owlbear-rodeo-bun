@@ -1,3 +1,4 @@
+import useSceneMap from "../../hooks/useSceneMap";
 import { useState } from "react";
 import { IconButton } from "theme-ui";
 
@@ -30,7 +31,9 @@ function SelectMapButton({
 }: SelectMapButtonProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  const { updateMapState } = useMapData();
+  const { updateMapState, mapsById } = useMapData();
+  const { placed } = useSceneMap();
+  const pickedLibraryMap = placed ? mapsById[placed.metadata.pickerMapId as string] || null : null;
   const userId = useUserId();
   function openModal() {
     if (currentMapState && currentMap && currentMap.owner === userId) {
@@ -58,7 +61,7 @@ function SelectMapButton({
         onDone={handleDone}
         onMapChange={onMapChange}
         onMapReset={onMapReset}
-        currentMap={currentMap}
+        currentMap={pickedLibraryMap}
       />
     </>
   );
