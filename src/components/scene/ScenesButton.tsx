@@ -5,15 +5,9 @@ import ScenesModal from "../../modals/ScenesModal";
 import SelectMapIcon from "../../icons/SelectMapIcon";
 
 import { useSceneList } from "../../scene/SceneContext";
-import { MapChangeEventHandler } from "../../types/Events";
-
-type ScenesButtonProps = {
-  onMapChange: MapChangeEventHandler;
-  allowMapChange: boolean;
-};
 
 /** Opens the Scenes dialog, for the GM */
-function ScenesButton({ onMapChange, allowMapChange }: ScenesButtonProps) {
+function ScenesButton() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const sceneList = useSceneList();
 
@@ -30,8 +24,6 @@ function ScenesButton({ onMapChange, allowMapChange }: ScenesButtonProps) {
       <ScenesModal
         isOpen={isModalOpen}
         onDone={() => setIsModalOpen(false)}
-        onMapChange={onMapChange}
-        allowMapChange={allowMapChange}
       />
     </>
   );

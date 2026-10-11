@@ -3,9 +3,9 @@ import { Box, Button, Flex, Input, Label, Text } from "theme-ui";
 
 import { useScene, SceneAnswer } from "../../scene/SceneContext";
 import { ListedScene } from "../../helpers/sceneList";
+import { sceneNameMaxLength } from "../../scene/mapItem";
 
-// The server's cap on a scene's name
-const sceneNameMaxLength = 100;
+import SceneImporter from "./SceneImporter";
 
 function refusal(answer: SceneAnswer) {
   switch (answer.error) {
@@ -66,6 +66,7 @@ function SceneList({ onDone }: SceneListProps) {
   const [name, setName] = useState("");
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState<string>();
+  const [isImporting, setIsImporting] = useState(false);
 
   if (!sceneList) return null;
 
@@ -107,7 +108,7 @@ function SceneList({ onDone }: SceneListProps) {
         ))}
       </Box>
       <Box as="form" onSubmit={handleCreate}>
-        <Label htmlFor="newSceneName">New empty scene</Label>
+        <Label htmlFor="newSceneName">New scene</Label>
         <Flex>
           <Input
             id="newSceneName"
@@ -122,10 +123,29 @@ function SceneList({ onDone }: SceneListProps) {
             mr={2}
           />
           <Button sx={{ flexShrink: 0 }} disabled={!name.trim() || isSending}>
-            Create
+            Create empty
           </Button>
         </Flex>
       </Box>
+      <Button
+        type="button"
+        variant="secondary"
+        sx={{ width: "100%" }}
+        mt={2}
+        onClick={() => setIsImporting(true)}
+      >
+        Make a scene from a map
+      </Button>
+      {isImporting && (
+        <SceneImporter
+          onCancel={() => setIsImporting(false)}
+          onCreated={() => {
+            setIsImporting(false);
+            onDone();
+          }}
+          refusal={refusal}
+        />
+      )}
       {error && (
         <Text as="p" variant="caption" sx={{ color: "highlight" }} mt={2}>
           {error}

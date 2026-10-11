@@ -5,9 +5,6 @@ import { Note } from "./Note";
 import { Timer } from "./Timer";
 import { Token } from "./Token";
 
-export type MapChangeEventHandler = (
-  map: Map | null
-) => void;
 export type MapSettingsChangeEventHandler = (change: Partial<Map>) => void;
 
 export type DiceSelectEventHandler = (dice: DefaultDice) => void;
