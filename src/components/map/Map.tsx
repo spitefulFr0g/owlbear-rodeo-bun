@@ -28,6 +28,7 @@ import { Settings } from "../../types/Settings";
 import { MapChangeEventHandler } from "../../types/Events";
 import NoteTool from "../tools/NoteTool";
 import SceneItemMenu from "../scene/SceneItemMenu";
+import SceneNotice from "../scene/SceneNotice";
 import SceneSelection, { SceneItems } from "../scene/SceneSelection";
 
 type MapProps = {
@@ -93,6 +94,7 @@ function Map({
               onToolAction={handleToolAction}
             />
             <DisplayControls session={session} />
+            <SceneNotice />
             <SceneItemMenu
               position={itemMenu}
               close={() => setItemMenu(null)}
