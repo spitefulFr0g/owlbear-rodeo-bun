@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Flex } from "theme-ui";
 import { useMedia } from "react-media";
 
@@ -29,19 +30,23 @@ import {
 
 type FogToolSettingsProps = {
   settings: FogToolSettingsType;
+  disabledActions?: string[];
   onSettingChange: (change: Partial<FogToolSettingsType>) => void;
 };
 
-function FogToolSettings({ settings, onSettingChange }: FogToolSettingsProps) {
+function FogToolSettings({ settings, onSettingChange, disabledActions = [] }: FogToolSettingsProps) {
+  useEffect(() => {
+    if (disabledActions.includes(settings.type)) onSettingChange({ type: "polygon" });
+  }, [disabledActions, settings.type, onSettingChange]);
   // Keyboard shortcuts
   function handleKeyDown(event: KeyboardEvent) {
     if (shortcuts.fogPolygon(event)) {
       onSettingChange({ type: "polygon" });
     } else if (shortcuts.fogBrush(event)) {
       onSettingChange({ type: "brush" });
-    } else if (shortcuts.fogToggle(event)) {
+    } else if (shortcuts.fogToggle(event) && !disabledActions.includes("toggle")) {
       onSettingChange({ type: "toggle" });
-    } else if (shortcuts.fogErase(event)) {
+    } else if (shortcuts.fogErase(event) && !disabledActions.includes("remove")) {
       onSettingChange({ type: "remove" });
     } else if (shortcuts.fogLayer(event)) {
       onSettingChange({ multilayer: !settings.multilayer });
@@ -102,7 +107,7 @@ function FogToolSettings({ settings, onSettingChange }: FogToolSettingsProps) {
         title="Toggle Fog (T)"
         onClick={() => onSettingChange({ type: "toggle" })}
         isSelected={settings.type === "toggle"}
-        disabled={settings.preview}
+        disabled={settings.preview || disabledActions.includes("toggle")}
       >
         <FogToggleIcon />
       </RadioIconButton>
@@ -110,7 +115,7 @@ function FogToolSettings({ settings, onSettingChange }: FogToolSettingsProps) {
         title="Erase Fog (E)"
         onClick={() => onSettingChange({ type: "remove" })}
         isSelected={settings.type === "remove"}
-        disabled={settings.preview}
+        disabled={settings.preview || disabledActions.includes("remove")}
       >
         <FogRemoveIcon />
       </RadioIconButton>

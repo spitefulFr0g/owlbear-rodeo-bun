@@ -49,7 +49,7 @@ function DrawingTool({
   visible,
   renderItems = true,
 }: DrawingToolProps) {
-  const { scene, person, readOnly, act } = useScene();
+  const { scene, person, readOnly, act, canChange } = useScene();
   const drawings = scene ? drawingsInOrder(scene) : [];
   const placement = useWorldPlacement();
   const stageScale = useDebouncedStageScale();
@@ -231,7 +231,7 @@ function DrawingTool({
   });
 
   function handleShapeOver(id: string, isDown: boolean) {
-    if (shouldHover && isDown && !readOnly) {
+    if (shouldHover && isDown && canChange({ type: "delete", id })) {
       setErasingDrawings((ids) => (ids.includes(id) ? ids : [...ids, id]));
     }
   }

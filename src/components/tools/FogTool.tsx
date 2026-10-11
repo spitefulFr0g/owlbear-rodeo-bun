@@ -52,7 +52,7 @@ type MapFogProps = {
 };
 
 function FogTool({ onShapeError, active, toolSettings, editable: permitted, visible }: MapFogProps) {
-  const { scene, person, readOnly, act } = useScene();
+  const { scene, person, readOnly, act, canChange } = useScene();
   const editable = permitted && !readOnly;
   const items = useMemo(() => scene ? fogItems(scene) : [], [scene]);
   const shapes = useMemo(() => items.map(fogShape), [items]);
@@ -470,7 +470,9 @@ function FogTool({ onShapeError, active, toolSettings, editable: permitted, visi
   }
 
   function handleShapeOver(shape: Fog, isDown: boolean) {
-    if (shouldHover && isDown) {
+    if (shouldHover && isDown && canChange(toolSettings.type === "remove"
+      ? { type: "delete", id: shape.id }
+      : { type: "update", id: shape.id, fields: { hidden: !shape.visible } })) {
       if (hoveredShapes.findIndex((s) => s.id === shape.id) === -1) {
         setHoveredShapes((prevShapes) => [...prevShapes, shape]);
       }

@@ -35,7 +35,7 @@ export default function SceneSelection({
   layer?: Layer;
   onMenuOpen: (position: { x: number; y: number } | null) => void;
 }) {
-  const { scene, selection, setSelection, readOnly, act } = useScene();
+  const { scene, selection, setSelection, readOnly, act, canSelect } = useScene();
   const stageRef = useMapStage();
   useEffect(() => {
     onMenuOpen(null);
@@ -63,7 +63,7 @@ export default function SceneSelection({
       if (readOnly) return;
       let node: Konva.Node | null = event.target;
       while (node && !scene!.items[node.id()]) node = node.getParent();
-      if (!node || (layer && scene!.items[node.id()].layer !== layer)) return;
+      if (!node || !canSelect(scene!.items[node.id()]) || (layer && scene!.items[node.id()].layer !== layer)) return;
       if (!selectedRef.current.includes(node.id())) setSelection([node.id()]);
       const rect = stage!.container().getBoundingClientRect();
       const pointer = stage!.getPointerPosition() || { x: 0, y: 0 };
@@ -73,7 +73,7 @@ export default function SceneSelection({
     return () => {
       stage.off(".itemMenu");
     };
-  }, [scene, readOnly, layer, setSelection, stageRef, onMenuOpen]);
+  }, [scene, readOnly, layer, setSelection, stageRef, onMenuOpen, canSelect]);
   const clipboard = useRef<Item[]>([]);
   const prevent = useSetPreventMapInteraction();
   const snap = useSceneSnapping();
@@ -122,6 +122,7 @@ export default function SceneSelection({
         .filter(
           (node) =>
             !!scene.items[node.id()] &&
+            canSelect(scene.items[node.id()]) &&
             (!layer || scene.items[node.id()].layer === layer)
         );
     const selectedNodes = () =>
@@ -220,7 +221,7 @@ export default function SceneSelection({
       while (node && !scene!.items[node.id()] && node !== transformer)
         node = node.getParent();
       if (node === transformer) return;
-      if (node && layer && scene!.items[node.id()]?.layer !== layer)
+      if (node && scene!.items[node.id()] && (!canSelect(scene!.items[node.id()]) || (layer && scene!.items[node.id()].layer !== layer)))
         node = null;
       onMenuOpen(null);
       if (!node && !boxSelect) {
@@ -347,6 +348,7 @@ export default function SceneSelection({
     scene,
     readOnly,
     act,
+    canSelect,
     prevent,
     setSelection,
     stageRef,
