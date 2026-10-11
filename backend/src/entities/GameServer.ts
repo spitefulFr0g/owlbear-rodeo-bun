@@ -274,14 +274,24 @@ export default class GameServer {
         for (const change of batch.changes) {
           const id = change.type === "add" ? change.item.id : change.id;
           if (batch.sceneId !== game.scene.id || (socket.data.role !== "gm" && !game.session) ||
-              change.type !== "add" || checkChange(game.scene, change) ||
+              checkChange(game.scene, change) ||
               (socket.data.role !== "gm" && !socket.data.playerId)) {
             refused.push({ id, item: Object.hasOwn(game.scene.items, id) ? game.scene.items[id] : null });
             continue;
           }
-          const actual: Change = { type: "add", item: { ...change.item,
-            owner: socket.data.role === "gm" ? gmOwner : socket.data.playerId,
-            order: topOrder(game.scene, change.item.layer) } };
+          let actual: Change = change;
+          if (change.type === "add") {
+            actual = { type: "add", item: { ...change.item,
+              owner: socket.data.role === "gm" ? gmOwner : socket.data.playerId,
+              order: topOrder(game.scene, change.item.layer) } };
+          } else if (change.type === "update") {
+            const item = game.scene.items[change.id];
+            if (item && (change.fields.layer !== undefined ||
+                (change.fields.position !== undefined && item.kind === "image" && item.layer !== "map"))) {
+              const fields = { ...change.fields, order: topOrder(game.scene, change.fields.layer ?? item.layer) };
+              actual = { ...change, fields };
+            }
+          }
           const result = applyChange(game.scene, actual);
           if (!result.applied) {
             refused.push({ id, item: game.scene.items[id] ?? null });

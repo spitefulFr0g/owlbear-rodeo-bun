@@ -114,3 +114,79 @@ test("one add is saved after three seconds without waiting for a clean stop", as
     finally { await after.dispose(); }
   } finally { await server.dispose(); }
 });
+
+test("mixed updates and deletes relay applied changes and answer with real refused items", async () => {
+  const server = await startTestServer();
+  try {
+    const { cookie } = await setupAdministrator(server);
+    const room = await createRoom(server, cookie, "Room");
+    const gm = await server.joinRoomAsGM(room.id, cookie);
+    const sceneId = gm.snapshot!.scene.id;
+    await sendBatch(gm.socket, { id: "add", sceneId, changes: [{ type: "add", item: token }] });
+    await new Promise(resolve => gm.socket.emit("session", true, resolve));
+    const player = await server.joinRoom(room.id, "", "player-browser");
+    const relay = nextMessage(player.socket, "scene_changes");
+    const answer = await sendBatch(gm.socket, { id: "mixed", sceneId, changes: [
+      { type: "update", id: "hero", fields: { position: { x: 450, y: 600 } } },
+      { type: "add", item: token },
+      { type: "update", id: "hero", fields: { rotation: NaN } },
+      { type: "delete", id: "hero" },
+      { type: "update", id: "hero", fields: { label: "Too late" } },
+    ] });
+    expect(answer.applied as unknown).toEqual([
+      { type: "update", id: "hero", fields: { position: { x: 450, y: 600 }, order: 1 } },
+      { type: "delete", id: "hero" },
+    ]);
+    const moved = { ...token, owner: "gm", order: 1, position: { x: 450, y: 600 } };
+    expect(answer.refused).toEqual([{ id: "hero", item: moved }, { id: "hero", item: moved }, { id: "hero", item: null }]);
+    expect((await relay)[0]).toEqual({ sceneId, changes: answer.applied });
+    await server.restart();
+    expect((await server.joinRoomAsGM(room.id, cookie)).snapshot!.scene.items).toEqual({});
+  } finally { await server.dispose(); }
+});
+
+test("connections retain independent fields and converge on the server's last write and layer order", async () => {
+  const server = await startTestServer();
+  try {
+    const { cookie } = await setupAdministrator(server);
+    const room = await createRoom(server, cookie, "Room");
+    const gm = await server.joinRoomAsGM(room.id, cookie);
+    const sceneId = gm.snapshot!.scene.id;
+    await sendBatch(gm.socket, { id: "seed", sceneId, changes: [
+      { type: "add", item: token },
+      { type: "add", item: { ...token, id: "prop", layer: "prop" } },
+      { type: "add", item: { ...token, id: "map", layer: "map" } },
+    ] });
+    await new Promise(resolve => gm.socket.emit("session", true, resolve));
+    const player = await server.joinRoom(room.id, "", "player-browser");
+    const playerEvents: unknown[] = [];
+    const gmEvents: unknown[] = [];
+    player.socket.on("scene_changes", value => playerEvents.push(value));
+    gm.socket.on("scene_changes", value => gmEvents.push(value));
+    const move = await sendBatch(gm.socket, { id: "move", sceneId, changes: [
+      { type: "update", id: "hero", fields: { position: { x: 300, y: 300 } } },
+    ] });
+    expect(move.applied as unknown).toEqual([{ type: "update", id: "hero", fields: { position: { x: 300, y: 300 }, order: 1 } }]);
+    const label = await sendBatch(player.socket, { id: "label", sceneId, changes: [
+      { type: "update", id: "hero", fields: { label: "Player label" } },
+    ] });
+    expect(label.applied).toEqual([{ type: "update", id: "hero", fields: { label: "Player label" } }]);
+    const last = await sendBatch(player.socket, { id: "last", sceneId, changes: [
+      { type: "update", id: "hero", fields: { position: { x: 900, y: 750 } } },
+      { type: "update", id: "hero", fields: { layer: "prop" } },
+      { type: "update", id: "map", fields: { position: { x: -150, y: 0 } } },
+    ] });
+    expect(last.applied as unknown).toEqual([
+      { type: "update", id: "hero", fields: { position: { x: 900, y: 750 }, order: 2 } },
+      { type: "update", id: "hero", fields: { layer: "prop", order: 1 } },
+      { type: "update", id: "map", fields: { position: { x: -150, y: 0 } } },
+    ]);
+    const current = (await server.joinRoomAsGM(room.id, cookie)).snapshot!.scene;
+    expect(current.items.hero).toEqual({ ...token, owner: "gm", layer: "prop", order: 1,
+      position: { x: 900, y: 750 }, label: "Player label" });
+    expect(playerEvents).toEqual([{ sceneId, changes: move.applied }]);
+    expect(gmEvents).toEqual([{ sceneId, changes: label.applied }, { sceneId, changes: last.applied }]);
+    await server.restart();
+    expect((await server.joinRoomAsGM(room.id, cookie)).snapshot!.scene).toEqual(current);
+  } finally { await server.dispose(); }
+});
