@@ -142,3 +142,19 @@ test("only the GM can lock, unlock or assign an unlocked item's owner", () => {
     }
   }
 });
+
+test("uploads off limits only players adding unknown file images", () => {
+  const image = { ...examples[0], kind: "image" as const, image: { type: "file" as const, file: "image" },
+    width: 150, height: 150, label: "", outline: { type: "circle" as const, x: 0, y: 0, radius: 75 } };
+  for (const role of ["gm", "trusted", "player", "display"] as const) {
+    for (const uploads of [false, true]) {
+      for (const known of [false, true]) {
+        const currentRules = { switches: { ...rules.switches, uploads }, knownImage: () => known };
+        expect(mayChange({ role, id: "player" }, currentRules, undefined, { type: "add", item: image }))
+          .toBe(role !== "display" && (role !== "player" || uploads || known));
+      }
+    }
+  }
+  expect(mayChange({ role: "player", id: "player" }, { switches: { ...rules.switches, uploads: false } },
+    undefined, { type: "add", item: image })).toBe(false);
+});

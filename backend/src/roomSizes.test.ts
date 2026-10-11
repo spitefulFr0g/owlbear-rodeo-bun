@@ -50,7 +50,7 @@ for (const method of ["PUT", "HEAD", "GET"] as const) {
 }
 
 
-test("legacy images count only after first use, including a cast display download", async () => {
+test("cast display downloads do not record legacy images as used by the room", async () => {
   const bytes = "old image";
   const hash = createHash("sha256").update(bytes).digest("hex");
   const server = await startTestServer(async dataDir => {
@@ -88,7 +88,7 @@ test("legacy images count only after first use, including a cast display downloa
     expect(await response.text()).toBe(bytes);
     await server.restart();
     const list = await fetch(`${server.address}/api/rooms`, { headers: { Cookie: cookie } });
-    expect((await list.json() as any).rooms[0].sizeBytes).toBe(308); // Version 2 envelope, legacy map (22 bytes), and nine-byte image.
+    expect((await list.json() as any).rooms[0].sizeBytes).toBe(299); // Version 2 envelope and legacy map (22 bytes), without the image.
   } finally { await server.dispose(); }
 });
 
