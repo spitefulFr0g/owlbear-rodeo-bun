@@ -158,8 +158,8 @@ function Game() {
                           height: "100%",
                         }}
                       >
-                        <NetworkedParty session={session} gameId={gameId} />
                         <SceneProvider session={session}>
+                          <NetworkedParty session={session} gameId={gameId} />
                           <NetworkedMapAndTokens session={session} />
                         </SceneProvider>
                       </Flex>

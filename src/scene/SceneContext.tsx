@@ -120,6 +120,8 @@ type SceneStore = {
    * open scene, and moves a GM connection viewing the scene to the open scene.
    */
   deleteScene: (sceneId: string) => Promise<SceneAnswer>;
+  /** Assigns a welcome-screen scene, or restores the default welcome screen */
+  welcomeScene: (sceneId: string | null) => Promise<SceneAnswer>;
   /**
    * Show to players: makes the scene this GM connection is viewing the open
    * scene, carrying a view of it in world units for players and cast displays
@@ -214,7 +216,7 @@ export function SceneProvider({
   }, [session]);
 
   useEffect(() => {
-    function handleSnapshot({ scene }: { scene: Scene }) {
+    function handleSnapshot({ scene }: { scene: Scene | null }) {
       setSelection([]);
       // A carried view follows the snapshot of its scene
       setPlayerView(null);
@@ -259,15 +261,7 @@ export function SceneProvider({
     };
   }, [session.socket]);
 
-  // Outside a session only the GM is sent the scene
   const waiting = role !== "gm" && room.session === false;
-  useEffect(() => {
-    if (waiting) {
-      changeHeld(() => nothingHeld);
-      changeHistory(emptyHistory);
-      setPlayerView(null);
-    }
-  }, [waiting]);
 
   // Fetch the files the scene's images name, the local database then draws them
   const fetchedRef = useRef(new Set<string>());
@@ -306,7 +300,7 @@ export function SceneProvider({
   }, [display, role, userId]);
 
   const switches = room.switches || defaultRoomSwitches;
-  const viewOnly = !!scene?.viewOnly;
+  const viewOnly = waiting || !!scene?.viewOnly;
 
   // Image availability is handled by the token bar; this gate covers item actions.
   const canChange = useCallback((change: Change) =>
@@ -330,7 +324,7 @@ export function SceneProvider({
       if (!scene || !session.socket?.connected || !session.joinToken || askingRef.current) {
         return false;
       }
-      const rules = { switches, viewOnly: scene.viewOnly, knownImage: () => true };
+      const rules = { switches, viewOnly: waiting || scene.viewOnly, knownImage: () => true };
       changes = changes.filter(change => mayChange(person, rules,
         change.type === "add" ? undefined : scene.items[change.id], change));
       if (changes.length === 0) {
@@ -348,7 +342,7 @@ export function SceneProvider({
       session.socket.emit("scene_changes", batch);
       return true;
     },
-    [session, person, switches]
+    [session, person, switches, waiting]
   );
 
   const replay = useCallback((direction: "undo" | "redo") => {
@@ -426,7 +420,7 @@ export function SceneProvider({
   // Scene actions that move this connection nowhere by asking
   const askForList = useCallback(
     (
-      event: "scene_rename" | "scene_delete" | "scene_show" | "scene_bring" | "scene_duplicate",
+      event: "scene_rename" | "scene_delete" | "scene_show" | "scene_bring" | "scene_welcome" | "scene_duplicate",
       payload: Record<string, unknown>
     ) =>
       new Promise<SceneAnswer>((resolve) => {
@@ -449,6 +443,11 @@ export function SceneProvider({
   );
   const deleteScene = useCallback(
     (sceneId: string) => askForList("scene_delete", { sceneId }),
+    [askForList]
+  );
+
+  const welcomeScene = useCallback(
+    (sceneId: string | null) => askForList("scene_welcome", { sceneId }),
     [askForList]
   );
 
@@ -506,12 +505,13 @@ export function SceneProvider({
       createScene,
       renameScene,
       deleteScene,
+      welcomeScene,
       duplicateScene,
       showScene,
       bringPlayers,
       share,
     }),
-    [scene, selection, person, switches, role, sceneList, playerView, readOnly, act, undo, redo, canUndo, canRedo, canChange, canSelect, setSettings, viewScene, createScene, renameScene, deleteScene, duplicateScene, showScene, bringPlayers, share]
+    [scene, selection, person, switches, role, sceneList, playerView, readOnly, act, undo, redo, canUndo, canRedo, canChange, canSelect, setSettings, viewScene, createScene, renameScene, deleteScene, welcomeScene, duplicateScene, showScene, bringPlayers, share]
   );
 
   return (
@@ -535,7 +535,7 @@ export function useScene() {
 /** The tools the room's switches and the scene viewed leave this connection */
 export function useToolPermissions() {
   const { scene, switches } = useScene();
-  return getToolPermissions(useRole(), switches, scene?.viewOnly);
+  return getToolPermissions(useRole(), switches, useRoom().session === false || scene?.viewOnly);
 }
 
 /**
@@ -577,7 +577,7 @@ export function useCanPlaceToken() {
     ? imagesInOrder(scene).reduce<string[]>((files, item) => files.concat(imageFiles(item)), [])
     : [], [scene]);
   const permissions = getToolPermissions(
-    person.role === "display" ? "player" : person.role, switches, scene?.viewOnly);
+    person.role === "display" ? "player" : person.role, switches, useRoom().session === false || scene?.viewOnly);
   return (token: Token) => !readOnly && person.role !== "display" &&
     canPlaceImage(token, permissions, files);
 }

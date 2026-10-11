@@ -1,4 +1,4 @@
-import React, { useRef, useState } from "react";
+import React, { useMemo, useRef, useState } from "react";
 import { Box } from "theme-ui";
 import ReactResizeDetector from "react-resize-detector";
 import { Stage, Layer, Group } from "react-konva";
@@ -35,6 +35,8 @@ type MapInteractionProps = {
   onSelectedToolChange: SelectedToolChangeEventHanlder;
   // Keep this part of the map fitted to the window and ignore all input
   followRect?: MapRect;
+  // Fit once when the scene arrives, leaving pan and zoom available
+  initialRect?: MapRect;
 };
 
 function MapInteraction({
@@ -43,6 +45,7 @@ function MapInteraction({
   selectedToolId,
   onSelectedToolChange,
   followRect,
+  initialRect,
 }: MapInteractionProps) {
   const [stageWidth, setStageWidth] = useState(1);
   const [stageHeight, setStageHeight] = useState(1);
@@ -79,8 +82,11 @@ function MapInteraction({
     setStageScale
   );
 
+  const sceneId = scene?.id;
+  const initialView = useMemo(() => initialRect && sceneId
+    ? { ...initialRect, sceneId } : null, [initialRect, sceneId]);
   useFitPlayerView(
-    playerView,
+    playerView || initialView,
     scene?.id,
     mapStageRef,
     { stageWidth, stageHeight },

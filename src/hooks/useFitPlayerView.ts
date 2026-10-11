@@ -27,7 +27,7 @@ function useFitPlayerView(
   useEffect(() => {
     const stage = stageRef.current;
     // A stage that has yet to be measured is one pixel wide
-    if (!view || view === fittedRef.current || !stage || stageWidth <= 1) {
+    if (!view || view === fittedRef.current || !stage || stageWidth <= 1 || stageHeight <= 1) {
       return;
     }
     const worldLayout = worldFrame(stage, { stageWidth, stageHeight });
