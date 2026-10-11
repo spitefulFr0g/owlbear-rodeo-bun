@@ -33,25 +33,16 @@ import { TileDragProvider } from "../contexts/TileDragContext";
 import { useDatabase } from "../contexts/DatabaseContext";
 
 import { Map } from "../types/Map";
-import {
-  MapChangeEventHandler,
-  RequestCloseEventHandler,
-} from "../types/Events";
+import { RequestCloseEventHandler } from "../types/Events";
 
 type SelectMapProps = {
   isOpen: boolean;
   onDone: RequestCloseEventHandler;
-  onMapChange: MapChangeEventHandler;
-  currentMap: Map | null;
+  onMapSelect: (map: Map) => void;
 };
 
-function SelectMapModal({
-  isOpen,
-  onDone,
-  onMapChange,
-  // The map currently being view in the map screen
-  currentMap,
-}: SelectMapProps) {
+/** The browser library's maps: pick one, import more, edit a map's own record */
+function SelectMapModal({ isOpen, onDone, onMapSelect }: SelectMapProps) {
   const { addToast } = useToasts();
 
   const { databaseStatus } = useDatabase();
@@ -171,15 +162,12 @@ function SelectMapModal({
     if (isLoading) {
       return;
     }
-    if (mapId) {
-      setIsLoading(true);
-      const map = (await getMap(mapId)) || null;
-      await onMapChange(map);
-      setIsLoading(false);
-    } else {
-      await onMapChange(null);
+    setIsLoading(true);
+    const map = await getMap(mapId);
+    setIsLoading(false);
+    if (map) {
+      onMapSelect(map);
     }
-    onDone();
   }
 
   const [editingMapId, setEditingMapId] = useState<string>();
@@ -295,10 +283,8 @@ function SelectMapModal({
                   </TilesOverlay>
                 </TileDragProvider>
                 <MapEditBar
-                  currentMap={currentMap}
                   disabled={isLoading || !!editingMapId}
-                  onMapChange={onMapChange}
-                          onLoad={setIsLoading}
+                  onLoad={setIsLoading}
                 />
               </Box>
               <SelectMapSelectButton

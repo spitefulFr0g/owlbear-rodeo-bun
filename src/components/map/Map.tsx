@@ -4,7 +4,7 @@ import { useToasts } from "react-toast-notifications";
 
 import MapControls from "./MapControls";
 import MapInteraction from "./MapInteraction";
-import useSceneGrid from "../../hooks/useSceneGrid";
+import SceneGrid from "../scene/SceneGrid";
 
 import { useScene } from "../../scene/SceneContext";
 import { drawingsInOrder, deleteDrawings } from "../../scene/drawingItem";
@@ -25,23 +25,16 @@ import Session from "../../network/Session";
 
 import { MapToolId } from "../../types/Map";
 import { Settings } from "../../types/Settings";
-import { MapChangeEventHandler } from "../../types/Events";
 import NoteTool from "../tools/NoteTool";
 import SceneItemMenu from "../scene/SceneItemMenu";
 import SceneNotice from "../scene/SceneNotice";
 import SceneSelection, { SceneItems } from "../scene/SceneSelection";
 
 type MapProps = {
-  onMapChange: MapChangeEventHandler;
-  allowMapChange: boolean;
   session: Session;
 };
 
-function Map({
-  onMapChange,
-  allowMapChange,
-  session,
-}: MapProps) {
+function Map({ session }: MapProps) {
   const { addToast } = useToasts();
 
   const permissions = useToolPermissions();
@@ -77,7 +70,6 @@ function Map({
       !settings.fog.preview);
   const selecting =
     grabbing || selectedToolId === "move" || selectedToolId === "select";
-  const sceneGrid = useSceneGrid();
 
   return (
     <Box sx={{ flexGrow: 1 }}>
@@ -85,8 +77,6 @@ function Map({
         controls={
           <>
             <MapControls
-              onMapChange={onMapChange}
-              allowMapChange={allowMapChange}
               onSelectedToolChange={setSelectedToolId}
               selectedToolId={selectedToolId}
               toolSettings={settings}
@@ -105,7 +95,7 @@ function Map({
         onSelectedToolChange={setSelectedToolId}
       >
         <SceneItems placement="belowGrid" />
-        {sceneGrid}
+        <SceneGrid />
         <DrawingTool
           visible={!selecting}
           renderItems={

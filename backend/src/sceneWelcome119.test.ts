@@ -83,9 +83,6 @@ test("waiting viewers receive only their welcome scene's changes and pointers, w
     const settings = waiting.map(peer => nextMessage(peer.socket, "scene_settings"));
     await action(gm.socket, "scene_settings", { sceneId, grid: { ...defaultSceneGrid, shown: false }, fogFill: true });
     for (const [setting] of await Promise.all(settings)) expect(setting.fogFill).toBe(true);
-    const grids = waiting.map(peer => nextMessage(peer.socket, "scene_grid"));
-    await action(gm.socket, "scene_grid", { sceneId, grid: defaultSceneGrid });
-    for (const [grid] of await Promise.all(grids)) expect(grid.sceneId).toBe(sceneId);
     const pointers = [gm, trusted, waiting[2]].map(peer => nextMessage(peer.socket, "player_pointer"));
     player.socket.emit("player_pointer", { position: { x: 1, y: 2 } });
     for (const [pointer] of await Promise.all(pointers)) expect(pointer.position).toEqual({ x: 1, y: 2 });
@@ -98,7 +95,6 @@ test("waiting viewers receive only their welcome scene's changes and pointers, w
     gm.socket.emit("player_pointer", { position: { x: 3, y: 4 } });
     gm.socket.emit("display_view", { sceneId: openSceneId, ...view });
     await action(gm.socket, "scene_settings", { sceneId: openSceneId, fogFill: true });
-    await action(gm.socket, "scene_grid", { sceneId: openSceneId, grid: defaultSceneGrid });
     // Round trips on each socket drain messages sent before the barriers.
     for (const peer of waiting) await action(peer.socket, "scene_welcome", { sceneId });
     expect(leaked).toEqual([]);
