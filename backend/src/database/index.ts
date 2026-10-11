@@ -17,7 +17,7 @@ export interface RoomRecord {
   document: string;
 }
 
-export const LAYOUT_VERSION = 1;
+export const LAYOUT_VERSION = 2;
 
 // All v0.2.0 tables belong here, in the same layout version. Nothing in
 // this release has shipped yet, so later tickets extend this declaration.

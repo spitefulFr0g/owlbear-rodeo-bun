@@ -34,7 +34,7 @@ test("marker strokes are closed and filled while retaining blending", () => {
 
 test("only drawing items are erased, in server order, within the batch cap", () => {
   const item = drawingItem({ ...style, type: "shape", shapeType: "circle", data: { x: 0, y: 0, radius: 75 } }, "gm", 15);
-  const scene = { id: "scene", grid: defaultSceneGrid, items: {
+  const scene = { id: "scene", grid: defaultSceneGrid, fogFill: false, viewOnly: false, items: {
     later: { ...item, id: "later", order: 2 }, earlier: { ...item, id: "earlier", order: 1 },
     fog: { ...item, id: "fog", layer: "fog" as const },
   } };

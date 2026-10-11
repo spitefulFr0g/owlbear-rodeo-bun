@@ -10,13 +10,13 @@ test("room creation, listing and renaming answer the saved document size", async
   try {
     const { cookie } = await setupAdministrator(server);
     const room = await createRoom(server, cookie, "Room");
-    expect(room.sizeBytes).toBe(267); // The version 2 document contains only the scene envelope.
+    expect(room.sizeBytes).toBe(385); // The version 3 document includes scene settings, name and welcome screen.
     const list = await fetch(`${server.address}/api/rooms`, { headers: { Cookie: cookie } });
-    expect((await list.json() as any).rooms[0].sizeBytes).toBe(267);
+    expect((await list.json() as any).rooms[0].sizeBytes).toBe(385);
     const renamed = await fetch(`${server.address}/api/rooms/${room.id}`, {
       method: "PATCH", headers: { Cookie: cookie, "Content-Type": "application/json" }, body: JSON.stringify({ name: "Renamed" }),
     });
-    expect((await renamed.json() as any).room.sizeBytes).toBe(267);
+    expect((await renamed.json() as any).room.sizeBytes).toBe(385);
   } finally { await server.dispose(); }
 });
 
@@ -36,16 +36,16 @@ for (const method of ["PUT", "HEAD", "GET"] as const) {
       expect(upload.status).toBe(201);
       await upload.text();
       const sizes = async () => (await (await fetch(`${server.address}/api/rooms`, { headers: { Cookie: cookie } })).json() as any).rooms.map((room: any) => room.sizeBytes);
-      expect(await sizes()).toEqual([275, 267]);
+      expect(await sizes()).toEqual([393, 385]);
       for (let repeat = 0; repeat < 2; repeat++) {
         const response = await fetch(`${server.address}/assets/image`, { method, headers: imageHeaders(reader.token), ...(method === "PUT" ? { body: "ignored" } : {}) });
         expect(response.status).toBe(method === "PUT" ? 409 : 200);
         if (method === "GET") expect(await response.text()).toBe("12345678");
         else await response.text();
       }
-      expect(await sizes()).toEqual([275, 275]);
+      expect(await sizes()).toEqual([393, 393]);
       await server.restart();
-      expect(await sizes()).toEqual([275, 275]);
+      expect(await sizes()).toEqual([393, 393]);
     } finally { await server.dispose(); }
   });
 }
@@ -66,7 +66,7 @@ test("cast display downloads do not record legacy images as used by the room", a
   try {
     const { cookie } = await setupAdministrator(server);
     const room = await createRoom(server, cookie, "Room");
-    expect(room.sizeBytes).toBe(267);
+    expect(room.sizeBytes).toBe(385);
     const player = await server.joinRoomAsGM(room.id, cookie);
     await new Promise(resolve => player.socket.emit("session", true, resolve));
     const observer = await server.joinRoom(room.id);
@@ -85,7 +85,7 @@ test("cast display downloads do not record legacy images as used by the room", a
     expect(await response.text()).toBe(bytes);
     await server.restart();
     const list = await fetch(`${server.address}/api/rooms`, { headers: { Cookie: cookie } });
-    expect((await list.json() as any).rooms[0].sizeBytes).toBe(267); // The display fetch does not add image usage.
+    expect((await list.json() as any).rooms[0].sizeBytes).toBe(385); // The display fetch does not add image usage.
   } finally { await server.dispose(); }
 });
 
@@ -102,10 +102,10 @@ test("room size counts saved document UTF-8 bytes and changes only after saving"
     await sendBatch(writer.socket, { id: "utf8", sceneId, changes: [{ type: "add", item: { ...tokenItem, label: "é" } }] });
     await received;
     const size = async () => (await (await fetch(`${server.address}/api/rooms`, { headers: { Cookie: cookie } })).json() as any).rooms[0].sizeBytes;
-    expect(await size()).toBe(267);
+    expect(await size()).toBe(385);
     await server.clock.advance(3000);
     const scene = (await server.joinRoomAsGM(room.id, cookie)).snapshot!.scene;
-    const expected = Buffer.byteLength(JSON.stringify({ openSceneId: sceneId, scenes: { [sceneId]: scene } }));
+    const expected = Buffer.byteLength(JSON.stringify({ openSceneId: sceneId, welcomeSceneId: null, scenes: { [sceneId]: { ...scene, name: "Scene 1" } } }));
     expect(await size()).toBe(expected);
     await server.restart();
     expect(await size()).toBe(expected);

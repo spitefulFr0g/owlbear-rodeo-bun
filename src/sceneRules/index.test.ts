@@ -36,7 +36,7 @@ const item: TextItem = {
   size: 150,
   square: true,
 };
-const empty: Scene = { id: "scene", grid: defaultSceneGrid, items: {} };
+const empty: Scene = { id: "scene", grid: defaultSceneGrid, fogFill: false, viewOnly: false, items: {} };
 test("items preserve independent field and metadata writes without changing earlier scenes", () => {
   const added = applyChange(empty, { type: "add", item }).scene;
   const first = applyChange(added, {
