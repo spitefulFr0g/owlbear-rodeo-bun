@@ -160,7 +160,7 @@ test("a cast display receives initial and live state without player presence", a
   expect(await assetStatus(joinToken)).toBe(404);
   expect(await assetStatus(joinToken, "PUT")).toBe(403);
   expect(events.map(([event]) => event)).toEqual([
-    "party_state", "map_state", "map", "manifest", "joined_display", "display_frozen",
+    "party_state", "map_state", "map", "manifest", "joined_display", "scene_snapshot", "display_frozen",
   ]);
   expect(events[0][1]).toEqual({ [player.id!]: { userId: "gm", nickname: "GM", role: "gm", color: "blue" } });
   expect(events[1][1]).toEqual({ mapId: "map-1", notes: {} });
@@ -346,6 +346,7 @@ test("freeze holds the shown view for joining displays and unfreeze sends the la
     ["party_state", expect.any(Object)], ["map_state", undefined],
     ["map", { id: "map-1", owner: "gm" }], ["manifest", undefined],
     ["joined_display", lateDisplay.id, expect.any(String), { room: { name: "display-freeze", session: true, hasPassword: true, switches: { tokens: true, drawing: true, notes: true, fog: false, uploads: false } } }],
+    ["scene_snapshot", { scene: expect.objectContaining({ id: expect.any(String), items: {} }) }],
     ["display_frozen", true], ["display_view", view],
   ]);
   player.emit("display_freeze", false);

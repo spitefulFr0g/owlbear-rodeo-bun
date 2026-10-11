@@ -33,14 +33,20 @@ export default class GameRepository {
       game.trustedPlayerIds = new Set(JSON.parse(record.trustedPlayerIds ?? "[]"));
       game.gmAccountId = record.gmAccountId;
       game.hasPassword = !!record.hasPassword;
-      if (record.documentVersion === 1) game.state = JSON.parse(record.document);
+      if (record.documentVersion === 2) {
+        const document = JSON.parse(record.document);
+        game.scene = document.scenes[document.openSceneId];
+        game.state = document.legacy ?? {};
+      } else if (record.documentVersion === 1 || !record.documentVersion) {
+        game.state = JSON.parse(record.document || "{}");
+      }
       this.games[gameId] = game;
     }
 
     return true;
   }
 
-  private changed(gameId: string): void {
+  changed(gameId: string): void {
     if (!this.database || !this.clock) return;
     const previous = this.pending.get(gameId);
     previous?.cancel();
@@ -55,7 +61,7 @@ export default class GameRepository {
     this.database?.saveRoom({ id: game.gameId, passwordHash: game.passwordHash,
       name: game.name, gmAccountId: game.gmAccountId, hasPassword: Number(game.hasPassword),
       trustedPlayerIds: JSON.stringify([...game.trustedPlayerIds]),
-      switches: JSON.stringify(game.switches), displayToken: game.displayToken, documentVersion: 1, document: JSON.stringify(game.state) });
+      switches: JSON.stringify(game.switches), displayToken: game.displayToken, documentVersion: 2, document: JSON.stringify({ openSceneId: game.scene.id, scenes: { [game.scene.id]: game.scene }, legacy: game.state }) });
     this.pending.get(gameId)?.cancel();
     this.pending.delete(gameId);
   }
