@@ -1,4 +1,4 @@
-import { useCanPlaceToken } from "../../contexts/RoomContext";
+import { useCanPlaceToken } from "../../scene/SceneContext";
 import { Box } from "theme-ui";
 import { useInView } from "react-intersection-observer";
 

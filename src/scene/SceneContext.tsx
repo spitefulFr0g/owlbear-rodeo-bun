@@ -18,7 +18,7 @@ import { snapPosition } from "./grid";
 
 import { useUserId } from "../contexts/UserIdContext";
 
-import { defaultRoomSwitches } from "../helpers/roomControls";
+import { canPlaceImage, getToolPermissions, defaultRoomSwitches } from "../helpers/roomControls";
 
 import { downloadAsset, hasAsset, uploadAsset } from "../network/assetStore";
 import Session, { SessionStatus } from "../network/Session";
@@ -322,12 +322,24 @@ export function useScene() {
   return context;
 }
 
+/** Availability uses only images this connection can see in the scene. */
+export function useCanPlaceToken() {
+  const { scene, person, switches, readOnly } = useScene();
+  const files = useMemo(() => scene
+    ? imagesInOrder(scene).reduce<string[]>((files, item) => files.concat(imageFiles(item)), [])
+    : [], [scene]);
+  const permissions = getToolPermissions(person.role === "display" ? "player" : person.role, switches);
+  return (token: Token) => !readOnly && person.role !== "display" &&
+    canPlaceImage(token, permissions, files);
+}
+
 /**
  * Adds tokens to the scene as Image items, the first centred on a point of
  * the page and each one after it a step down and to the right.
  */
 export function useAddTokens() {
   const { scene, person, readOnly, act, share } = useScene();
+  const canPlaceToken = useCanPlaceToken();
   const mapStageRef = useMapStage();
   const [sensitivity] = useSetting<number>("map.gridSnappingSensitivity");
   const suspended = useRef(false);
@@ -348,6 +360,7 @@ export function useAddTokens() {
     clientPosition: Vector2,
     checkMapBounds = true
   ) {
+    tokens = tokens.filter(canPlaceToken);
     const mapStage = mapStageRef.current;
     if (!scene || readOnly || !mapStage || tokens.length === 0) {
       return;

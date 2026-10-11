@@ -1,4 +1,4 @@
-import { useCanPlaceToken } from "../../contexts/RoomContext";
+import { useCanPlaceToken } from "../../scene/SceneContext";
 import TokenTile from "./TokenTile";
 import TokenTileGroup from "./TokenTileGroup";
 import TokenHiddenBadge from "./TokenHiddenBadge";

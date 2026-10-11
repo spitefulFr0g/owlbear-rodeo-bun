@@ -1,4 +1,4 @@
-import { useCanPlaceToken } from "../../contexts/RoomContext";
+import { useCanPlaceToken } from "../../scene/SceneContext";
 import { useState } from "react";
 import { createPortal } from "react-dom";
 import { Box, Flex, Grid } from "theme-ui";
