@@ -35,3 +35,33 @@ export function awayFromOpenScene(
     openName: name(list.openSceneId),
   };
 }
+
+/**
+ * The scenes in the order the list shows them: by name, ignoring capitals and
+ * comparing numbers as numbers. Scenes sharing a name keep one order between
+ * lists, by id.
+ */
+export function sortScenes(scenes: ListedScene[]): ListedScene[] {
+  return [...scenes].sort(
+    (a, b) =>
+      a.name.localeCompare(b.name, undefined, {
+        sensitivity: "base",
+        numeric: true,
+      }) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)
+  );
+}
+
+/** What the list says a scene is, beside its name */
+export type SceneMark = "open" | "viewed";
+
+/** The marks of one scene of the list, in the order shown */
+export function sceneMarks(
+  list: SceneList,
+  viewedSceneId: string | undefined,
+  sceneId: string
+): SceneMark[] {
+  const marks: SceneMark[] = [];
+  if (sceneId === list.openSceneId) marks.push("open");
+  if (sceneId === viewedSceneId) marks.push("viewed");
+  return marks;
+}

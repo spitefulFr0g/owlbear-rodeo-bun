@@ -101,6 +101,13 @@ type SceneStore = {
     name: string,
     from?: { grid: SceneGrid; map: Item }
   ) => Promise<SceneAnswer>;
+  /** Sets a scene's name. The scene list shows it once the server has */
+  renameScene: (sceneId: string, name: string) => Promise<SceneAnswer>;
+  /**
+   * Removes a scene and everything on it, for good. The server refuses the
+   * open scene, and moves a GM connection viewing the scene to the open scene.
+   */
+  deleteScene: (sceneId: string) => Promise<SceneAnswer>;
   /** Puts stored files this browser holds on the server, for an item to name */
   share: (files: string[]) => Promise<void>;
 };
@@ -381,6 +388,28 @@ export function SceneProvider({
     [askForScene]
   );
 
+  // Changes to the scene list, which move this connection nowhere by asking
+  const askForList = useCallback(
+    (event: "scene_rename" | "scene_delete", payload: Record<string, unknown>) =>
+      new Promise<SceneAnswer>((resolve) => {
+        if (!session.socket?.connected || !session.joinToken) {
+          resolve({ ok: false, error: "offline" });
+          return;
+        }
+        session.socket.emit(event, payload, resolve);
+      }),
+    [session]
+  );
+  const renameScene = useCallback(
+    (sceneId: string, name: string) =>
+      askForList("scene_rename", { sceneId, name }),
+    [askForList]
+  );
+  const deleteScene = useCallback(
+    (sceneId: string) => askForList("scene_delete", { sceneId }),
+    [askForList]
+  );
+
   const share = useCallback(
     async (files: string[]) => {
       const token = session.joinToken;
@@ -420,9 +449,11 @@ export function SceneProvider({
       setGrid,
       viewScene,
       createScene,
+      renameScene,
+      deleteScene,
       share,
     }),
-    [scene, selection, person, switches, role, sceneList, readOnly, act, undo, redo, canUndo, canRedo, canChange, canSelect, setGrid, viewScene, createScene, share]
+    [scene, selection, person, switches, role, sceneList, readOnly, act, undo, redo, canUndo, canRedo, canChange, canSelect, setGrid, viewScene, createScene, renameScene, deleteScene, share]
   );
 
   return (
