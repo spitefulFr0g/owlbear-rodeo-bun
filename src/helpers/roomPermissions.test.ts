@@ -11,11 +11,12 @@ const off = {
   notes: false,
   fog: false,
   uploads: false,
+  ownerOnly: false,
 };
 
 test("new room tools use the room defaults when switches have not arrived", () => {
   expect(getToolPermissions("player")).toEqual({
-    ...defaultRoomSwitches,
+    tokens: true, drawing: true, notes: true, fog: false, uploads: false,
     measure: true,
     pointer: true,
   });
@@ -26,7 +27,7 @@ test.each(["tokens", "drawing", "notes", "fog", "uploads"] as const)(
   (key) => {
     expect(getToolPermissions("player", off)[key]).toBe(false);
     expect(getToolPermissions("player", { ...off, [key]: true })).toEqual({
-      ...off,
+      tokens: false, drawing: false, notes: false, fog: false, uploads: false,
       [key]: true,
       measure: true,
       pointer: true,
@@ -53,7 +54,7 @@ test.each(["gm", "trusted"] as const)(
 
 test("measure and pointer stay available when every player switch is off", () => {
   expect(getToolPermissions("player", off)).toEqual({
-    ...off,
+    tokens: false, drawing: false, notes: false, fog: false, uploads: false,
     measure: true,
     pointer: true,
   });
@@ -85,4 +86,9 @@ test("uploads off allows built-ins and images already in the room but refuses lo
       []
     )
   ).toBe(true);
+});
+
+test("Owner Only limits items without disabling the token tool", () => {
+  expect(getToolPermissions("player", { ...defaultRoomSwitches, ownerOnly: true }))
+    .toEqual(getToolPermissions("player", defaultRoomSwitches));
 });

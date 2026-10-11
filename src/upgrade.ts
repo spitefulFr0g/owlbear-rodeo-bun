@@ -1,25 +1,15 @@
 // eslint-disable-next-line no-unused-vars
 import Dexie, { Version } from "dexie";
-import shortid from "shortid";
 import { v4 as uuid } from "uuid";
-import Case from "case";
 import chunk from "lodash.chunk";
 
 import blobToBuffer from "./helpers/blobToBuffer";
 import { getGridDefaultInset } from "./helpers/grid";
 import { createThumbnail, getImageOutline } from "./helpers/image";
-import {
-  AddStatesAction,
-  EditStatesAction,
-  RemoveStatesAction,
-  SubtractFogAction,
-  CutFogAction,
-} from "./actions";
 import { getDefaultMaps } from "./maps";
 import { getDefaultTokens } from "./tokens";
 import { Outline } from "./types/Outline";
 import { Group, GroupContainer } from "./types/Group";
-import cloneDeep from "lodash.clonedeep";
 
 export type UpgradeEventHandler = (versionNumber: number) => void;
 
@@ -59,68 +49,8 @@ export const versions: Record<number, VersionCallback> = {
     });
   },
   // v1.3.0 - Added new default tokens
-  3(v, onUpgrade) {
-    v.stores({}).upgrade((tx) => {
-      onUpgrade?.(3);
-      return tx
-        .table("states")
-        .toCollection()
-        .modify((state) => {
-          function mapTokenId(id: string) {
-            switch (id) {
-              case "__default-Axes":
-                return "__default-Barbarian";
-              case "__default-Bird":
-                return "__default-Druid";
-              case "__default-Book":
-                return "__default-Wizard";
-              case "__default-Crown":
-                return "__default-Humanoid";
-              case "__default-Dragon":
-                return "__default-Dragon";
-              case "__default-Eye":
-                return "__default-Warlock";
-              case "__default-Fist":
-                return "__default-Monk";
-              case "__default-Horse":
-                return "__default-Fey";
-              case "__default-Leaf":
-                return "__default-Druid";
-              case "__default-Lion":
-                return "__default-Monstrosity";
-              case "__default-Money":
-                return "__default-Humanoid";
-              case "__default-Moon":
-                return "__default-Cleric";
-              case "__default-Potion":
-                return "__default-Sorcerer";
-              case "__default-Shield":
-                return "__default-Paladin";
-              case "__default-Skull":
-                return "__default-Undead";
-              case "__default-Snake":
-                return "__default-Beast";
-              case "__default-Sun":
-                return "__default-Cleric";
-              case "__default-Swords":
-                return "__default-Fighter";
-              case "__default-Tree":
-                return "__default-Plant";
-              case "__default-Triangle":
-                return "__default-Sorcerer";
-              default:
-                return "__default-Fighter";
-            }
-          }
-          for (let stateId in state.tokens) {
-            state.tokens[stateId].tokenId = mapTokenId(
-              state.tokens[stateId].tokenId
-            );
-            state.tokens[stateId].lastEditedBy = "";
-            state.tokens[stateId].rotation = 0;
-          }
-        });
-    });
+  3(v) {
+    v.stores({});
   },
   // v1.3.1 - Added show grid option
   4(v, onUpgrade) {
@@ -135,22 +65,8 @@ export const versions: Record<number, VersionCallback> = {
     });
   },
   // v1.4.0 - Added fog subtraction
-  5(v, onUpgrade) {
-    v.stores({}).upgrade((tx) => {
-      onUpgrade?.(5);
-      return tx
-        .table("states")
-        .toCollection()
-        .modify((state) => {
-          for (let fogAction of state.fogDrawActions) {
-            if (fogAction.type === "add" || fogAction.type === "edit") {
-              for (let shape of fogAction.shapes) {
-                shape.data.holes = [];
-              }
-            }
-          }
-        });
-    });
+  5(v) {
+    v.stores({});
   },
   // v1.4.2 - Added map resolutions
   6(v, onUpgrade) {
@@ -166,20 +82,8 @@ export const versions: Record<number, VersionCallback> = {
     });
   },
   // v1.5.0 - Fixed default token rogue spelling
-  7(v, onUpgrade) {
-    v.stores({}).upgrade((tx) => {
-      onUpgrade?.(7);
-      return tx
-        .table("states")
-        .toCollection()
-        .modify((state) => {
-          for (let id in state.tokens) {
-            if (state.tokens[id].tokenId === "__default-Rouge") {
-              state.tokens[id].tokenId = "__default-Rogue";
-            }
-          }
-        });
-    });
+  7(v) {
+    v.stores({});
   },
   // v1.5.0 - Added map snap to grid option
   8(v, onUpgrade) {
@@ -194,22 +98,8 @@ export const versions: Record<number, VersionCallback> = {
     });
   },
   // v1.5.1 - Added lock, visibility and modified to tokens
-  9(v, onUpgrade) {
-    v.stores({}).upgrade((tx) => {
-      onUpgrade?.(9);
-      return tx
-        .table("states")
-        .toCollection()
-        .modify((state) => {
-          for (let id in state.tokens) {
-            state.tokens[id].lastModifiedBy = state.tokens[id].lastEditedBy;
-            delete state.tokens[id].lastEditedBy;
-            state.tokens[id].lastModified = Date.now();
-            state.tokens[id].locked = false;
-            state.tokens[id].visible = true;
-          }
-        });
-    });
+  9(v) {
+    v.stores({});
   },
   // v1.5.1 - Added token prop category and remove isVehicle bool
   10(v, onUpgrade) {
@@ -312,68 +202,16 @@ export const versions: Record<number, VersionCallback> = {
     });
   },
   // v1.7.0 - Added note tool
-  16(v, onUpgrade) {
-    v.stores({}).upgrade((tx) => {
-      onUpgrade?.(16);
-      return tx
-        .table("states")
-        .toCollection()
-        .modify((state) => {
-          state.notes = {};
-        });
-    });
+  16(v) {
+    v.stores({});
   },
   // 1.7.0 (hotfix) - Optimized fog shape edits to only include needed data
-  17(v, onUpgrade) {
-    v.stores({}).upgrade((tx) => {
-      onUpgrade?.(17);
-      return tx
-        .table("states")
-        .toCollection()
-        .modify((state) => {
-          for (let i = 0; i < state.fogDrawActions.length; i++) {
-            const action = state.fogDrawActions[i];
-            if (action && action.type === "edit") {
-              for (let j = 0; j < action.shapes.length; j++) {
-                const shape = action.shapes[j];
-                const temp = { ...shape };
-                state.fogDrawActions[i].shapes[j] = {
-                  id: temp.id,
-                  visible: temp.visible,
-                };
-              }
-            }
-          }
-        });
-    });
+  17(v) {
+    v.stores({});
   },
   // 1.8.0 - Added note text only mode, converted draw and fog representations
-  18(v, onUpgrade) {
-    v.stores({}).upgrade((tx) => {
-      onUpgrade?.(18);
-      return tx
-        .table("states")
-        .toCollection()
-        .modify((state) => {
-          for (let id in state.notes) {
-            state.notes[id].textOnly = false;
-          }
-
-          state.drawShapes = convertOldActionsToShapes(
-            state.mapDrawActions,
-            state.mapDrawActionIndex
-          );
-          state.fogShapes = convertOldActionsToShapes(
-            state.fogDrawActions,
-            state.fogDrawActionIndex
-          );
-
-          delete state.mapDrawActions;
-          delete state.mapDrawActionIndex;
-          delete state.fogDrawActions;
-          delete state.fogDrawActionIndex;
-        });
-    });
+  18(v) {
+    v.stores({});
   },
   // 1.8.0 - Add thumbnail to maps and add measurement to grid
   19(v, onUpgrade) {
@@ -427,21 +265,8 @@ export const versions: Record<number, VersionCallback> = {
     v.stores({});
   },
   // v1.8.1 - Shorten fog shape ids
-  22(v, onUpgrade) {
-    v.stores({}).upgrade((tx) => {
-      onUpgrade?.(22);
-      return tx
-        .table("states")
-        .toCollection()
-        .modify((state) => {
-          for (let id of Object.keys(state.fogShapes)) {
-            const newId = shortid.generate();
-            state.fogShapes[newId] = state.fogShapes[id];
-            state.fogShapes[newId].id = newId;
-            delete state.fogShapes[id];
-          }
-        });
-    });
+  22(v) {
+    v.stores({});
   },
   // v1.9.0 - Add outlines to tokens
   23(v, onUpgrade) {
@@ -680,62 +505,8 @@ export const versions: Record<number, VersionCallback> = {
     });
   },
   // v1.9.0 - Move tokens to use more defaults and add token outline to token states
-  30(v, onUpgrade) {
-    v.stores({}).upgrade(async (tx) => {
-      onUpgrade?.(30);
-      const tokens = await Dexie.waitFor(tx.table("tokens").toArray());
-      tx.table("states")
-        .toCollection()
-        .modify((state) => {
-          for (let id in state.tokens) {
-            if (!state.tokens[id]?.tokenId) {
-              delete state.tokens[id];
-              continue;
-            }
-            if (!state.tokens[id].tokenId.startsWith("__default")) {
-              const token = tokens.find(
-                (token) => token.id === state.tokens[id].tokenId
-              );
-              if (token) {
-                state.tokens[id].category = token.defaultCategory;
-                state.tokens[id].file = token.file;
-                state.tokens[id].type = "file";
-                state.tokens[id].outline = token.outline;
-                state.tokens[id].width = token.width;
-                state.tokens[id].height = token.height;
-                state.tokens[id].owner = token.owner;
-              } else {
-                state.tokens[id].category = "character";
-                state.tokens[id].type = "file";
-                state.tokens[id].file = "";
-                state.tokens[id].outline = {
-                  type: "rect",
-                  width: 256,
-                  height: 256,
-                  x: 0,
-                  y: 0,
-                };
-                state.tokens[id].width = 256;
-                state.tokens[id].height = 256;
-              }
-            } else {
-              state.tokens[id].category = "character";
-              state.tokens[id].type = "default";
-              state.tokens[id].key = Case.camel(
-                state.tokens[id].tokenId.slice(10)
-              );
-              state.tokens[id].outline = {
-                type: "circle",
-                x: 128,
-                y: 128,
-                radius: 128,
-              };
-              state.tokens[id].width = 256;
-              state.tokens[id].height = 256;
-            }
-          }
-        });
-    });
+  30(v) {
+    v.stores({});
   },
   // v1.9.0 - Remove maps not owned by user as cache is now done on the asset level
   31(v, onUpgrade) {
@@ -835,17 +606,8 @@ export const versions: Record<number, VersionCallback> = {
     });
   },
   // v1.10.0 - Add rotation to notes
-  37(v, onUpgrade) {
-    v.stores({}).upgrade((tx) => {
-      onUpgrade?.(37);
-      tx.table("states")
-        .toCollection()
-        .modify((state) => {
-          for (let id in state.notes) {
-            state.notes[id].rotation = 0;
-          }
-        });
-    });
+  37(v) {
+    v.stores({});
   },
   // v1.10.0 - Delete groups again
   38(v, onUpgrade) {
@@ -864,60 +626,24 @@ export const versions: Record<number, VersionCallback> = {
     });
   },
   // v1.10.0 - Rename drawShapes and fogShapes in state
-  39(v, onUpgrade) {
-    v.stores({}).upgrade((tx) => {
-      onUpgrade?.(39);
-      tx.table("states")
-        .toCollection()
-        .modify((state) => {
-          state.drawings = state.drawShapes;
-          state.fogs = state.fogShapes;
-
-          delete state.drawShapes;
-          delete state.fogShapes;
-        });
-    });
+  39(v) {
+    v.stores({});
   },
   // v1.10.0 (patch 1) - Rename drawShapes and fogShapes in state again (some people's didn't work)
-  40(v, onUpgrade) {
-    v.stores({}).upgrade((tx) => {
-      onUpgrade?.(40);
-      tx.table("states")
-        .toCollection()
-        .modify((state) => {
-          if (state.drawShapes) {
-            state.drawings = cloneDeep(state.drawShapes);
-            delete state.drawShapes;
-          }
-          if (state.fogShapes) {
-            state.fogs = cloneDeep(state.fogShapes);
-            delete state.fogShapes;
-          }
-        });
-    });
+  40(v) {
+    v.stores({});
   },
   // v1.10.0 (patch 2) - Rename drawShapes and fogShapes in state again again (some people's still didn't work)
-  41(v, onUpgrade) {
-    v.stores({}).upgrade((tx) => {
-      onUpgrade?.(41);
-      return tx
-        .table("states")
-        .toCollection()
-        .modify((state) => {
-          if (state.drawShapes) {
-            state.drawings = cloneDeep(state.drawShapes);
-            delete state.drawShapes;
-          }
-          if (state.fogShapes) {
-            state.fogs = cloneDeep(state.fogShapes);
-            delete state.fogShapes;
-          }
-        });
-    });
+  41(v) {
+    v.stores({});
+  },
+  // Discard placed state while retaining the browser library.
+  42(v) {
+    v.stores({ states: null });
   },
 };
 
-export const latestVersion = 41;
+export const latestVersion = 42;
 
 /**
  * Load versions onto a database up to a specific version number
@@ -933,41 +659,6 @@ export function loadVersions(
   for (let versionNumber = 1; versionNumber <= upTo; versionNumber++) {
     versions[versionNumber](db.version(versionNumber), onUpgrade);
   }
-}
-
-/**
- * Convert from the previous representation of actions (1.7.0) to the new representation (1.8.0)
- * and combine into shapes
- */
-function convertOldActionsToShapes(actions: any[], actionIndex: number) {
-  let newShapes = {};
-  for (let i = 0; i <= actionIndex; i++) {
-    const action = actions[i];
-    if (!action) {
-      continue;
-    }
-    let newAction;
-    if (action.shapes) {
-      if (action.type === "add") {
-        newAction = new AddStatesAction(action.shapes);
-      } else if (action.type === "edit") {
-        newAction = new EditStatesAction(action.shapes);
-      } else if (action.type === "remove") {
-        newAction = new RemoveStatesAction(action.shapes);
-      } else if (action.type === "subtract") {
-        newAction = new SubtractFogAction(action.shapes);
-      } else if (action.type === "cut") {
-        newAction = new CutFogAction(action.shapes);
-      }
-    } else if (action.type === "remove" && action.shapeIds) {
-      newAction = new RemoveStatesAction(action.shapeIds);
-    }
-
-    if (newAction) {
-      newShapes = newAction.execute(newShapes);
-    }
-  }
-  return newShapes;
 }
 
 // Helper to create a thumbnail for a file in a db

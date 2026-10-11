@@ -36,8 +36,7 @@ export function PlayerProvider({ session, children }: PlayerProviderProps) {
     },
     session,
     "player_state",
-    500,
-    false
+    500
   );
 
   useEffect(() => {

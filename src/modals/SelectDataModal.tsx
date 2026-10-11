@@ -10,7 +10,6 @@ import { getDatabase } from "../database";
 
 import { Map } from "../types/Map";
 import { Group, GroupContainer } from "../types/Group";
-import { MapState } from "../types/MapState";
 import { Token } from "../types/Token";
 import { RequestCloseEventHandler } from "../types/Events";
 
@@ -35,7 +34,7 @@ type SelectDataProps = {
   confirmText: string;
   label: string;
   databaseName: string;
-  filter: (table: string, data: Map | MapState | Token, id: string) => boolean;
+  filter: (table: string, data: Map | Token, id: string) => boolean;
 };
 
 type DataRecord = Record<string, SelectData>;
@@ -51,9 +50,6 @@ function SelectDataModal({
 }: SelectDataProps) {
   const [maps, setMaps] = useState<DataRecord>({});
   const [mapGroups, setMapGroups] = useState<Group[]>([]);
-  const [tokensByMap, setTokensByMap] = useState<Record<string, Set<string>>>(
-    {}
-  );
   const [tokens, setTokens] = useState<DataRecord>({});
   const [tokenGroups, setTokenGroups] = useState<Group[]>([]);
 
@@ -67,7 +63,6 @@ function SelectDataModal({
         setIsLoading(true);
         const db = getDatabase({ addons: [] }, databaseName);
         let loadedMaps: DataRecord = {};
-        let loadedTokensByMap: Record<string, Set<string>> = {};
         let loadedTokens: DataRecord = {};
         await db
           .table("maps")
@@ -80,17 +75,6 @@ function SelectDataModal({
               checked: true,
             };
           });
-        await db
-          .table("states")
-          .filter((state: MapState) => filter("states", state, state.mapId))
-          .each((state: MapState) => {
-            loadedTokensByMap[state.mapId] = new Set(
-              Object.values(state.tokens).map(
-                (tokenState) => tokenState.tokenId
-              )
-            );
-          });
-
         await db
           .table("tokens")
           .filter((token: Token) => filter("tokens", token, token.id))
@@ -109,7 +93,6 @@ function SelectDataModal({
         db.close();
         setMaps(loadedMaps);
         setMapGroups(mapGroup.items);
-        setTokensByMap(loadedTokensByMap);
         setTokenGroups(tokenGroup.items);
         setTokens(loadedTokens);
         setIsLoading(false);
@@ -118,41 +101,10 @@ function SelectDataModal({
         setTokens({});
         setTokenGroups([]);
         setMapGroups([]);
-        setTokensByMap({});
       }
     }
     loadData();
   }, [isOpen, databaseName, filter]);
-
-  // An object mapping a tokenId to how many checked maps it is currently used in
-  const [tokenUsedCount, setTokenUsedCount] = useState<Record<string, number>>(
-    {}
-  );
-  useEffect(() => {
-    let tokensUsed: Record<string, number> = {};
-    for (let mapId in maps) {
-      if (maps[mapId].checked && mapId in tokensByMap) {
-        for (let tokenId of tokensByMap[mapId]) {
-          if (tokenId in tokensUsed) {
-            tokensUsed[tokenId] += 1;
-          } else {
-            tokensUsed[tokenId] = 1;
-          }
-        }
-      }
-    }
-    setTokenUsedCount(tokensUsed);
-    // Update tokens to ensure used tokens are checked
-    setTokens((prevTokens) => {
-      let newTokens = { ...prevTokens };
-      for (let id in newTokens) {
-        if (id in tokensUsed && newTokens[id].type !== "default") {
-          newTokens[id].checked = true;
-        }
-      }
-      return newTokens;
-    });
-  }, [maps, tokensByMap]);
 
   function getCheckedGroups(groups: Group[], data: DataRecord) {
     let checkedGroups = [];
@@ -196,26 +148,6 @@ function SelectDataModal({
       }
       return newMaps;
     });
-    // If all token select is unchecked then ensure all tokens are unchecked
-    if (!event.target.checked && !tokensSelectChecked) {
-      setTokens((prevTokens) => {
-        let newTokens = { ...prevTokens };
-        let tempUsedCount = { ...tokenUsedCount };
-        for (let id in newTokens) {
-          for (let map of maps) {
-            if (tokensByMap[map.id].has(id)) {
-              if (tempUsedCount[id] > 1) {
-                tempUsedCount[id] -= 1;
-              } else if (tempUsedCount[id] === 1) {
-                tempUsedCount[id] = 0;
-                newTokens[id].checked = false;
-              }
-            }
-          }
-        }
-        return newTokens;
-      });
-    }
   }
 
   function handleTokensChanged(
@@ -225,19 +157,13 @@ function SelectDataModal({
     setTokens((prevTokens) => {
       let newTokens = { ...prevTokens };
       for (let token of tokens) {
-        if (!(token.id in tokenUsedCount) || token.type === "default") {
-          newTokens[token.id].checked = event.target.checked;
-        }
+        newTokens[token.id].checked = event.target.checked;
       }
       return newTokens;
     });
   }
 
-  // Some tokens are checked not by maps or all tokens are checked by maps
-  const tokensSelectChecked =
-    Object.values(tokens).some(
-      (token) => !(token.id in tokenUsedCount) && token.checked
-    ) || Object.values(tokens).every((token) => token.id in tokenUsedCount);
+  const tokensSelectChecked = Object.values(tokens).some((token) => token.checked);
 
   function renderGroupContainer(
     group: GroupContainer,
@@ -332,27 +258,16 @@ function SelectDataModal({
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                   handleTokensChanged(e, [token])
                 }
-                disabled={
-                  token.type !== "default" && token.id in tokenUsedCount
-                }
               />
               {token.name}
             </Label>
-            {token.id in tokenUsedCount && token.type !== "default" && (
-              <Text as="p" variant="caption" ml={4}>
-                Token used in {tokenUsedCount[token.id]} selected map
-                {tokenUsedCount[token.id] > 1 && "s"}
-              </Text>
-            )}
           </Box>
         );
       }
     } else {
       if (group.items.some((item) => item.id in tokens)) {
         const checked =
-          group.items.some(
-            (item) => !(item.id in tokenUsedCount) && tokens[item.id]?.checked
-          ) || group.items.every((item) => item.id in tokenUsedCount);
+          group.items.some((item) => tokens[item.id]?.checked);
         return renderGroupContainer(
           group,
           checked,

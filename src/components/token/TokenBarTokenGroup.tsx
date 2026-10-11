@@ -1,4 +1,4 @@
-import { useCanPlaceToken } from "../../contexts/RoomContext";
+import { useCanPlaceToken } from "../../scene/SceneContext";
 import { useState, useRef } from "react";
 import { Grid, Flex, Box } from "theme-ui";
 import { useSpring, animated } from "react-spring";
@@ -100,10 +100,12 @@ function TokenBarTokenGroup({
             <TokenImage
               token={token}
               key={token.id}
+              alt={canPlaceToken(token) ? token.name : `${token.name}: placement unavailable`}
               sx={{
                 userSelect: "none",
                 touchAction: "none",
                 pointerEvents: "none",
+                opacity: canPlaceToken(token) ? 1 : 0.4,
               }}
             />
           ))}

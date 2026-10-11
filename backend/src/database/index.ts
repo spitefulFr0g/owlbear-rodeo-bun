@@ -121,7 +121,7 @@ export class OwlbearDatabase {
       passwordHash = excluded.passwordHash, displayToken = excluded.displayToken,
       documentVersion = excluded.documentVersion, document = excluded.document,
       name = excluded.name, gmAccountId = excluded.gmAccountId, hasPassword = excluded.hasPassword, switches = excluded.switches, trustedPlayerIds = excluded.trustedPlayerIds`)
-      .run(record.id, record.passwordHash, record.displayToken, record.documentVersion, record.document, record.name, record.gmAccountId, record.hasPassword, record.switches ?? JSON.stringify({ tokens: true, drawing: true, notes: true, fog: false, uploads: false }), record.trustedPlayerIds ?? "[]");
+      .run(record.id, record.passwordHash, record.displayToken, record.documentVersion, record.document, record.name, record.gmAccountId, record.hasPassword, record.switches ?? JSON.stringify({ tokens: true, drawing: true, notes: true, fog: false, uploads: false, ownerOnly: false }), record.trustedPlayerIds ?? "[]");
   }
 
   roomsForGM(accountId: string): RoomRecord[] {
@@ -146,6 +146,10 @@ export class OwlbearDatabase {
         SELECT SUM(assets.size) FROM room_assets
         JOIN assets ON assets.id = room_assets.assetId WHERE room_assets.roomId = rooms.id
       ), 0) AS sizeBytes FROM rooms WHERE id = ?`).get(roomId)?.sizeBytes ?? 0;
+  }
+
+  roomHasAsset(roomId: string, assetId: string): boolean {
+    return !!this.connection.query("SELECT 1 FROM room_assets WHERE roomId = ? AND assetId = ?").get(roomId, assetId);
   }
 
   recordRoomAsset(roomId: string, assetId: string): void {

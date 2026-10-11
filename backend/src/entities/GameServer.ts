@@ -1,4 +1,4 @@
-import { allowsLegacyMapStateUpdateV1 } from "../helpers/roomSwitches";
+import { applyChange, visibleTo, changeFor, Item, Scene, mayChange, Person, checkChange, readBatch, topOrder, gmOwner, Change, SceneGrid } from "../../../src/sceneRules";
 import { randomBytes } from "crypto";
 import Accounts from "../accounts/Accounts";
 import { clientAddress } from "../clientRequest";
@@ -13,12 +13,8 @@ import { DisplayView } from "../types/DisplayView";
 import GameRepository from "./GameRepository";
 import GameState from "./GameState";
 import JoinTokens from "./JoinTokens";
-import { applyChanges, isSafeUpdate, Update } from "../helpers/diff";
-import { Map } from "../types/Map";
-import { MapState } from "../types/MapState";
 import { PlayerState } from "../types/PlayerState";
 import { playerColours, isPlayerColour } from "../types/PlayerColour";
-import { Manifest } from "../types/Manifest";
 import { Pointer } from "../types/Pointer";
 
 export default class GameServer {
@@ -28,7 +24,7 @@ export default class GameServer {
   private readonly attempts: AttemptLimiter;
   private readonly joinTokens: JoinTokens;
 
-  constructor(io: IOServer, joinTokens: JoinTokens, database?: OwlbearDatabase, private readonly clock: Clock = realClock, attempts?: AttemptLimiter, private readonly behindProxy = false, private readonly accounts?: Accounts) {
+  constructor(io: IOServer, joinTokens: JoinTokens, private readonly database?: OwlbearDatabase, private readonly clock: Clock = realClock, attempts?: AttemptLimiter, private readonly behindProxy = false, private readonly accounts?: Accounts) {
     this.attempts = attempts ?? new AttemptLimiter(clock ?? realClock);
     this.io = io;
     this.joinTokens = joinTokens;
@@ -46,12 +42,15 @@ export default class GameServer {
     return this.gameRepo.games[gameId].trustedPlayerIds.has(socket.data.playerId) ? "trusted" : "player";
   }
 
-  private allowsManifest(socket: Socket, gameId: string, manifest: Manifest): boolean {
-    if (this.playerRole(socket, gameId) !== "player" || this.gameRepo.games[gameId].switches.uploads) return true;
-    const current = this.gameRepo.getState(gameId, "manifest") as Manifest | undefined;
-    // Built-in images do not enter the manifest; compare stored image ids, not aliases.
-    const used = new Set(Object.values(current?.assets ?? {}).map(asset => asset.id));
-    return Object.values(manifest?.assets ?? {}).every(asset => used.has(asset.id));
+  private person(socket: Socket, gameId: string): Person {
+    return { role: socket.data.castDisplay ? "display" : this.playerRole(socket, gameId),
+      id: socket.data.castDisplay ? "" : socket.data.role === "gm" ? gmOwner : socket.data.playerId };
+  }
+
+  private sceneFor(socket: Socket, gameId: string): Scene {
+    const scene = this.gameRepo.games[gameId].scene;
+    const person = this.person(socket, gameId);
+    return { ...scene, items: Object.fromEntries(Object.entries(scene.items).filter(([, item]) => visibleTo(person, item))) };
   }
 
   private broadcastCanvas(sender: Socket, gameId: string, event: string, value: unknown): void {
@@ -74,9 +73,7 @@ export default class GameServer {
       for (const id of this.io.sockets.adapter.rooms.get(gameId) || []) {
         const peer = this.io.sockets.sockets.get(id);
         if (!peer || peer.data.role === "gm") continue;
-        peer.emit("map", game.getState("map"));
-        peer.emit("map_state", game.getState("mapState"));
-        peer.emit("manifest", game.getState("manifest"));
+        peer.emit("scene_snapshot", { scene: this.sceneFor(peer, gameId) });
         if (peer.data.castDisplay && game.shownDisplayView) peer.emit("display_view", game.shownDisplayView);
       }
     }
@@ -112,16 +109,12 @@ export default class GameServer {
       // refused here too, before any handler can change or forward state.
       socket.use(([event], next) => {
         const roomId = gameState.getGameId();
-        // Waiting connections must not receive even the full state used to refuse an edit.
+        // Pointers are private to GM connections outside a session.
         if (roomId && !this.gameRepo.games[roomId].session && socket.data.role !== "gm" &&
-          ["map", "map_state", "map_state_update", "manifest", "manifest_update", "player_pointer"].includes(event)) return;
+          event === "player_pointer") return;
         if (
-          socket.data.castDisplay && !["get_display_token", "join_display", "room_switches", "room_trust", "room_password", "new_display_link", "session"].includes(event)
+          socket.data.castDisplay && !["get_display_token", "join_display", "scene_grid", "room_switches", "room_trust", "room_password", "new_display_link", "session"].includes(event)
         ) {
-          const gameId = gameState.getGameId();
-          if (gameId && (event === "map" || event === "map_state")) {
-            socket.emit(event, this.gameRepo.getState(gameId, event === "map" ? "map" : "mapState"));
-          }
           return;
         }
         next();
@@ -153,6 +146,7 @@ export default class GameServer {
         const token = this.joinTokens.issue(socket.id, gameId, "display");
         socket.emit("joined_display", socket.id, token, { room: this.gameRepo.roomState(gameId) });
         const game = this.gameRepo.games[gameId];
+        if (game.session) socket.emit("scene_snapshot", { scene: this.sceneFor(socket, gameId) });
         socket.emit("display_frozen", game.displayFrozen);
         if (game.session && game.shownDisplayView) socket.emit("display_view", game.shownDisplayView);
       });
@@ -236,7 +230,7 @@ export default class GameServer {
             socket.emit("room_not_found");
             return;
           }
-          socket.data.playerId = typeof me?.playerId === "string" && me.playerId.length > 0 ? me.playerId : undefined;
+          socket.data.playerId = typeof me?.playerId === "string" && me.playerId.length > 0 && (role === "gm" || me.playerId !== gmOwner) ? me.playerId : undefined;
           socket.data.role = role;
           const usedColours = new Set([...this.io.sockets.adapter.rooms.get(gameId) || []]
             .map(id => this.io.sockets.sockets.get(id)?.data.color));
@@ -251,12 +245,104 @@ export default class GameServer {
           // Only the player who joined gets the token for the asset routes
           const token = this.joinTokens.issue(socket.id, gameId, role);
           socket.emit("joined_game", socket.id, token, { role: this.playerRole(socket, gameId), color: socket.data.color, room: this.gameRepo.roomState(gameId) });
+          if (role === "gm" || game.session) socket.emit("scene_snapshot", { scene: this.sceneFor(socket, gameId) });
           socket.emit("display_frozen", this.gameRepo.games[gameId].displayFrozen);
           socket.to(gameId).emit("joined_game", socket.id);
         } catch (error) {
           console.error("JOIN_ERROR", error);
         } finally {
           joining = false;
+        }
+      });
+
+      socket.on("scene_grid", (value: unknown, answer?: (result: { ok: boolean; error?: string }) => void) => {
+        const gameId = gameState.getGameId();
+        if (!gameId || socket.data.castDisplay || socket.data.role !== "gm") {
+          if (typeof answer === "function") answer({ ok: false, error: "not_room_gm" });
+          return;
+        }
+        const game = this.gameRepo.games[gameId];
+        const payload = value as { sceneId?: unknown; grid?: SceneGrid } | null;
+        const grid = payload?.grid;
+        if (!payload || typeof payload !== "object" || Array.isArray(payload) ||
+            Object.keys(payload).some(key => !["sceneId", "grid"].includes(key)) ||
+            payload.sceneId !== game.scene.id || !grid || typeof grid !== "object" || Array.isArray(grid) ||
+            Object.keys(grid).some(key => !["type", "unitsPerCell", "measurement", "shown", "snap"].includes(key)) ||
+            !["square", "hexVertical", "hexHorizontal"].includes(grid.type) || grid.unitsPerCell !== 150 ||
+            typeof grid.shown !== "boolean" || typeof grid.snap !== "boolean" ||
+            !grid.measurement || typeof grid.measurement !== "object" || Array.isArray(grid.measurement) ||
+            Object.keys(grid.measurement).some(key => !["type", "scale"].includes(key)) ||
+            !["chebyshev", "alternating", "euclidean", "manhattan"].includes(grid.measurement.type) ||
+            typeof grid.measurement.scale !== "string") {
+          if (typeof answer === "function") answer({ ok: false, error: "invalid" });
+          return;
+        }
+        game.scene = { ...game.scene, grid };
+        this.gameRepo.changed(gameId);
+        socket.emit("scene_grid", { sceneId: game.scene.id, grid });
+        this.broadcastCanvas(socket, gameId, "scene_grid", { sceneId: game.scene.id, grid });
+        if (typeof answer === "function") answer({ ok: true });
+      });
+
+      socket.on("scene_changes", (value: unknown) => {
+        const batch = readBatch(value);
+        const gameId = gameState.getGameId();
+        if (!batch || !gameId || socket.data.castDisplay) return;
+        const game = this.gameRepo.games[gameId];
+        const person = this.person(socket, gameId);
+        const applied: Change[] = [];
+        const transitions: { before: Item | undefined; after: Item | undefined; change: Change }[] = [];
+        const refused: { id: string; item: Item | null }[] = [];
+        for (const change of batch.changes) {
+          const id = change.type === "add" ? change.item.id : change.id;
+          const before = Object.hasOwn(game.scene.items, id) ? game.scene.items[id] : undefined;
+          const refusedItem = before && visibleTo(person, before) ? before : null;
+          if (batch.sceneId !== game.scene.id || (socket.data.role !== "gm" && !game.session) ||
+              checkChange(game.scene, change) ||
+              !mayChange(person, { switches: game.switches, knownImage: image =>
+                image.type === "default" || [image.file, image.thumbnail, ...Object.values(image.resolutions ?? {})]
+                  .filter((id): id is string => id !== undefined)
+                  .every(id => this.database?.roomHasAsset(gameId, id) ?? false) },
+                change.type === "add" ? undefined : before, change) ||
+              (socket.data.role !== "gm" && !socket.data.playerId)) {
+            refused.push({ id, item: refusedItem });
+            continue;
+          }
+          let actual: Change = change;
+          if (change.type === "add") {
+            actual = { type: "add", item: { ...change.item,
+              owner: socket.data.role === "gm" ? gmOwner : socket.data.playerId,
+              order: topOrder(game.scene, change.item.layer) } };
+          } else if (change.type === "update") {
+            const item = game.scene.items[change.id];
+            if (item && (change.fields.layer !== undefined ||
+                (change.fields.position !== undefined && item.kind === "image" && item.layer !== "map"))) {
+              const fields = { ...change.fields, order: topOrder(game.scene, change.fields.layer ?? item.layer) };
+              actual = { ...change, fields };
+            }
+          }
+          const result = applyChange(game.scene, actual);
+          if (!result.applied) {
+            refused.push({ id, item: refusedItem });
+            continue;
+          }
+          game.scene = result.scene;
+          applied.push(actual);
+          transitions.push({ before, after: Object.hasOwn(game.scene.items, id) ? game.scene.items[id] : undefined, change: actual });
+        }
+        if (applied.length) this.gameRepo.changed(gameId);
+        socket.emit("scene_answer", { batchId: batch.id, sceneId: batch.sceneId, applied, refused });
+        if (applied.length) {
+          for (const id of this.io.sockets.adapter.rooms.get(gameId) || []) {
+            const peer = this.io.sockets.sockets.get(id);
+            if (!peer || peer.id === socket.id || (!game.session && peer.data.role !== "gm")) continue;
+            const viewer = this.person(peer, gameId);
+            const changes = transitions.flatMap(({ before, after, change }) => {
+              const visibleChange = changeFor(viewer, before, after, change);
+              return visibleChange ? [visibleChange] : [];
+            });
+            if (changes.length) peer.emit("scene_changes", { sceneId: game.scene.id, changes });
+          }
         }
       });
 
@@ -276,8 +362,8 @@ export default class GameServer {
       socket.on("display_view", (view: DisplayView) => {
         const game = followedGame();
         if (
-          !game || !view || typeof view.mapId !== "string" ||
-          view.mapId !== (game.getState("map") as Map | undefined)?.id ||
+          !game || !view || typeof view !== "object" || Array.isArray(view) ||
+          typeof view.sceneId !== "string" || view.sceneId !== game.scene.id ||
           ![view.x, view.y, view.width, view.height].every(
             (value) => typeof value === "number" && Number.isFinite(value)
           ) || view.width <= 0 || view.height <= 0
@@ -403,99 +489,6 @@ export default class GameServer {
         if (typeof answer === "function") answer({ ok: true, token: game.displayToken });
       });
 
-      socket.on("map", async (map: Map) => {
-        try {
-          let gameId: string;
-          if (_gameId) {
-            gameId = _gameId;
-          } else {
-            const result = gameState.getGameId();
-            if (result) {
-              gameId = result;
-              _gameId = result;
-            } else {
-              return;
-            }
-          }
-
-          if (socket.data.role !== "gm") {
-            socket.emit("map", this.gameRepo.getState(gameId, "map"));
-            return;
-          }
-          const game = this.gameRepo.games[gameId];
-          const previousMap = game.getState("map") as Map | undefined;
-          if (previousMap?.id !== map?.id) {
-            game.latestDisplayView = undefined;
-            game.shownDisplayView = undefined;
-            if (game.displayFrozen) {
-              game.displayFrozen = false;
-              this.io.to(gameId).emit("display_frozen", false);
-            }
-          }
-          this.gameRepo.setState(gameId, "map", map);
-          const state = this.gameRepo.getState(gameId, "map");
-          this.broadcastCanvas(socket, gameId, "map", state);
-        } catch (error) {
-          console.error("MAP_ERROR", error);
-        }
-      });
-
-      socket.on("map_state", async (mapState: MapState) => {
-        try {
-          let gameId: string;
-          if (_gameId) {
-            gameId = _gameId;
-          } else {
-            const result = gameState.getGameId();
-            if (result) {
-              gameId = result;
-              _gameId = result;
-            } else {
-              return;
-            }
-          }
-
-          if (socket.data.role !== "gm") {
-            socket.emit("map_state", this.gameRepo.getState(gameId, "mapState"));
-            return;
-          }
-          this.gameRepo.setState(gameId, "mapState", mapState);
-          const state = this.gameRepo.getState(gameId, "mapState");
-          this.broadcastCanvas(socket, gameId, "map_state", state);
-        } catch (error) {
-          console.error("MAP_STATE_ERROR", error);
-        }
-      });
-
-      socket.on("map_state_update", async (update: Update<MapState>) => {
-        try {
-          let gameId: string;
-          if (_gameId) {
-            gameId = _gameId;
-          } else {
-            const result = gameState.getGameId();
-            if (result) {
-              gameId = result;
-              _gameId = result;
-            } else {
-              return;
-            }
-          }
-
-          if (!isSafeUpdate(update) || (socket.data.role !== "gm" && !allowsLegacyMapStateUpdateV1(update, this.playerRole(socket, gameId) === "trusted"
-            ? { tokens: true, drawing: true, notes: true, fog: true, uploads: true }
-            : this.gameRepo.games[gameId].switches))) {
-            socket.emit("map_state", this.gameRepo.getState(gameId, "mapState"));
-            return;
-          }
-          if (await gameState.updateState(gameId, "mapState", update)) {
-            this.broadcastCanvas(socket, gameId, "map_state_update", update);
-          }
-        } catch (error) {
-          console.error("MAP_STATE_UPDATE_ERROR", error);
-        }
-      });
-
       socket.on("player_state", async (playerState: PlayerState) => {
         try {
           let gameId: string;
@@ -516,69 +509,6 @@ export default class GameServer {
           await gameState.broadcastPlayerState(gameId, socket, "party_state");
         } catch (error) {
           console.error("PLAYER_STATE_ERROR", error);
-        }
-      });
-
-      socket.on("manifest", async (manifest: Manifest) => {
-        try {
-          let gameId: string;
-          if (_gameId) {
-            gameId = _gameId;
-          } else {
-            const result = gameState.getGameId();
-            if (result) {
-              gameId = result;
-              _gameId = result;
-            } else {
-              return;
-            }
-          }
-
-          if (!this.allowsManifest(socket, gameId, manifest)) {
-            socket.emit("manifest", this.gameRepo.getState(gameId, "manifest"));
-            return;
-          }
-          this.gameRepo.setState(gameId, "manifest", manifest);
-          const state = this.gameRepo.getState(gameId, "manifest");
-          this.broadcastCanvas(socket, gameId, "manifest", state);
-        } catch (error) {
-          console.error("MANIFEST_ERROR", error);
-        }
-      });
-
-      socket.on("manifest_update", async (update: Update<Manifest>) => {
-        try {
-          let gameId: string;
-          if (_gameId) {
-            gameId = _gameId;
-          } else {
-            const result = gameState.getGameId();
-            if (result) {
-              gameId = result;
-              _gameId = result;
-            } else {
-              return;
-            }
-          }
-
-          const current = this.gameRepo.getState(gameId, "manifest") as Manifest;
-          if (!isSafeUpdate(update)) {
-            socket.emit("manifest", current);
-            return;
-          }
-          if (current && update.id === current.mapId) {
-            const proposed = structuredClone(current);
-            applyChanges(proposed, update.changes);
-            if (!this.allowsManifest(socket, gameId, proposed)) {
-              socket.emit("manifest", current);
-              return;
-            }
-          }
-          if (await gameState.updateState(gameId, "manifest", update)) {
-            this.broadcastCanvas(socket, gameId, "manifest_update", update);
-          }
-        } catch (error) {
-          console.error("MANIFEST_UPDATE_ERROR", error);
         }
       });
 

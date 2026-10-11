@@ -1,17 +1,16 @@
-import React, { useRef, useEffect, useState } from "react";
+import React, { useRef, useState } from "react";
 import { Box } from "theme-ui";
 import ReactResizeDetector from "react-resize-detector";
-import { Stage, Layer, Image, Group } from "react-konva";
+import { Stage, Layer, Group } from "react-konva";
 import Konva from "konva";
 
-import useMapImage from "../../hooks/useMapImage";
 import usePreventOverscroll from "../../hooks/usePreventOverscroll";
 import useStageInteraction from "../../hooks/useStageInteraction";
-import useImageCenter from "../../hooks/useImageCenter";
 import usePreventContextMenu from "../../hooks/usePreventContextMenu";
 import useFollowMapRect from "../../hooks/useFollowMapRect";
 
-import { getGridMaxZoom } from "../../helpers/grid";
+import { useScene } from "../../scene/SceneContext";
+
 import { MapRect } from "../../helpers/displayView";
 import KonvaBridge from "../../helpers/KonvaBridge";
 
@@ -24,14 +23,11 @@ import { GridProvider } from "../../contexts/GridContext";
 import { useKeyboard } from "../../contexts/KeyboardContext";
 
 import shortcuts from "../../shortcuts";
-import { Map, MapToolId } from "../../types/Map";
-import { MapState } from "../../types/MapState";
+import { MapToolId } from "../../types/Map";
 
 type SelectedToolChangeEventHanlder = (tool: MapToolId) => void;
 
 type MapInteractionProps = {
-  map: Map | null;
-  mapState: MapState | null;
   children?: React.ReactNode;
   controls: React.ReactNode;
   selectedToolId: MapToolId;
@@ -41,25 +37,12 @@ type MapInteractionProps = {
 };
 
 function MapInteraction({
-  map,
-  mapState,
   children,
   controls,
   selectedToolId,
   onSelectedToolChange,
   followRect,
 }: MapInteractionProps) {
-  const [mapImage, mapImageStatus] = useMapImage(map);
-
-  const [mapLoaded, setMapLoaded] = useState(false);
-  useEffect(() => {
-    if (!map || !mapState || mapState.mapId !== map.id) {
-      setMapLoaded(false);
-    } else if (mapImageStatus === "loaded") {
-      setMapLoaded(true);
-    }
-  }, [mapImageStatus, map, mapState]);
-
   const [stageWidth, setStageWidth] = useState(1);
   const [stageHeight, setStageHeight] = useState(1);
   const [stageScale, setStageScale] = useState(1);
@@ -69,7 +52,6 @@ function MapInteraction({
   const stageTranslateRef = useRef({ x: 0, y: 0 });
   const mapStageRef = useMapStage();
   const mapLayerRef = useRef<Konva.Layer>(null);
-  const mapImageRef = useRef<Konva.Image>(null);
 
   function handleResize(width?: number, height?: number) {
     if (width && height && width > 0 && height > 0) {
@@ -82,24 +64,16 @@ function MapInteraction({
   usePreventOverscroll(containerRef);
   usePreventContextMenu(containerRef);
 
-  const [mapWidth, mapHeight] = useImageCenter(
-    map,
-    mapStageRef,
-    stageWidth,
-    stageHeight,
-    stageTranslateRef,
-    setStageScale,
-    mapLayerRef,
-    containerRef
-  );
+  const mapWidth = stageWidth;
+  const mapHeight = stageHeight;
 
+  const { scene } = useScene();
   const isFollowing = followRect !== undefined;
   useFollowMapRect(
     followRect,
-    map?.id,
+    scene?.id,
     mapStageRef,
-    mapLayerRef,
-    { stageWidth, stageHeight, mapWidth, mapHeight },
+    { stageWidth, stageHeight },
     stageTranslateRef,
     setStageScale
   );
@@ -115,7 +89,7 @@ function MapInteraction({
     setStageScale,
     stageTranslateRef,
     mapLayerRef,
-    getGridMaxZoom(map?.grid),
+    10,
     selectedToolId,
     preventMapInteraction || isFollowing,
     {
@@ -149,7 +123,7 @@ function MapInteraction({
       // Stop active state on move icon from being selected
       event.preventDefault();
     }
-    if (map && shortcuts.move(event) && selectedToolId !== "move") {
+    if (shortcuts.move(event) && selectedToolId !== "move") {
       event.preventDefault();
       previousSelectedToolRef.current = selectedToolId;
       onSelectedToolChange("move");
@@ -202,7 +176,7 @@ function MapInteraction({
   return (
     <MapInteractionProvider value={mapInteraction}>
       <GridProvider
-        grid={map?.grid || null}
+        grid={null}
         width={mapWidth}
         height={mapHeight}
       >
@@ -239,14 +213,7 @@ function MapInteraction({
               )}
             >
               <Layer ref={mapLayerRef}>
-                <Image
-                  image={(mapLoaded && mapImage) || undefined}
-                  width={mapWidth}
-                  height={mapHeight}
-                  id="mapImage"
-                  ref={mapImageRef}
-                />
-                {mapLoaded && children}
+                {children}
                 <Group id="portal" />
               </Layer>
             </KonvaBridge>

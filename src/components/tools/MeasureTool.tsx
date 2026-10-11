@@ -1,168 +1,66 @@
 import { useState, useEffect } from "react";
-import { Group } from "react-konva";
+import { Label, Line, Tag, Text } from "react-konva";
 
-import {
-  useInteractionEmitter,
-  MapDragEvent,
-  leftMouseButton,
-} from "../../contexts/MapInteractionContext";
+import { useInteractionEmitter, MapDragEvent, leftMouseButton, useStageScale } from "../../contexts/MapInteractionContext";
 import { useMapStage } from "../../contexts/MapStageContext";
-import {
-  useGrid,
-  useGridCellPixelSize,
-  useGridCellNormalizedSize,
-  useGridOffset,
-} from "../../contexts/GridContext";
-
-import {
-  getDefaultShapeData,
-  getUpdatedShapeData,
-} from "../../helpers/drawing";
-import Vector2 from "../../helpers/Vector2";
 import { getRelativePointerPosition } from "../../helpers/konva";
-import { parseGridScale, gridDistance } from "../../helpers/grid";
+import { parseGridScale } from "../../helpers/grid";
+import useSceneSnapping from "../../hooks/useSceneSnapping";
+import useWorldPlacement from "../../hooks/useWorldPlacement";
+import { useScene } from "../../scene/SceneContext";
+import { gridDistance } from "../../scene/grid";
+import { worldNodeId } from "../../scene/worldPosition";
+import { Vector2 } from "../../sceneRules";
+import World from "../scene/World";
 
-import Ruler from "../konva/Ruler";
-
-import useGridSnapping from "../../hooks/useGridSnapping";
-import { Map } from "../../types/Map";
-import { PointsData } from "../../types/Drawing";
-
-type MapMeasureProps = {
-  map: Map | null;
-  active: boolean;
-};
-
-type MeasureData = { length: number; points: Vector2[] };
-
-function MeasureTool({ map, active }: MapMeasureProps) {
-  const interactionEmitter = useInteractionEmitter();
-
-  const grid = useGrid();
-  const gridCellNormalizedSize = useGridCellNormalizedSize();
-  const gridCellPixelSize = useGridCellPixelSize();
-  const gridOffset = useGridOffset();
-
-  const mapStageRef = useMapStage();
-  const [drawingShapeData, setDrawingShapeData] = useState<MeasureData | null>(
-    null
-  );
-  const [isBrushDown, setIsBrushDown] = useState(false);
-
-  const gridScale = parseGridScale(active ? grid.measurement.scale : null);
-
-  const snapPositionToGrid = useGridSnapping(
-    grid.measurement.type === "euclidean" ? 0 : 1,
-    false
-  );
-
+/** Measures in world units on the scene's grid, above items and below fog */
+function MeasureTool({ active }: { active: boolean }) {
+  const { scene } = useScene();
+  const emitter = useInteractionEmitter();
+  const stage = useMapStage();
+  const stageScale = useStageScale();
+  const placement = useWorldPlacement();
+  const [points, setPoints] = useState<Vector2[] | null>(null);
+  const snap = useSceneSnapping(scene?.grid.measurement.type === "euclidean" ? 0 : 1, false);
   useEffect(() => {
-    if (!active) {
-      return;
+    if (!active) { setPoints(null); return; }
+    function position() {
+      const world = stage.current?.findOne(`#${worldNodeId}`);
+      const point = world && getRelativePointerPosition(world);
+      return point && snap(point);
     }
-    const mapStage = mapStageRef.current;
-    const mapImage = mapStage?.findOne("#mapImage");
-
-    function getBrushPosition() {
-      if (!mapImage) {
-        return;
-      }
-      let position = getRelativePointerPosition(mapImage);
-      if (!position) {
-        return;
-      }
-      if (map?.snapToGrid) {
-        position = snapPositionToGrid(position);
-      }
-      return Vector2.divide(position, {
-        x: mapImage.width(),
-        y: mapImage.height(),
-      });
+    function down(event: MapDragEvent) {
+      const point = position();
+      if (leftMouseButton(event) && point) setPoints([point, point]);
     }
-
-    function handleBrushDown(props: MapDragEvent) {
-      if (!leftMouseButton(props)) {
-        return;
-      }
-      const brushPosition = getBrushPosition();
-      if (!brushPosition) {
-        return;
-      }
-      const { points } = getDefaultShapeData(
-        "line",
-        brushPosition
-      ) as PointsData;
-      const length = 0;
-      setDrawingShapeData({ length, points });
-      setIsBrushDown(true);
+    function move(event: MapDragEvent) {
+      const point = position();
+      if (leftMouseButton(event) && point) setPoints((previous) => previous && [previous[0], point]);
     }
-
-    function handleBrushMove(props: MapDragEvent) {
-      if (!leftMouseButton(props)) {
-        return;
-      }
-      const brushPosition = getBrushPosition();
-      if (isBrushDown && drawingShapeData && brushPosition && mapImage) {
-        const { points } = getUpdatedShapeData(
-          "line",
-          drawingShapeData,
-          brushPosition,
-          gridCellNormalizedSize,
-          1,
-          1
-        ) as PointsData;
-        // Convert back to pixel values
-        const a = Vector2.subtract(
-          Vector2.multiply(points[0], {
-            x: mapImage.width(),
-            y: mapImage.height(),
-          }),
-          gridOffset
-        );
-        const b = Vector2.subtract(
-          Vector2.multiply(points[1], {
-            x: mapImage.width(),
-            y: mapImage.height(),
-          }),
-          gridOffset
-        );
-        const length = gridDistance(grid, a, b, gridCellPixelSize);
-        setDrawingShapeData({
-          length,
-          points,
-        });
-      }
-    }
-
-    function handleBrushUp(props: MapDragEvent) {
-      if (!leftMouseButton(props)) {
-        return;
-      }
-      setDrawingShapeData(null);
-      setIsBrushDown(false);
-    }
-
-    interactionEmitter?.on("dragStart", handleBrushDown);
-    interactionEmitter?.on("drag", handleBrushMove);
-    interactionEmitter?.on("dragEnd", handleBrushUp);
-
+    function up() { setPoints(null); }
+    emitter?.on("dragStart", down);
+    emitter?.on("drag", move);
+    emitter?.on("dragEnd", up);
     return () => {
-      interactionEmitter?.off("dragStart", handleBrushDown);
-      interactionEmitter?.off("drag", handleBrushMove);
-      interactionEmitter?.off("dragEnd", handleBrushUp);
+      emitter?.off("dragStart", down);
+      emitter?.off("drag", move);
+      emitter?.off("dragEnd", up);
     };
-  });
-
+  }, [active, emitter, stage, snap]);
+  if (!points || !scene) return null;
+  const scale = parseGridScale(scene.grid.measurement.scale);
+  const length = gridDistance(scene.grid, points[0], points[1]);
+  const zoom = stageScale * placement.scale;
+  const line = points.reduce<number[]>((values, point) => [...values, point.x, point.y], []);
   return (
-    <Group>
-      {drawingShapeData && (
-        <Ruler
-          points={drawingShapeData.points}
-          scale={gridScale}
-          length={drawingShapeData.length}
-        />
-      )}
-    </Group>
+    <World listening={false}>
+      <Line points={line} stroke="hsla(230, 25%, 18%, 0.8)" strokeWidth={15} lineCap="round" />
+      <Line points={line} stroke="white" strokeWidth={2.5} lineCap="round" />
+      <Label x={(points[0].x + points[1].x) / 2} y={(points[0].y + points[1].y) / 2} scaleX={1 / zoom} scaleY={1 / zoom}>
+        <Tag fill="hsla(230, 25%, 18%, 0.8)" cornerRadius={4} />
+        <Text text={`${(length * scale.multiplier).toFixed(scale.digits)}${scale.unit}`} fill="white" fontSize={24} padding={4} />
+      </Label>
+    </World>
   );
 }
 

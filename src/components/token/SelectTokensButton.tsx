@@ -4,15 +4,8 @@ import { IconButton } from "theme-ui";
 import SelectTokensIcon from "../../icons/SelectTokensIcon";
 
 import SelectTokensModal from "../../modals/SelectTokensModal";
-import { TokensStateCreateHandler } from "../../types/Events";
 
-type SelectTokensButtonProps = {
-  onMapTokensStateCreate: TokensStateCreateHandler;
-};
-
-function SelectTokensButton({
-  onMapTokensStateCreate,
-}: SelectTokensButtonProps) {
+function SelectTokensButton() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   function openModal() {
     setIsModalOpen(true);
@@ -30,11 +23,7 @@ function SelectTokensButton({
       >
         <SelectTokensIcon />
       </IconButton>
-      <SelectTokensModal
-        isOpen={isModalOpen}
-        onRequestClose={closeModal}
-        onMapTokensStateCreate={onMapTokensStateCreate}
-      />
+      <SelectTokensModal isOpen={isModalOpen} onRequestClose={closeModal} />
     </>
   );
 }

@@ -1,7 +1,1 @@
-export type RoomSwitches = {
-  tokens: boolean;
-  drawing: boolean;
-  notes: boolean;
-  fog: boolean;
-  uploads: boolean;
-};
+export type { RoomSwitches } from "../../../src/sceneRules";

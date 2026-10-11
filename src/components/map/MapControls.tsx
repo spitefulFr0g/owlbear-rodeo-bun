@@ -1,37 +1,24 @@
+import { createToolEntries } from "./toolEntries";
 import { useState, Fragment, useEffect, useMemo } from "react";
 import { IconButton, Flex, Box } from "theme-ui";
 
 import RadioIconButton from "../RadioIconButton";
 import Divider from "../Divider";
+import SceneGridControls from "../scene/SceneGridControls";
 
 import SelectMapButton from "./SelectMapButton";
 
-import FogToolSettings from "../controls/FogToolSettings";
-import DrawingToolSettings from "../controls/DrawingToolSettings";
-import SelectToolSettings from "../controls/SelectToolSettings";
-
-import MoveToolIcon from "../../icons/MoveToolIcon";
-import FogToolIcon from "../../icons/FogToolIcon";
-import BrushToolIcon from "../../icons/BrushToolIcon";
-import MeasureToolIcon from "../../icons/MeasureToolIcon";
 import ExpandMoreIcon from "../../icons/ExpandMoreIcon";
-import PointerToolIcon from "../../icons/PointerToolIcon";
 import FullScreenIcon from "../../icons/FullScreenIcon";
 import FullScreenExitIcon from "../../icons/FullScreenExitIcon";
-import NoteToolIcon from "../../icons/NoteToolIcon";
-import SelectToolIcon from "../../icons/SelectToolIcon";
 
 import UndoButton from "../controls/shared/UndoButton";
 import RedoButton from "../controls/shared/RedoButton";
 
 import useSetting from "../../hooks/useSetting";
 
-import { Map, MapTool, MapToolId } from "../../types/Map";
-import { MapState } from "../../types/MapState";
-import {
-  MapChangeEventHandler,
-  MapResetEventHandler,
-} from "../../types/Events";
+import { MapToolId } from "../../types/Map";
+import { MapChangeEventHandler } from "../../types/Events";
 import { Settings } from "../../types/Settings";
 
 import { useKeyboard } from "../../contexts/KeyboardContext";
@@ -39,167 +26,66 @@ import { useKeyboard } from "../../contexts/KeyboardContext";
 import shortcuts from "../../shortcuts";
 import { useToolPermissions, useRole } from "../../contexts/RoomContext";
 import { getRoleControls } from "../../helpers/roomControls";
-import { isEmpty } from "../../helpers/shared";
-import { MapActions } from "../../hooks/useMapActions";
+import { useScene } from "../../scene/SceneContext";
+import { fogItems } from "../../scene/fogItem";
+import { drawingsInOrder } from "../../scene/drawingItem";
 
 type MapControlsProps = {
   onMapChange: MapChangeEventHandler;
-  onMapReset: MapResetEventHandler;
-  map: Map | null;
-  mapState: MapState | null;
-  mapActions: MapActions;
   allowMapChange: boolean;
   selectedToolId: MapToolId;
   onSelectedToolChange: (toolId: MapToolId) => void;
   toolSettings: Settings;
   onToolSettingChange: (change: Partial<Settings>) => void;
   onToolAction: (actionId: string) => void;
-  onUndo: () => void;
-  onRedo: () => void;
 };
 
 function MapContols({
   onMapChange,
-  onMapReset,
-  map,
-  mapState,
-  mapActions,
   allowMapChange,
   selectedToolId,
   onSelectedToolChange,
   toolSettings,
   onToolSettingChange,
   onToolAction,
-  onUndo,
-  onRedo,
 }: MapControlsProps) {
   const [isExpanded, setIsExpanded] = useState(true);
   const [fullScreen, setFullScreen] = useSetting("map.fullScreen");
 
   const permissions = useToolPermissions();
+  const { scene, readOnly, canChange, undo: onUndo, redo: onRedo, canUndo, canRedo } = useScene();
   const isGM = getRoleControls(useRole()).hidden;
-
-  const disabledControls = useMemo(() => {
-    const allowMapDrawing = permissions.drawing;
-    const allowFogDrawing = permissions.fog;
-    const allowNoteEditing = permissions.notes;
-
-    const disabled: MapToolId[] = [];
-    if (!allowMapChange) {
-      disabled.push("map");
-    }
-    if (!map) {
-      disabled.push("move");
-      disabled.push("measure");
-      disabled.push("pointer");
-      disabled.push("select");
-    }
-    if (!permissions.tokens && !permissions.notes) disabled.push("select");
-    if (!map || !allowMapDrawing) {
-      disabled.push("drawing");
-    }
-    if (!map || !allowFogDrawing) {
-      disabled.push("fog");
-    }
-    if (!map || !allowNoteEditing) {
-      disabled.push("note");
-    }
-    const allowed = (index: number) =>
-      (mapActions.actions[index] || []).every((action) =>
-        action.type === "drawings"
-          ? permissions.drawing
-          : action.type === "fogs"
-          ? permissions.fog
-          : permissions[action.type]
-      );
-    if (
-      !map ||
-      mapActions.actionIndex < 0 ||
-      !allowed(mapActions.actionIndex)
-    ) {
-      disabled.push("undo");
-    }
-    if (
-      !map ||
-      mapActions.actionIndex === mapActions.actions.length - 1 ||
-      !allowed(mapActions.actionIndex + 1)
-    ) {
-      disabled.push("redo");
-    }
-    return disabled;
-  }, [
-    map,
-    mapActions,
-    allowMapChange,
-    permissions,
-  ]);
-
-  // Change back to move tool if selected tool becomes disabled
-  useEffect(() => {
-    if (disabledControls.includes(selectedToolId)) {
-      onSelectedToolChange("move");
-    }
-  }, [selectedToolId, disabledControls, onSelectedToolChange]);
 
   const disabledSettings = useMemo(() => {
     const disabled: Partial<Record<keyof Settings, string[]>> = {
       drawing: [],
+      fog: [],
     };
-    if (mapState && isEmpty(mapState.drawings)) {
+    if (!scene || !drawingsInOrder(scene).some(item => canChange({ type: "delete", id: item.id }))) {
       disabled.drawing?.push("erase");
     }
+    const fog = scene ? fogItems(scene) : [];
+    if (!fog.some(item => canChange({ type: "delete", id: item.id })))
+      disabled.fog?.push("remove");
+    if (!fog.some(item => canChange({ type: "update", id: item.id, fields: { hidden: !item.hidden } })))
+      disabled.fog?.push("toggle");
     return disabled;
-  }, [mapState]);
+  }, [scene, canChange]);
 
-  const toolsById: Record<string, MapTool> = {
-    move: {
-      id: "move",
-      icon: <MoveToolIcon />,
-      title: "Move Tool (W)",
-    },
-    select: {
-      id: "select",
-      icon: <SelectToolIcon />,
-      title: "Select Tool (S)",
-      SettingsComponent: SelectToolSettings,
-    },
-    fog: {
-      id: "fog",
-      icon: <FogToolIcon />,
-      title: "Fog Tool (F)",
-      SettingsComponent: FogToolSettings,
-    },
-    drawing: {
-      id: "drawing",
-      icon: <BrushToolIcon />,
-      title: "Drawing Tool (D)",
-      SettingsComponent: DrawingToolSettings,
-    },
-    measure: {
-      id: "measure",
-      icon: <MeasureToolIcon />,
-      title: "Measure Tool (M)",
-    },
-    pointer: {
-      id: "pointer",
-      icon: <PointerToolIcon />,
-      title: "Pointer Tool (Q)",
-    },
-    note: {
-      id: "note",
-      icon: <NoteToolIcon />,
-      title: "Note Tool (N)",
-    },
-  };
-  const tools: MapToolId[] = [
-    "move",
-    "select",
-    "fog",
-    "drawing",
-    "measure",
-    "pointer",
-    "note",
-  ];
+  const tools = createToolEntries({
+    permissions, readOnly, toolSettings, onToolSettingChange,
+    onToolAction, disabledSettings,
+  });
+  const disabledControls: MapToolId[] = tools
+    .filter(tool => !tool.mayUse).map(tool => tool.id);
+  if (!allowMapChange) disabledControls.push("map");
+  if (!canUndo) disabledControls.push("undo");
+  if (!canRedo) disabledControls.push("redo");
+
+  // Change back to move when the selected tool becomes unavailable.
+  useEffect(() => {
+    if (disabledControls.includes(selectedToolId)) onSelectedToolChange("move");
+  }, [selectedToolId, disabledControls, onSelectedToolChange]);
 
   const sections = [
     {
@@ -207,24 +93,22 @@ function MapContols({
       component: (
         <SelectMapButton
           onMapChange={onMapChange}
-          onMapReset={onMapReset}
-          currentMap={map}
-          currentMapState={mapState}
           disabled={disabledControls.includes("map")}
         />
       ),
     },
+    { id: "grid", component: <SceneGridControls /> },
     {
       id: "tools",
       component: tools.map((tool) => (
         <RadioIconButton
-          key={tool}
-          title={toolsById[tool].title}
-          onClick={() => onSelectedToolChange(tool)}
-          isSelected={selectedToolId === tool}
-          disabled={disabledControls.includes(tool)}
+          key={tool.id}
+          title={tool.title}
+          onClick={() => onSelectedToolChange(tool.id)}
+          isSelected={selectedToolId === tool.id}
+          disabled={!tool.mayUse}
         >
-          {toolsById[tool].icon}
+          {tool.icon}
         </RadioIconButton>
       )),
     },
@@ -263,8 +147,8 @@ function MapContols({
     controls = (
       <>
         <IconButton
-          aria-label={isExpanded ? "Hide Map Controls" : "Show Map Controls"}
-          title={isExpanded ? "Hide Map Controls" : "Show Map Controls"}
+          aria-label={isExpanded ? "Hide Scene Controls" : "Show Scene Controls"}
+          title={isExpanded ? "Hide Scene Controls" : "Show Scene Controls"}
           onClick={() => setIsExpanded(!isExpanded)}
           sx={{
             transform: `rotate(${isExpanded ? "0" : "180deg"})`,
@@ -298,16 +182,8 @@ function MapContols({
   }
 
   function getToolSettings() {
-    const Settings = toolsById[selectedToolId].SettingsComponent;
-    if (
-      !Settings ||
-      (selectedToolId !== "fog" &&
-        selectedToolId !== "drawing" &&
-        selectedToolId !== "pointer" &&
-        selectedToolId !== "select")
-    ) {
-      return null;
-    }
+    const settings = tools.find(tool => tool.id === selectedToolId)?.settingsPanel;
+    if (!settings) return null;
     return (
       <Box
         sx={{
@@ -320,46 +196,14 @@ function MapContols({
         }}
         p={1}
       >
-        <Settings
-          settings={toolSettings[selectedToolId]}
-          onSettingChange={(
-            change: Partial<Settings["fog" | "drawing" | "pointer" | "select"]>
-          ) =>
-            onToolSettingChange({
-              [selectedToolId]: {
-                ...toolSettings[selectedToolId],
-                ...change,
-              },
-            })
-          }
-          onToolAction={onToolAction}
-          disabledActions={disabledSettings[selectedToolId]}
-        />
+        {settings}
       </Box>
     );
   }
 
   function handleKeyDown(event: KeyboardEvent) {
-    if (shortcuts.moveTool(event) && !disabledControls.includes("move")) {
-      onSelectedToolChange("move");
-    }
-    if (shortcuts.selectTool(event) && !disabledControls.includes("select")) {
-      onSelectedToolChange("select");
-    }
-    if (shortcuts.drawingTool(event) && !disabledControls.includes("drawing")) {
-      onSelectedToolChange("drawing");
-    }
-    if (shortcuts.fogTool(event) && !disabledControls.includes("fog")) {
-      onSelectedToolChange("fog");
-    }
-    if (shortcuts.measureTool(event) && !disabledControls.includes("measure")) {
-      onSelectedToolChange("measure");
-    }
-    if (shortcuts.pointerTool(event) && !disabledControls.includes("pointer")) {
-      onSelectedToolChange("pointer");
-    }
-    if (shortcuts.noteTool(event) && !disabledControls.includes("note")) {
-      onSelectedToolChange("note");
+    for (const tool of tools) {
+      if (tool.shortcut(event) && tool.mayUse) onSelectedToolChange(tool.id);
     }
     if (shortcuts.redo(event) && !disabledControls.includes("redo")) {
       onRedo();

@@ -17,6 +17,7 @@ import { AssetsProvider, AssetURLsProvider } from "../contexts/AssetsContext";
 import { MapLoadingProvider } from "../contexts/MapLoadingContext";
 
 import NetworkedDisplay from "../network/NetworkedDisplay";
+import { SceneProvider } from "../scene/SceneContext";
 
 import Session, { SessionStatus } from "../network/Session";
 
@@ -137,7 +138,9 @@ function Display() {
                   userSelect: "none",
                 }}
               >
-                <NetworkedDisplay session={session} />
+                <SceneProvider session={session} display>
+                  <NetworkedDisplay session={session} />
+                </SceneProvider>
               </Flex>
               <OfflineBanner isOpen={sessionStatus === "offline"} />
               <ReconnectBanner isOpen={sessionStatus === "reconnecting"} />

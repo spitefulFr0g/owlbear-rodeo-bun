@@ -1,4 +1,4 @@
-import { useCanPlaceToken } from "../../contexts/RoomContext";
+import { useCanPlaceToken } from "../../scene/SceneContext";
 import { useState } from "react";
 import { createPortal } from "react-dom";
 import { Box, Flex, Grid } from "theme-ui";
@@ -23,32 +23,21 @@ import useSetting from "../../hooks/useSetting";
 import usePreventSelect from "../../hooks/usePreventSelect";
 
 import { useTokenData } from "../../contexts/TokenDataContext";
-import { useUserId } from "../../contexts/UserIdContext";
-import { useMapStage } from "../../contexts/MapStageContext";
 import DragContext, { CustomDragEndEvent } from "../../contexts/DragContext";
 
-import {
-  createTokenState,
-  clientPositionToMapPosition,
-} from "../../helpers/token";
+import { useAddTokens } from "../../scene/SceneContext";
+
 import { findGroup } from "../../helpers/group";
-import Vector2 from "../../helpers/Vector2";
-import { TokensStateCreateHandler } from "../../types/Events";
 import { Group } from "../../types/Group";
+import { Token } from "../../types/Token";
 
-type TokenBarProps = {
-  onMapTokensStateCreate: TokensStateCreateHandler;
-};
-
-function TokenBar({ onMapTokensStateCreate }: TokenBarProps) {
-  const userId = useUserId();
+function TokenBar() {
+  const addTokens = useAddTokens();
   const canPlaceToken = useCanPlaceToken();
   const { tokensById, tokenGroups } = useTokenData();
   const [fullScreen] = useSetting<boolean>("map.fullScreen");
 
   const [dragId, setDragId] = useState<string | null>(null);
-
-  const mapStageRef = useMapStage();
 
   const mouseSensor = useSensor(MouseSensor, {
     activationConstraint: { distance: 5 },
@@ -72,46 +61,33 @@ function TokenBar({ onMapTokensStateCreate }: TokenBarProps) {
   }: CustomDragEndEvent) {
     setDragId(null);
     resumeSelect();
-    if (!userId) {
+    if (!overlayNodeClientRect) {
       return;
     }
-    const mapStage = mapStageRef.current;
-    if (mapStage && overlayNodeClientRect) {
-      const dragRect = overlayNodeClientRect;
-      const dragPosition = {
-        x: dragRect.left + dragRect.width / 2,
-        y: dragRect.top + dragRect.height / 2,
-      };
-      const mapPosition = clientPositionToMapPosition(mapStage, dragPosition);
-      const group = findGroup(tokenGroups, active.id);
-      if (group && mapPosition) {
-        if (group.type === "item") {
-          const token = tokensById[group.id];
-          if (!token || !canPlaceToken(token)) return;
-          const tokenState = createTokenState(token, mapPosition, userId);
-          onMapTokensStateCreate([tokenState]);
-        } else {
-          let tokenStates = [];
-          let offset = new Vector2(0, 0);
-          for (let item of group.items) {
-            const token = tokensById[item.id];
-            if (token && !token.hideInSidebar && canPlaceToken(token)) {
-              tokenStates.push(
-                createTokenState(
-                  token,
-                  Vector2.add(mapPosition, offset),
-                  userId
-                )
-              );
-              offset = Vector2.add(offset, 0.01);
-            }
-          }
-          if (tokenStates.length > 0) {
-            onMapTokensStateCreate(tokenStates);
-          }
+    const dragRect = overlayNodeClientRect;
+    const dragPosition = {
+      x: dragRect.left + dragRect.width / 2,
+      y: dragRect.top + dragRect.height / 2,
+    };
+    const group = findGroup(tokenGroups, active.id);
+    if (!group) {
+      return;
+    }
+    let tokens: Token[] = [];
+    if (group.type === "item") {
+      const token = tokensById[group.id];
+      if (token && canPlaceToken(token)) {
+        tokens.push(token);
+      }
+    } else {
+      for (let item of group.items) {
+        const token = tokensById[item.id];
+        if (token && !token.hideInSidebar && canPlaceToken(token)) {
+          tokens.push(token);
         }
       }
     }
+    addTokens(tokens, dragPosition);
   }
 
   function handleDragCancel() {
@@ -200,7 +176,7 @@ function TokenBar({ onMapTokensStateCreate }: TokenBarProps) {
             alignItems: "center",
           }}
         >
-          <SelectTokensButton onMapTokensStateCreate={onMapTokensStateCreate} />
+          <SelectTokensButton />
         </Flex>
         {createPortal(
           <DragOverlay dropAnimation={null}>
