@@ -57,15 +57,15 @@ function FogTool({ onShapeError, active, toolSettings, editable: permitted, visi
   const items = useMemo(() => scene ? fogItems(scene) : [], [scene]);
   const shapes = useMemo(() => items.map(fogShape), [items]);
   const snap = useSceneSnapping();
-  function addShapes(shapes: Fog[], cut: boolean) {
+  const addShapes = useCallback((shapes: Fog[], cut: boolean) => {
     if (cut && !shapes.some(shape => cutsFog(shape, items))) { onShapeError("No fog to cut"); return; }
     const clipped = toolSettings.multilayer ? shapes : shapes.flatMap(shape =>
       clipFog(shape, cut ? items.filter(item => item.cut && !item.hidden).map(fogShape) : coveredFog(items)));
     if (!clipped.length) { onShapeError(cut ? "Fog already cut" : "Fog already placed"); return; }
     act(clipped.map(shape => ({ type: "add", item: fogItem(shape, person.id, cut, toolSettings.type === "brush") })));
-  }
-  const onShapesAdd = (shapes: Fog[]) => addShapes(shapes, false);
-  const onShapesCut = (shapes: Fog[]) => addShapes(shapes, true);
+  }, [items, onShapeError, toolSettings, act, person.id]);
+  const onShapesAdd = useCallback((shapes: Fog[]) => addShapes(shapes, false), [addShapes]);
+  const onShapesCut = useCallback((shapes: Fog[]) => addShapes(shapes, true), [addShapes]);
   const onShapesRemove = (ids: string[]) => act(ids.map(id => ({ type: "delete", id })));
   const onShapesEdit = (edits: Partial<Fog>[]) => act(edits.map(edit => ({ type: "update", id: edit.id!, fields: { hidden: !edit.visible } })));
   const stageScale = useDebouncedStageScale();

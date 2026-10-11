@@ -152,6 +152,7 @@ function MapSettings({ map, onSettingsChange }: MapSettingsProps) {
           <Label htmlFor="gridX">Columns</Label>
           <Input
             type="number"
+            id="gridX"
             name="gridX"
             value={`${(map && map.grid.size.x) || 0}`}
             onChange={handleGridSizeXChange}
@@ -164,6 +165,7 @@ function MapSettings({ map, onSettingsChange }: MapSettingsProps) {
           <Label htmlFor="gridY">Rows</Label>
           <Input
             type="number"
+            id="gridY"
             name="gridY"
             value={`${(map && map.grid.size.y) || 0}`}
             onChange={handleGridSizeYChange}
@@ -176,6 +178,7 @@ function MapSettings({ map, onSettingsChange }: MapSettingsProps) {
       <Box mt={2} sx={{ flexGrow: 1 }}>
         <Label htmlFor="name">Name</Label>
         <Input
+          id="name"
           name="name"
           value={(map && map.name) || ""}
           onChange={(e) => onSettingsChange({ name: e.target.value })}
@@ -190,8 +193,9 @@ function MapSettings({ map, onSettingsChange }: MapSettingsProps) {
       >
         <Flex sx={{ alignItems: "flex-end" }}>
           <Box sx={{ width: "50%" }}>
-            <Label>Grid Type</Label>
+            <Label htmlFor="mapGridType">Grid Type</Label>
             <Select
+              inputId="mapGridType"
               isDisabled={mapEmpty}
               options={gridTypeSettings}
               value={
@@ -228,8 +232,9 @@ function MapSettings({ map, onSettingsChange }: MapSettingsProps) {
         </Flex>
         <Flex sx={{ alignItems: "flex-end" }}>
           <Box my={2} sx={{ width: "50%" }}>
-            <Label>Grid Measurement</Label>
+            <Label htmlFor="mapGridMeasurement">Grid Measurement</Label>
             <Select
+              inputId="mapGridMeasurement"
               isDisabled={mapEmpty}
               options={
                 map && map.grid.type === "square"
@@ -250,6 +255,7 @@ function MapSettings({ map, onSettingsChange }: MapSettingsProps) {
           <Box m={2} mr={0} sx={{ flexGrow: 1 }}>
             <Label htmlFor="gridMeasurementScale">Grid Scale</Label>
             <Input
+              id="gridMeasurementScale"
               name="gridMeasurementScale"
               value={`${map && map.grid.measurement.scale}`}
               onChange={handleGridMeasurementScaleChange}
@@ -264,8 +270,9 @@ function MapSettings({ map, onSettingsChange }: MapSettingsProps) {
       {!mapEmpty && map.type !== "default" && (
         <Flex my={2} sx={{ alignItems: "center" }}>
           <Box mb={1} sx={{ width: "50%" }}>
-            <Label>Quality</Label>
+            <Label htmlFor="mapQuality">Quality</Label>
             <Select
+              inputId="mapQuality"
               options={qualitySettings}
               value={
                 mapEmpty

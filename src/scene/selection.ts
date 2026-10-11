@@ -76,7 +76,7 @@ export function attachesTo(
       yi = outline.points[i + 1];
     const xj = outline.points[j],
       yj = outline.points[j + 1];
-    if (yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi)
+    if ((yi > y) !== (yj > y) && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi)
       inside = !inside;
   }
   return inside;

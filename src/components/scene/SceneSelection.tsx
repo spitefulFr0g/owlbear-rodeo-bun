@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import Konva from "konva";
 import { Group } from "react-konva";
 import { v4 as uuid } from "uuid";
@@ -22,6 +22,7 @@ import World from "./World";
 import { SceneImage } from "./SceneImages";
 import SceneText from "./SceneText";
 import SceneDrawing from "./SceneDrawing";
+import { coveredFog, fogItem, fogItems, fogShape } from "../../scene/fogItem";
 
 /** All kinds share one interaction, preview and final batch. */
 export default function SceneSelection({
@@ -37,11 +38,13 @@ export default function SceneSelection({
 }) {
   const { scene, selection, setSelection, readOnly, act, canSelect } = useScene();
   const stageRef = useMapStage();
+  const sceneRef = useRef(scene);
+  sceneRef.current = scene;
   useEffect(() => {
     onMenuOpen(null);
     if (layer)
       setSelection((prev) =>
-        prev.filter((id) => scene?.items[id]?.layer === layer)
+        prev.filter((id) => sceneRef.current?.items[id]?.layer === layer)
       );
   }, [active, layer, setSelection, onMenuOpen]);
   const root = useRef<Konva.Group>(null);
@@ -54,7 +57,7 @@ export default function SceneSelection({
         ?.find(".scene-item")
         .filter((node) => selectedRef.current.includes(node.id())) || []
     );
-  }, [selection]);
+  }, [selection, stageRef]);
   useEffect(() => {
     const stage = stageRef.current;
     if (!scene || !stage) return;
@@ -82,7 +85,7 @@ export default function SceneSelection({
   snapRef.current = snap;
   const sensitivityRef = useRef(sensitivity);
   sensitivityRef.current = sensitivity;
-  function copies(source: Item[], dx: number, dy: number) {
+  const copies = useCallback((source: Item[], dx: number, dy: number) => {
     const added = copySelection(
       source,
       { x: dx, y: dy },
@@ -90,7 +93,7 @@ export default function SceneSelection({
     );
     if (act(added.map((item) => ({ type: "add", item }))))
       setSelection(added.map((item) => item.id));
-  }
+  }, [act, setSelection]);
   useKeyboard((event) => {
     if (!active || readOnly || !scene) return;
     const selected = selection.map((id) => scene.items[id]).filter(Boolean);
@@ -338,6 +341,8 @@ export default function SceneSelection({
     return () => {
       stage.off(".selection");
       box?.destroy();
+      // Selection effects must never reuse the destroyed transformer.
+      if (transformRef.current === transformer) transformRef.current = undefined;
       transformer.destroy();
       prevent(false);
     };
@@ -349,6 +354,7 @@ export default function SceneSelection({
     readOnly,
     act,
     canSelect,
+    copies,
     prevent,
     setSelection,
     stageRef,
@@ -374,9 +380,16 @@ export function SceneItems({
   placement: "belowGrid" | "aboveGrid" | "aboveRuler";
   fogShapes?: boolean;
 }) {
-  const { scene } = useScene();
+  const { scene, person } = useScene();
   const permissions = useToolPermissions();
   const [fogOpacity] = useSetting<number>("fog.editOpacity");
+  const editsFog = person.role !== "display" && permissions.fog;
+  const cover = useMemo(() => {
+    if (!scene || placement !== "aboveRuler" || !fogShapes || editsFog) return [];
+    const fog = fogItems(scene);
+    // Hidden owned shapes remain a hint, but never contribute to coverage.
+    return [...coveredFog(fog), ...fog.filter(item => item.hidden).map(fogShape)];
+  }, [scene, placement, fogShapes, editsFog]);
   if (!scene) return null;
   const items = Object.values(scene.items)
     .filter((item) =>
@@ -399,7 +412,10 @@ export function SceneItems({
     );
   return (
     <World id={placement === "aboveGrid" ? worldNodeId : undefined}>
-      {items.map((item) =>
+      {cover.map(shape => (
+        <SceneDrawing key={shape.id} item={fogItem(shape, "gm", false, false)} listening={false} />
+      ))}
+      {items.filter(item => editsFog || item.layer !== "fog" || item.kind === "image" || item.kind === "text" || item.kind === "line").map((item) =>
         item.kind === "image" ? (
           <SceneImage
             key={item.id}
@@ -418,7 +434,7 @@ export function SceneItems({
                 : item
             }
             opacity={
-              item.layer === "fog" && permissions.fog
+              item.layer === "fog" && editsFog
                 ? fogOpacity
                 : item.blend
                   ? 0.5
