@@ -187,6 +187,12 @@ test("only the GM can change anything on a view-only scene, and a cast display n
 });
 
 test("welcome-screen scenes permit only the GM for every role, item kind, layer and change", () => {
+  for (const role of ["gm", "trusted", "player", "display"] as const) {
+    for (const viewOnly of [false, true]) {
+      expect(mayChangeNothing(role, { viewOnly, welcomeScreen: true })).toBe(role !== "gm");
+      expect(mayChangeNothing(role, { viewOnly, welcomeScreen: false })).toBe(role === "display" || (viewOnly && role !== "gm"));
+    }
+  }
   for (const example of examples) {
     for (const layer of ["map", "grid", "drawing", "prop", "mount", "character", "attachment", "note", "text", "ruler", "fog"] as const) {
       const item = { ...example, layer };
