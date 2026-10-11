@@ -17,9 +17,8 @@ function populate(db: Dexie) {
     db.table("user").add({ key: "userId", value: userId });
     const nickname = getRandomMonster();
     db.table("user").add({ key: "nickname", value: nickname });
-    const { maps, mapStates } = getDefaultMaps(userId);
+    const { maps } = getDefaultMaps(userId);
     db.table("maps").bulkAdd(maps);
-    db.table("states").bulkAdd(mapStates);
     const tokens = getDefaultTokens(userId);
     db.table("tokens").bulkAdd(tokens);
     db.table("groups").bulkAdd([

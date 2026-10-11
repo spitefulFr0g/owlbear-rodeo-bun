@@ -10,13 +10,15 @@ import { getImageLightness } from "../helpers/image";
 
 import { mapSources as defaultMapSources } from "../maps";
 
-import { Map } from "../types/Map";
+import useSceneMap from "./useSceneMap";
 
 /**
- * The scene's grid, drawn dark over a light 1.0 map or a light page and
+ * The scene's grid, drawn dark over a light map or a light page and
  * light over a dark one
  */
-function useSceneGrid(map: Map | null) {
+function useSceneGrid() {
+  const { placed } = useSceneMap();
+  const map = placed ? placed.image : null;
   const [colorMode] = useColorMode();
 
   const mapURL = useDataURL(

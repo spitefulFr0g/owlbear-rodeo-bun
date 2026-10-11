@@ -8,10 +8,6 @@ import ConfirmModal from "../../modals/ConfirmModal";
 
 import { createMapFromFile } from "../../helpers/map";
 import { createTokenFromFile } from "../../helpers/token";
-import {
-  createTokenState,
-  clientPositionToMapPosition,
-} from "../../helpers/token";
 import Vector2 from "../../helpers/Vector2";
 
 import { useToolPermissions, useRole } from "../../contexts/RoomContext";
@@ -21,35 +17,31 @@ import { useUserId } from "../../contexts/UserIdContext";
 import { useMapData } from "../../contexts/MapDataContext";
 import { useTokenData } from "../../contexts/TokenDataContext";
 import { useAssets } from "../../contexts/AssetsContext";
-import { useMapStage } from "../../contexts/MapStageContext";
 
 import useImageDrop, { ImageDropEvent } from "../../hooks/useImageDrop";
 
 import { Map } from "../../types/Map";
-import { MapState } from "../../types/MapState";
-import { TokenState } from "../../types/TokenState";
+import { useAddTokens } from "../../scene/SceneContext";
 
 type GlobalImageDropProps = {
   children?: React.ReactNode;
-  onMapChange: (map: Map, mapState: MapState) => void;
-  onMapTokensStateCreate: (states: TokenState[]) => void;
+  onMapChange: (map: Map) => void;
 };
 
 function GlobalImageDrop({
   children,
   onMapChange,
-  onMapTokensStateCreate,
 }: GlobalImageDropProps) {
   const { addToast } = useToasts();
 
   const userId = useUserId();
   const permissions = useToolPermissions();
   const canChangeMap = getRoleControls(useRole()).map;
-  const { addMap, getMapState } = useMapData();
+  const { addMap } = useMapData();
   const { addToken } = useTokenData();
   const { addAssets } = useAssets();
 
-  const mapStageRef = useMapStage();
+  const addTokens = useAddTokens();
 
   const [isLargeImageWarningModalOpen, setShowLargeImageWarning] =
     useState(false);
@@ -123,10 +115,7 @@ function GlobalImageDrop({
 
       // Change map if only 1 dropped
       if (maps.length === 1) {
-        const mapState = await getMapState(maps[0].id);
-        if (mapState) {
-          onMapChange(maps[0], mapState);
-        }
+        onMapChange(maps[0]);
       }
 
       setIsLoading(false);
@@ -153,30 +142,7 @@ function GlobalImageDrop({
       setIsLoading(false);
       droppedImagesRef.current = undefined;
 
-      const dropPosition = dropPositionRef.current;
-      const mapStage = mapStageRef.current;
-      if (mapStage && dropPosition) {
-        const mapPosition = clientPositionToMapPosition(mapStage, dropPosition);
-        if (mapPosition) {
-          let tokenStates = [];
-          let offset = new Vector2(0, 0);
-          for (let token of tokens) {
-            if (token) {
-              tokenStates.push(
-                createTokenState(
-                  token,
-                  Vector2.add(mapPosition, offset),
-                  userId
-                )
-              );
-              offset = Vector2.add(offset, 0.01);
-            }
-          }
-          if (tokenStates.length > 0) {
-            onMapTokensStateCreate(tokenStates);
-          }
-        }
-      }
+      if (dropPositionRef.current) await addTokens(tokens, dropPositionRef.current);
     }
   }
 

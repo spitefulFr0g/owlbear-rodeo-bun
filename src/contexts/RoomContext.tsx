@@ -68,5 +68,3 @@ export default RoomContext;
 export function useToolPermissions() {
   return getToolPermissions(useRole(), useRoom().switches);
 }
-
-export const RoomAssetsContext = React.createContext<string[]>([]);

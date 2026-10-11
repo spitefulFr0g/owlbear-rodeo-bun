@@ -6,7 +6,3 @@ export type Asset = {
   owner: string;
   mime: string;
 };
-
-export type AssetManifestAsset = Pick<Asset, "id" | "owner">;
-export type AssetManifestAssets = Record<string, AssetManifestAsset>;
-export type AssetManifest = { mapId: string; assets: AssetManifestAssets };

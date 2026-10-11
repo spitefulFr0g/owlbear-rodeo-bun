@@ -9,11 +9,7 @@ import { mapSources as defaultMapSources } from "../../maps";
 
 import Select from "../Select";
 import { Map, MapQuality } from "../../types/Map";
-import { MapState } from "../../types/MapState";
-import {
-  MapSettingsChangeEventHandler,
-  MapStateSettingsChangeEventHandler,
-} from "../../types/Events";
+import { MapSettingsChangeEventHandler } from "../../types/Events";
 import { Grid, GridMeasurementType, GridType } from "../../types/Grid";
 
 type QualityTypeSetting = { value: MapQuality; label: string };
@@ -47,9 +43,7 @@ const gridHexMeasurementTypeSettings: GridMeasurementTypeSetting[] = [
 
 type MapSettingsProps = {
   map: Map;
-  mapState: MapState;
   onSettingsChange: MapSettingsChangeEventHandler;
-  onStateSettingsChange: MapStateSettingsChangeEventHandler;
 };
 
 function MapSettings({ map, onSettingsChange }: MapSettingsProps) {

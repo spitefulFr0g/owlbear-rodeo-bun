@@ -8,7 +8,6 @@ import SceneGridControls from "../scene/SceneGridControls";
 
 import SelectMapButton from "./SelectMapButton";
 
-
 import ExpandMoreIcon from "../../icons/ExpandMoreIcon";
 import FullScreenIcon from "../../icons/FullScreenIcon";
 import FullScreenExitIcon from "../../icons/FullScreenExitIcon";
@@ -18,12 +17,8 @@ import RedoButton from "../controls/shared/RedoButton";
 
 import useSetting from "../../hooks/useSetting";
 
-import { Map, MapToolId } from "../../types/Map";
-import { MapState } from "../../types/MapState";
-import {
-  MapChangeEventHandler,
-  MapResetEventHandler,
-} from "../../types/Events";
+import { MapToolId } from "../../types/Map";
+import { MapChangeEventHandler } from "../../types/Events";
 import { Settings } from "../../types/Settings";
 
 import { useKeyboard } from "../../contexts/KeyboardContext";
@@ -37,9 +32,6 @@ import { drawingsInOrder } from "../../scene/drawingItem";
 
 type MapControlsProps = {
   onMapChange: MapChangeEventHandler;
-  onMapReset: MapResetEventHandler;
-  map: Map | null;
-  mapState: MapState | null;
   allowMapChange: boolean;
   selectedToolId: MapToolId;
   onSelectedToolChange: (toolId: MapToolId) => void;
@@ -50,9 +42,6 @@ type MapControlsProps = {
 
 function MapContols({
   onMapChange,
-  onMapReset,
-  map,
-  mapState,
   allowMapChange,
   selectedToolId,
   onSelectedToolChange,
@@ -104,9 +93,6 @@ function MapContols({
       component: (
         <SelectMapButton
           onMapChange={onMapChange}
-          onMapReset={onMapReset}
-          currentMap={map}
-          currentMapState={mapState}
           disabled={disabledControls.includes("map")}
         />
       ),

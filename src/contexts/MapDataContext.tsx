@@ -10,7 +10,6 @@ import { useLiveQuery } from "dexie-react-hooks";
 import { useDatabase } from "./DatabaseContext";
 
 import { Map } from "../types/Map";
-import { MapState } from "../types/MapState";
 
 import { removeGroupsItems } from "../helpers/group";
 
@@ -18,31 +17,19 @@ import { Group } from "../types/Group";
 
 export type AddMapEventHandler = (map: Map) => Promise<void>;
 export type RemoveMapsEventHandler = (ids: string[]) => Promise<void>;
-export type ResetMapEventHandler = (id: string) => Promise<MapState>;
 export type UpdateMapEventHanlder = (
   id: string,
   update: Partial<Map>
 ) => Promise<void>;
-export type UpdateMapStateEventHandler = (
-  id: string,
-  update: Partial<MapState>
-) => Promise<void>;
-export type GetMapStateEventHandler = (
-  id: string
-) => Promise<MapState | undefined>;
 export type GetMapEventHandler = (id: string) => Promise<Map | undefined>;
 export type UpdateMapGroupsEventHandler = (groups: Group[]) => Promise<void>;
 
 type MapDataContextValue = {
   maps: Array<Map>;
-  mapStates: MapState[];
-  /** Adds a map to the database, also adds an assosiated state and group for that map */
+  /** Adds a map to the database, also adds a group for that map */
   addMap: AddMapEventHandler;
   removeMaps: RemoveMapsEventHandler;
-  resetMap: ResetMapEventHandler;
   updateMap: UpdateMapEventHanlder;
-  updateMapState: UpdateMapStateEventHandler;
-  getMapState: GetMapStateEventHandler;
   getMap: GetMapEventHandler;
   mapsLoading: boolean;
   updateMapGroups: UpdateMapGroupsEventHandler;
@@ -53,14 +40,6 @@ type MapDataContextValue = {
 const MapDataContext =
   React.createContext<MapDataContextValue | undefined>(undefined);
 
-const defaultMapState: Omit<MapState, "mapId"> = {
-  tokens: {},
-  drawings: {},
-  fogs: {},
-  editFlags: ["drawing", "tokens", "notes"],
-  notes: {},
-};
-
 export function MapDataProvider({ children }: { children: React.ReactNode }) {
   const { database } = useDatabase();
 
@@ -68,17 +47,8 @@ export function MapDataProvider({ children }: { children: React.ReactNode }) {
     () => database?.table("maps").toArray() || [],
     [database]
   );
-  const mapStatesQuery = useLiveQuery<MapState[]>(
-    () => database?.table("states").toArray() || [],
-    [database]
-  );
-
   const maps = useMemo(() => mapsQuery || [], [mapsQuery]);
-  const mapStates = useMemo(() => mapStatesQuery || [], [mapStatesQuery]);
-  const mapsLoading = useMemo(
-    () => !mapsQuery || !mapStatesQuery,
-    [mapsQuery, mapStatesQuery]
-  );
+  const mapsLoading = !mapsQuery;
 
   const mapGroupQuery = useLiveQuery(
     () => database?.table("groups").get("maps"),
@@ -104,21 +74,11 @@ export function MapDataProvider({ children }: { children: React.ReactNode }) {
     [database]
   );
 
-  const getMapState = useCallback<GetMapStateEventHandler>(
-    async (mapId) => {
-      let mapState = await database?.table("states").get(mapId);
-      return mapState;
-    },
-    [database]
-  );
-
   const addMap = useCallback<AddMapEventHandler>(
     async (map) => {
       if (database) {
         // Just update map database as react state will be updated with an Observable
-        const state = { ...defaultMapState, mapId: map.id };
         await database.table("maps").add(map);
-        await database.table("states").add(state);
         const group = await database.table("groups").get("maps");
         await database.table("groups").update("maps", {
           items: [{ id: map.id, type: "item" }, ...group.items],
@@ -149,18 +109,8 @@ export function MapDataProvider({ children }: { children: React.ReactNode }) {
         await database.table("groups").update("maps", { items });
 
         await database.table("maps").bulkDelete(ids);
-        await database.table("states").bulkDelete(ids);
         await database.table("assets").bulkDelete(assetIds);
       }
-    },
-    [database]
-  );
-
-  const resetMap = useCallback<ResetMapEventHandler>(
-    async (id) => {
-      const state: MapState = { ...defaultMapState, mapId: id };
-      await database?.table("states").put(state);
-      return state;
     },
     [database]
   );
@@ -168,13 +118,6 @@ export function MapDataProvider({ children }: { children: React.ReactNode }) {
   const updateMap = useCallback<UpdateMapEventHanlder>(
     async (id, update) => {
       await database?.table("maps").update(id, update);
-    },
-    [database]
-  );
-
-  const updateMapState = useCallback<UpdateMapStateEventHandler>(
-    async (id, update) => {
-      await database?.table("states").update(id, update);
     },
     [database]
   );
@@ -200,16 +143,12 @@ export function MapDataProvider({ children }: { children: React.ReactNode }) {
 
   const value = {
     maps,
-    mapStates,
     mapGroups,
     addMap,
     removeMaps,
-    resetMap,
     updateMap,
-    updateMapState,
     getMap,
     mapsLoading,
-    getMapState,
     updateMapGroups,
     mapsById,
   };

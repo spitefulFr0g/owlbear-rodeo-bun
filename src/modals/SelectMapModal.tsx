@@ -35,7 +35,6 @@ import { useDatabase } from "../contexts/DatabaseContext";
 import { Map } from "../types/Map";
 import {
   MapChangeEventHandler,
-  MapResetEventHandler,
   RequestCloseEventHandler,
 } from "../types/Events";
 
@@ -43,7 +42,6 @@ type SelectMapProps = {
   isOpen: boolean;
   onDone: RequestCloseEventHandler;
   onMapChange: MapChangeEventHandler;
-  onMapReset: MapResetEventHandler;
   currentMap: Map | null;
 };
 
@@ -51,7 +49,6 @@ function SelectMapModal({
   isOpen,
   onDone,
   onMapChange,
-  onMapReset,
   // The map currently being view in the map screen
   currentMap,
 }: SelectMapProps) {
@@ -62,15 +59,12 @@ function SelectMapModal({
   const userId = useUserId();
   const {
     maps,
-    mapStates,
     mapGroups,
     addMap,
     mapsLoading,
-    getMapState,
     getMap,
     updateMapGroups,
     updateMap,
-    updateMapState,
     mapsById,
   } = useMapData();
   const { addAssets } = useAssets();
@@ -180,11 +174,10 @@ function SelectMapModal({
     if (mapId) {
       setIsLoading(true);
       const map = (await getMap(mapId)) || null;
-      const mapState = (await getMapState(mapId)) || null;
-      await onMapChange(map, mapState);
+      await onMapChange(map);
       setIsLoading(false);
     } else {
-      await onMapChange(null, null);
+      await onMapChange(null);
     }
     onDone();
   }
@@ -221,8 +214,6 @@ function SelectMapModal({
 
   const editingMap =
     editingMapId && maps.find((map) => map.id === editingMapId);
-  const editingMapState =
-    editingMapId && mapStates.find((state) => state.mapId === editingMapId);
 
   return (
     <Modal
@@ -307,8 +298,7 @@ function SelectMapModal({
                   currentMap={currentMap}
                   disabled={isLoading || !!editingMapId}
                   onMapChange={onMapChange}
-                  onMapReset={onMapReset}
-                  onLoad={setIsLoading}
+                          onLoad={setIsLoading}
                 />
               </Box>
               <SelectMapSelectButton
@@ -321,14 +311,12 @@ function SelectMapModal({
       </ImageDrop>
       <>{(isLoading || mapsLoading) && <LoadingOverlay bg="overlay" />}</>
       <>
-        {editingMap && editingMapState && (
+        {editingMap && (
           <EditMapModal
             isOpen={!!editingMapId}
             onDone={() => setEditingMapId(undefined)}
             map={editingMap}
-            mapState={editingMapState}
             onUpdateMap={updateMap}
-            onUpdateMapState={updateMapState}
           />
         )}
       </>

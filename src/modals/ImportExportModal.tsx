@@ -18,7 +18,6 @@ import SelectDataModal, { SelectData } from "./SelectDataModal";
 
 import { getDatabase } from "../database";
 import { Map } from "../types/Map";
-import { MapState } from "../types/MapState";
 import { Token } from "../types/Token";
 import { Group } from "../types/Group";
 import { RequestCloseEventHandler } from "../types/Events";
@@ -188,7 +187,7 @@ function ImportExportModal({
     const importDB = getDatabase({ addons: [] }, importDBName);
     const db = getDatabase({});
     try {
-      // Keep track of a mapping of old token ids to new ones to apply them to the map states
+      // Keep track of a mapping of old token ids to new ones for the library groups
       let newTokenIds: Record<string, string> = {};
       // Mapping of old asset ids to new asset ids
       let newAssetIds: Record<string, string> = {};
@@ -240,7 +239,6 @@ function ImportExportModal({
       }
 
       let newMaps: Map[] = [];
-      let newStates: MapState[] = [];
       if (checkedMaps.length > 0) {
         const mapIds = checkedMaps.map((map) => map.id);
         const mapsToAdd = await importDB.table("maps").bulkGet(mapIds);
@@ -248,21 +246,6 @@ function ImportExportModal({
 
           for (let map of mapsToAdd) {
             if (map) {
-              let state: MapState = await importDB.table("states").get(map.id);
-              // Apply new token ids to imported state
-              for (let tokenState of Object.values(state.tokens)) {
-                if (tokenState.tokenId in newTokenIds) {
-                  tokenState.tokenId = newTokenIds[tokenState.tokenId];
-                }
-                // Change token state file asset id
-                if (tokenState.type === "file" && tokenState.file in newAssetIds) {
-                  tokenState.file = newAssetIds[tokenState.file];
-                }
-                // Change token state owner if owned by the user of the map
-                if (tokenState.owner === map.owner && userId) {
-                  tokenState.owner = userId;
-                }
-              }
               // Generate new ids
               const newId = uuid();
               newMapIds[map.id] = newId;
@@ -300,7 +283,6 @@ function ImportExportModal({
                 }
               }
 
-              newStates.push({ ...state, mapId: newId });
             }
           }
         }
@@ -348,10 +330,6 @@ function ImportExportModal({
                 newMaps.splice(index, 1)
               }
 
-              const stateIndex = newStates.findIndex(state => state.mapId === unprocessedItem.newId)
-              if (stateIndex !== -1) {
-                newStates.splice(stateIndex, 1)
-              }
             } else if (unprocessedItem.item === "token") {
               unprocessedTokens += 1
               const index = newTokens.findIndex(token => token.id === unprocessedItem.newId)
@@ -409,7 +387,6 @@ function ImportExportModal({
         [
           db.table("tokens"),
           db.table("maps"),
-          db.table("states"),
           db.table("assets"),
           db.table("groups"),
         ],
@@ -419,9 +396,6 @@ function ImportExportModal({
           }
           if (newMaps.length > 0) {
             await db.table<Map>("maps").bulkAdd(newMaps);
-          }
-          if (newStates.length > 0) {
-            await db.table("states").bulkAdd(newStates);
           }
           if (newAssets.length > 0) {
             await db.table<Asset>("assets").bulkAdd(newAssets);
@@ -461,7 +435,6 @@ function ImportExportModal({
     return (
       table === "maps" ||
       table === "tokens" ||
-      table === "states" ||
       table === "groups"
     );
   }

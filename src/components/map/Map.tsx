@@ -21,66 +21,23 @@ import { useSettings } from "../../contexts/SettingsContext";
 import { useToolPermissions, useRole } from "../../contexts/RoomContext";
 import { getRoleControls } from "../../helpers/roomControls";
 
-import Action from "../../actions/Action";
-
 import Session from "../../network/Session";
 
-import { DrawingState } from "../../types/Drawing";
-import { FogState } from "../../types/Fog";
-import { Map as MapType, MapToolId } from "../../types/Map";
-import { MapState } from "../../types/MapState";
+import { MapToolId } from "../../types/Map";
 import { Settings } from "../../types/Settings";
-import {
-  MapChangeEventHandler,
-  MapResetEventHandler,
-  TokenStateRemoveHandler,
-  NoteChangeEventHandler,
-  NoteRemoveEventHander,
-  TokenStateChangeEventHandler,
-  NoteCreateEventHander,
-  SelectionItemsChangeEventHandler,
-  SelectionItemsRemoveEventHandler,
-  SelectionItemsCreateEventHandler,
-  TokensStateCreateHandler,
-} from "../../types/Events";
-
-import useMapTokens from "../../hooks/useMapTokens";
+import { MapChangeEventHandler } from "../../types/Events";
 import NoteTool from "../tools/NoteTool";
 import SceneItemMenu from "../scene/SceneItemMenu";
-import { MapActions } from "../../hooks/useMapActions";
 import SceneSelection, { SceneItems } from "../scene/SceneSelection";
 
 type MapProps = {
-  map: MapType | null;
-  mapState: MapState | null;
-  mapActions: MapActions;
-  onMapTokenStateChange: TokenStateChangeEventHandler;
-  onMapTokenStateRemove: TokenStateRemoveHandler;
-  onMapTokensStateCreate: TokensStateCreateHandler;
-  onSelectionItemsChange: SelectionItemsChangeEventHandler;
-  onSelectionItemsRemove: SelectionItemsRemoveEventHandler;
-  onSelectionItemsCreate: SelectionItemsCreateEventHandler;
   onMapChange: MapChangeEventHandler;
-  onMapReset: MapResetEventHandler;
-  onMapDraw: (action: Action<DrawingState>) => void;
-  onFogDraw: (action: Action<FogState>) => void;
-  onMapNoteCreate: NoteCreateEventHander;
-  onMapNoteChange: NoteChangeEventHandler;
-  onMapNoteRemove: NoteRemoveEventHander;
   allowMapChange: boolean;
   session: Session;
-  onUndo: () => void;
-  onRedo: () => void;
 };
 
 function Map({
-  map,
-  mapState,
-  onMapTokenStateChange,
-  onMapTokenStateRemove,
-  onMapTokensStateCreate,
   onMapChange,
-  onMapReset,
   allowMapChange,
   session,
 }: MapProps) {
@@ -112,15 +69,6 @@ function Map({
     }
   }
 
-  const { tokens, propTokens, tokenDragOverlay } = useMapTokens(
-    map,
-    mapState,
-    onMapTokenStateChange,
-    onMapTokenStateRemove,
-    onMapTokensStateCreate,
-    selectedToolId
-  );
-
   const grabbing =
     (selectedToolId === "drawing" && settings.drawing.type === "grab") ||
     (selectedToolId === "fog" &&
@@ -128,20 +76,15 @@ function Map({
       !settings.fog.preview);
   const selecting =
     grabbing || selectedToolId === "move" || selectedToolId === "select";
-  const sceneGrid = useSceneGrid(map);
+  const sceneGrid = useSceneGrid();
 
   return (
     <Box sx={{ flexGrow: 1 }}>
       <MapInteraction
-        map={map}
-        mapState={mapState}
         controls={
           <>
             <MapControls
               onMapChange={onMapChange}
-              onMapReset={onMapReset}
-              map={map}
-              mapState={mapState}
               allowMapChange={allowMapChange}
               onSelectedToolChange={setSelectedToolId}
               selectedToolId={selectedToolId}
@@ -154,7 +97,6 @@ function Map({
               position={itemMenu}
               close={() => setItemMenu(null)}
             />
-            {tokenDragOverlay}
           </>
         }
         selectedToolId={selectedToolId}
@@ -162,7 +104,6 @@ function Map({
       >
         <SceneItems placement="belowGrid" />
         {sceneGrid}
-        {propTokens}
         <DrawingTool
           visible={!selecting}
           renderItems={
@@ -173,7 +114,6 @@ function Map({
           }
           toolSettings={settings.drawing}
         />
-        {tokens}
         <SceneItems placement="aboveGrid" />
         <NoteTool
           active={selectedToolId === "note" && permissions.notes}

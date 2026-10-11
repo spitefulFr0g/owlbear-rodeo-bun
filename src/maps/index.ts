@@ -1,7 +1,6 @@
 import Case from "case";
 
 import { DefaultMap } from "../types/Map";
-import { MapState } from "../types/MapState";
 
 import blankImage from "./Blank.jpg";
 import grassImage from "./Grass.jpg";
@@ -23,11 +22,9 @@ export const mapSources = {
 
 export function getDefaultMaps(userId: string): {
   maps: DefaultMap[];
-  mapStates: MapState[];
 } {
   const mapKeys = Object.keys(mapSources);
   let maps: DefaultMap[] = [];
-  let mapStates: MapState[] = [];
   for (let i = 0; i < mapKeys.length; i++) {
     const key = mapKeys[i];
     const name = Case.capital(key);
@@ -52,17 +49,8 @@ export function getDefaultMaps(userId: string): {
       snapToGrid: true,
     };
     maps.push(map);
-    const state: MapState = {
-      mapId: id,
-      tokens: {},
-      drawings: {},
-      fogs: {},
-      editFlags: ["drawing", "tokens", "notes"],
-      notes: {},
-    };
-    mapStates.push(state);
   }
-  return { maps, mapStates };
+  return { maps };
 }
 
 export const unknownSource = unknownImage;
