@@ -173,18 +173,20 @@ test("connections retain independent fields and converge on the server's last wr
     expect(label.applied).toEqual([{ type: "update", id: "hero", fields: { label: "Player label" } }]);
     const last = await sendBatch(player.socket, { id: "last", sceneId, changes: [
       { type: "update", id: "hero", fields: { position: { x: 900, y: 750 } } },
-      { type: "update", id: "hero", fields: { layer: "prop" } },
       { type: "update", id: "map", fields: { position: { x: -150, y: 0 } } },
     ] });
     expect(last.applied as unknown).toEqual([
       { type: "update", id: "hero", fields: { position: { x: 900, y: 750 }, order: 2 } },
-      { type: "update", id: "hero", fields: { layer: "prop", order: 1 } },
     ]);
     expect(last.refused).toEqual([{ id: "map", item: { ...token, id: "map", layer: "map", owner: "gm", order: 0 } }]);
+    const layer = await sendBatch(gm.socket, { id: "layer", sceneId, changes: [
+      { type: "update", id: "hero", fields: { layer: "prop" } },
+    ] });
+    expect(layer.applied as unknown).toEqual([{ type: "update", id: "hero", fields: { layer: "prop", order: 1 } }]);
     const current = (await server.joinRoomAsGM(room.id, cookie)).snapshot!.scene;
     expect(current.items.hero).toEqual({ ...token, owner: "gm", layer: "prop", order: 1,
       position: { x: 900, y: 750 }, label: "Player label" });
-    expect(playerEvents).toEqual([{ sceneId, changes: move.applied }]);
+    expect(playerEvents).toEqual([{ sceneId, changes: move.applied }, { sceneId, changes: layer.applied }]);
     expect(gmEvents).toEqual([{ sceneId, changes: label.applied }, { sceneId, changes: last.applied }]);
     await server.restart();
     expect((await server.joinRoomAsGM(room.id, cookie)).snapshot!.scene).toEqual(current);
