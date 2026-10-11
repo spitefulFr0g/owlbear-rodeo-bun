@@ -9,12 +9,16 @@ on:
       - "backend/**"
       - "src/sceneRules/**"
       - "src/scene/**"
+      - "package.json"
+      - "yarn.lock"
       - ".github/workflows/backend.yml"
   pull_request:
     paths:
       - "backend/**"
       - "src/sceneRules/**"
       - "src/scene/**"
+      - "package.json"
+      - "yarn.lock"
       - ".github/workflows/backend.yml"
 
 jobs:
@@ -25,6 +29,13 @@ jobs:
         working-directory: backend
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 16.20.0
+          cache: yarn
+      # Shared scene tests import the frontend's geometry dependencies.
+      - run: yarn install --frozen-lockfile --non-interactive
+        working-directory: .
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.4.2
