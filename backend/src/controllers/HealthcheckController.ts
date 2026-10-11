@@ -1,4 +1,4 @@
-import { NextFunction, Request, Response } from "express";
+import { Request, Response } from "express";
 import Controller, { Methods } from "./Controller";
 
 export default class HealthcheckController extends Controller {
@@ -14,7 +14,7 @@ export default class HealthcheckController extends Controller {
   ];
 
 
-  async handleHealthcheck(req: Request, res: Response, next: NextFunction): Promise<void> {
+  async handleHealthcheck(req: Request, res: Response): Promise<void> {
     res.sendStatus(200);
   }
 }
