@@ -23,7 +23,6 @@ import { getRoleControls } from "../../helpers/roomControls";
 
 import Action from "../../actions/Action";
 
-
 import Session from "../../network/Session";
 
 import { DrawingState } from "../../types/Drawing";
@@ -48,8 +47,8 @@ import {
 import useMapTokens from "../../hooks/useMapTokens";
 import useMapNotes from "../../hooks/useMapNotes";
 import { MapActions } from "../../hooks/useMapActions";
-import useMapSelection from "../../hooks/useMapSelection";
-import useSceneImages from "../../hooks/useSceneImages";
+import SceneSelection, { SceneItems } from "../scene/SceneSelection";
+import SceneImages from "../scene/SceneImages";
 
 type MapProps = {
   map: MapType | null;
@@ -81,9 +80,6 @@ function Map({
   onMapTokenStateChange,
   onMapTokenStateRemove,
   onMapTokensStateCreate,
-  onSelectionItemsChange,
-  onSelectionItemsRemove,
-  onSelectionItemsCreate,
   onMapChange,
   onMapReset,
   allowMapChange,
@@ -106,12 +102,13 @@ function Map({
     }));
   }
 
-
-
   const { scene, act, readOnly } = useScene();
   function handleToolAction(action: string) {
     if (action === "eraseAll" && scene && permissions.drawing && !readOnly) {
-      deleteDrawings(drawingsInOrder(scene).map((item) => item.id), act);
+      deleteDrawings(
+        drawingsInOrder(scene).map((item) => item.id),
+        act
+      );
     }
   }
 
@@ -126,21 +123,7 @@ function Map({
 
   const { notes, noteMenu, noteTool } = useMapNotes(selectedToolId);
 
-  const { selectionTool, selectionMenu, selectionDragOverlay } =
-    useMapSelection(
-      map,
-      mapState,
-      onSelectionItemsChange,
-      onSelectionItemsRemove,
-      onSelectionItemsCreate,
-      selectedToolId,
-      settings.select
-    );
-
-  const { sceneImages, sceneMapImages, sceneFogImages, sceneDragOverlay } = useSceneImages(
-    selectedToolId === "move"
-  );
-
+  const selecting = selectedToolId === "move" || selectedToolId === "select";
   const sceneGrid = useSceneGrid(map);
 
   return (
@@ -168,29 +151,36 @@ function Map({
             <DisplayControls session={session} />
             {tokenMenu}
             {noteMenu}
-            {selectionMenu}
             {tokenDragOverlay}
-            {selectionDragOverlay}
-            {sceneDragOverlay}
           </>
         }
         selectedToolId={selectedToolId}
         onSelectedToolChange={setSelectedToolId}
       >
-        {sceneMapImages}
+        {selecting ? (
+          <SceneItems placement="belowGrid" />
+        ) : (
+          <SceneImages placement="belowGrid" />
+        )}
         {sceneGrid}
         {propTokens}
         <DrawingTool
+          visible={!selecting}
           active={selectedToolId === "drawing" && permissions.drawing}
           toolSettings={settings.drawing}
         />
         {tokens}
-        {sceneImages}
-        {notes}
+        {selecting ? <SceneItems placement="aboveGrid" /> : <SceneImages />}
+        {!selecting && notes}
         {noteTool}
         <MeasureTool active={selectedToolId === "measure"} />
-        {sceneFogImages}
+        {selecting ? (
+          <SceneItems placement="aboveRuler" />
+        ) : (
+          <SceneImages placement="aboveRuler" />
+        )}
         <FogTool
+          visible={!selecting}
           onShapeError={addToast}
           active={selectedToolId === "fog"}
           toolSettings={settings.fog}
@@ -203,7 +193,10 @@ function Map({
         {scene && roleControls.room && (
           <NetworkedDisplayView session={session} sceneId={scene.id} />
         )}
-        {selectionTool}
+        <SceneSelection
+          active={selecting}
+          boxSelect={selectedToolId === "select"}
+        />
       </MapInteraction>
     </Box>
   );

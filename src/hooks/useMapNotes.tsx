@@ -15,14 +15,12 @@ import World from "../components/scene/World";
 import NoteTool from "../components/tools/NoteTool";
 import MapMenu from "../components/map/MapMenu";
 import TextareaAutosize from "../components/TextareaAutoSize";
-import useSceneSnapping from "./useSceneSnapping";
 
 function useMapNotes(selectedToolId: MapToolId) {
   const { scene, readOnly, act, person } = useScene();
   const permissions = useToolPermissions();
   const editable = permissions.notes && !readOnly && person.role !== "display";
-  const interactive =
-    editable && (selectedToolId === "move" || selectedToolId === "note");
+  const interactive = editable && selectedToolId === "note";
   const [editor, setEditor] = useState<{
     id: string;
     left: number;
@@ -37,11 +35,11 @@ function useMapNotes(selectedToolId: MapToolId) {
       id,
       left: Math.max(
         map.left,
-        Math.min(map.right - 180, map.left + rect.x + rect.width / 2 - 90),
+        Math.min(map.right - 180, map.left + rect.x + rect.width / 2 - 90)
       ),
       top: Math.max(
         map.top,
-        Math.min(map.bottom - 240, map.top + rect.y + rect.height + 20),
+        Math.min(map.bottom - 240, map.top + rect.y + rect.height + 20)
       ),
       text,
     });
@@ -63,7 +61,7 @@ function useMapNotes(selectedToolId: MapToolId) {
           (a, b) =>
             layers.indexOf(a.layer) - layers.indexOf(b.layer) ||
             a.order - b.order ||
-            a.id.localeCompare(b.id),
+            a.id.localeCompare(b.id)
         )
     : [];
   const notes = (
@@ -74,7 +72,6 @@ function useMapNotes(selectedToolId: MapToolId) {
           item={editor?.id === item.id ? { ...item, text: editor.text } : item}
           interactive={interactive}
           onEdit={open}
-          onFinishEditing={close}
         />
       ))}
     </World>
@@ -175,21 +172,18 @@ function SceneNote({
   item,
   interactive,
   onEdit,
-  onFinishEditing,
 }: {
   item: TextItem;
   interactive: boolean;
   onEdit: (id: string, node: Konva.Node, text?: string) => void;
-  onFinishEditing: () => void;
 }) {
-  const { person, act } = useScene();
+  const { person } = useScene();
   const prevent = useSetPreventMapInteraction();
-  const snap = useSceneSnapping();
   const editable = interactive && (!item.locked || person.role === "gm");
   return (
     <SceneText
       item={item}
-      draggable={editable}
+      draggable={false}
       onMouseDown={(event: Konva.KonvaEventObject<MouseEvent>) => {
         if (editable && leftMouseButton(event)) prevent(true);
       }}
@@ -204,24 +198,6 @@ function SceneNote({
       }}
       onTap={(event: Konva.KonvaEventObject<TouchEvent>) => {
         if (editable) onEdit(item.id, event.currentTarget, item.text);
-      }}
-      onDragStart={() => {
-        onFinishEditing();
-        prevent(true);
-      }}
-      onDragMove={(event: Konva.KonvaEventObject<DragEvent>) => {
-        if (event.target === event.currentTarget)
-          event.target.position(snap(event.target.position()));
-      }}
-      onDragEnd={(event: Konva.KonvaEventObject<DragEvent>) => {
-        act([
-          {
-            type: "update",
-            id: item.id,
-            fields: { position: snap(event.currentTarget.position()) },
-          },
-        ]);
-        prevent(false);
       }}
     />
   );

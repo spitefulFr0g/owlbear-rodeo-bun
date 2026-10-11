@@ -59,6 +59,8 @@ export type Person = {
 type SceneStore = {
   /** The scene as shown, null until the server sends one */
   scene: Scene | null;
+  selection: string[];
+  setSelection: React.Dispatch<React.SetStateAction<string[]>>;
   person: Person;
   switches: RoomSwitches;
   /** Not connected, or no snapshot yet */
@@ -105,6 +107,7 @@ export function SceneProvider({
   const room = useRoom();
   const { getAsset, putAsset } = useAssets();
 
+  const [selection, setSelection] = useState<string[]>([]);
   const [held, setHeld] = useState(nothingHeld);
   const sceneRef = useRef(held.server);
   useEffect(() => {
@@ -114,6 +117,14 @@ export function SceneProvider({
     () => shownScene(held.server, held.unconfirmed),
     [held]
   );
+
+  useEffect(() => {
+    setSelection((previous) =>
+      previous.some((id) => !scene?.items[id])
+        ? previous.filter((id) => !!scene?.items[id])
+        : previous
+    );
+  }, [scene]);
 
   const [connected, setConnected] = useState(!!session.joinToken);
   useEffect(() => {
@@ -128,6 +139,7 @@ export function SceneProvider({
 
   useEffect(() => {
     function handleSnapshot({ scene }: { scene: Scene }) {
+      setSelection([]);
       setHeld({ server: scene, unconfirmed: [] });
     }
     function handleChanges(relayed: RelayedChanges) {
@@ -269,8 +281,18 @@ export function SceneProvider({
   const switches = room.switches || defaultRoomSwitches;
 
   const store = useMemo(
-    () => ({ scene, person, switches, readOnly, act, setGrid, share }),
-    [scene, person, switches, readOnly, act, setGrid, share]
+    () => ({
+      scene,
+      selection,
+      setSelection,
+      person,
+      switches,
+      readOnly,
+      act,
+      setGrid,
+      share,
+    }),
+    [scene, selection, person, switches, readOnly, act, setGrid, share]
   );
 
   return (
@@ -296,10 +318,16 @@ export function useAddTokens() {
   const [sensitivity] = useSetting<number>("map.gridSnappingSensitivity");
   const suspended = useRef(false);
   useKeyboard(
-    (event) => { if (shortcuts.disableSnapping(event)) suspended.current = true; },
-    (event) => { if (shortcuts.disableSnapping(event)) suspended.current = false; }
+    (event) => {
+      if (shortcuts.disableSnapping(event)) suspended.current = true;
+    },
+    (event) => {
+      if (shortcuts.disableSnapping(event)) suspended.current = false;
+    }
   );
-  useBlur(() => { suspended.current = false; });
+  useBlur(() => {
+    suspended.current = false;
+  });
 
   return async function addTokens(
     tokens: Token[],
