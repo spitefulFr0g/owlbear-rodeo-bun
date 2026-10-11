@@ -1,11 +1,19 @@
 import { ChangeEvent, ComponentType, FormEvent, useState } from "react";
-import { Box, Button, Flex, Input, Label, Text } from "theme-ui";
+import { Box, Button, Flex, IconButton, Input, Label, Text } from "theme-ui";
+
+import ChangeNicknameIcon from "../../icons/ChangeNicknameIcon";
+import RemoveMapIcon from "../../icons/RemoveMapIcon";
+
+import ConfirmModal from "../../modals/ConfirmModal";
+import SceneNameModal, { sceneNameMaxLength } from "../../modals/SceneNameModal";
 
 import { useScene, SceneAnswer } from "../../scene/SceneContext";
-import { ListedScene } from "../../helpers/sceneList";
-
-// The server's cap on a scene's name
-const sceneNameMaxLength = 100;
+import {
+  ListedScene,
+  SceneMark,
+  sceneMarks,
+  sortScenes,
+} from "../../helpers/sceneList";
 
 function refusal(answer: SceneAnswer) {
   switch (answer.error) {
@@ -15,6 +23,8 @@ function refusal(answer: SceneAnswer) {
       return "That scene is no longer in the room.";
     case "cap":
       return "This room holds as many scenes as it can.";
+    case "open_scene":
+      return "The open scene cannot be deleted. Show another scene to players first.";
     case "invalid":
       return "A scene's name is 1 to 100 characters.";
     default:
@@ -50,8 +60,81 @@ function OpenSceneEntry({ scene, onRefused, onDone }: SceneEntryProps) {
   );
 }
 
+function RenameSceneEntry({ scene }: SceneEntryProps) {
+  const { renameScene } = useScene();
+  const [isRenaming, setIsRenaming] = useState(false);
+
+  async function handleRename(name: string) {
+    const answer = await renameScene(scene.id, name);
+    if (!answer.ok) return refusal(answer);
+    setIsRenaming(false);
+  }
+
+  return (
+    <>
+      <IconButton
+        type="button"
+        title="Rename"
+        aria-label={`Rename ${scene.name}`}
+        onClick={() => setIsRenaming(true)}
+      >
+        <ChangeNicknameIcon />
+      </IconButton>
+      <SceneNameModal
+        isOpen={isRenaming}
+        onRequestClose={() => setIsRenaming(false)}
+        onSubmit={handleRename}
+        name={scene.name}
+      />
+    </>
+  );
+}
+
+function DeleteSceneEntry({ scene, onRefused }: SceneEntryProps) {
+  const { sceneList, deleteScene } = useScene();
+  const [isConfirming, setIsConfirming] = useState(false);
+  const isOpenScene = sceneList?.openSceneId === scene.id;
+
+  async function handleDelete() {
+    setIsConfirming(false);
+    const answer = await deleteScene(scene.id);
+    if (!answer.ok) onRefused(answer);
+  }
+
+  return (
+    <>
+      <IconButton
+        type="button"
+        title={isOpenScene ? "The open scene cannot be deleted" : "Delete"}
+        aria-label={`Delete ${scene.name}`}
+        disabled={isOpenScene}
+        onClick={() => setIsConfirming(true)}
+      >
+        <RemoveMapIcon />
+      </IconButton>
+      <ConfirmModal
+        isOpen={isConfirming}
+        onRequestClose={() => setIsConfirming(false)}
+        onConfirm={handleDelete}
+        label="Delete this scene?"
+        description={`“${scene.name}” and everything on it will be gone for good.`}
+        confirmText="Delete"
+      />
+    </>
+  );
+}
+
 /** What a GM can do to one scene of the list, in the order shown */
-const sceneEntries: ComponentType<SceneEntryProps>[] = [OpenSceneEntry];
+const sceneEntries: ComponentType<SceneEntryProps>[] = [
+  OpenSceneEntry,
+  RenameSceneEntry,
+  DeleteSceneEntry,
+];
+
+const markLabels: Record<SceneMark, string> = {
+  open: "Open scene",
+  viewed: "Viewing",
+};
 
 type SceneListProps = {
   onDone: () => void;
@@ -62,7 +145,7 @@ type SceneListProps = {
  * the dialog that holds it.
  */
 function SceneList({ onDone }: SceneListProps) {
-  const { sceneList, createScene } = useScene();
+  const { scene: viewed, sceneList, createScene } = useScene();
   const [name, setName] = useState("");
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState<string>();
@@ -90,21 +173,31 @@ function SceneList({ onDone }: SceneListProps) {
   return (
     <Box>
       <Box as="ul" sx={{ listStyle: "none", maxHeight: "50vh", overflowY: "auto" }} p={0} my={2}>
-        {sceneList.scenes.map((scene) => (
-          <Flex
-            as="li"
-            key={scene.id}
-            sx={{ alignItems: "center", justifyContent: "space-between" }}
-            py={1}
-          >
-            <Text sx={{ overflowWrap: "anywhere" }} mr={2}>{scene.name}</Text>
-            <Flex sx={{ flexShrink: 0 }}>
-              {sceneEntries.map((Entry, index) => (
-                <Entry key={index} scene={scene} onRefused={handleRefused} onDone={onDone} />
-              ))}
+        {sortScenes(sceneList.scenes).map((scene) => {
+          const marks = sceneMarks(sceneList, viewed?.id, scene.id);
+          return (
+            <Flex
+              as="li"
+              key={scene.id}
+              sx={{ alignItems: "center", justifyContent: "space-between" }}
+              py={1}
+            >
+              <Box mr={2}>
+                <Text sx={{ overflowWrap: "anywhere" }}>{scene.name}</Text>
+                {marks.length > 0 && (
+                  <Text as="p" variant="caption" m={0}>
+                    {marks.map((mark) => markLabels[mark]).join(" · ")}
+                  </Text>
+                )}
+              </Box>
+              <Flex sx={{ flexShrink: 0, alignItems: "center" }}>
+                {sceneEntries.map((Entry, index) => (
+                  <Entry key={index} scene={scene} onRefused={handleRefused} onDone={onDone} />
+                ))}
+              </Flex>
             </Flex>
-          </Flex>
-        ))}
+          );
+        })}
       </Box>
       <Box as="form" onSubmit={handleCreate}>
         <Label htmlFor="newSceneName">New empty scene</Label>
