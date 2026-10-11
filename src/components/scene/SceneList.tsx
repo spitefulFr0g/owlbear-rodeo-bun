@@ -35,8 +35,6 @@ function refusal(answer: SceneAnswer) {
       return "The open scene cannot be deleted. Show another scene to players first.";
     case "no_view":
       return "The scene is not on screen yet. Try again in a moment.";
-    case "invalid":
-      return "A scene's name is 1 to 100 characters.";
     default:
       return "The room refused that.";
   }
@@ -171,6 +169,31 @@ function EditSceneEntry({ scene, onRefused, onDone }: SceneEntryProps) {
   );
 }
 
+function DuplicateSceneEntry({ scene, onRefused }: SceneEntryProps) {
+  const { duplicateScene } = useScene();
+  const [isSending, setIsSending] = useState(false);
+
+  async function handleDuplicate() {
+    setIsSending(true);
+    const answer = await duplicateScene(scene.id);
+    setIsSending(false);
+    if (!answer.ok) onRefused(answer);
+  }
+
+  return (
+    <Button
+      type="button"
+      variant="secondary"
+      ml={1}
+      disabled={isSending}
+      onClick={handleDuplicate}
+      aria-label={`Duplicate ${scene.name}`}
+    >
+      Duplicate
+    </Button>
+  );
+}
+
 function DeleteSceneEntry({ scene, onRefused }: SceneEntryProps) {
   const { sceneList, deleteScene } = useScene();
   const [isConfirming, setIsConfirming] = useState(false);
@@ -211,6 +234,7 @@ const sceneEntries: ComponentType<SceneEntryProps>[] = [
   ShowSceneEntry,
   EditSceneEntry,
   RenameSceneEntry,
+  DuplicateSceneEntry,
   DeleteSceneEntry,
 ];
 
@@ -264,7 +288,7 @@ function SceneList({ onDone }: SceneListProps) {
             <Flex
               as="li"
               key={scene.id}
-              sx={{ alignItems: "center", justifyContent: "space-between" }}
+              sx={{ flexDirection: "column", alignItems: "stretch" }}
               py={1}
             >
               <Box mr={2}>
@@ -275,7 +299,7 @@ function SceneList({ onDone }: SceneListProps) {
                   </Text>
                 )}
               </Box>
-              <Flex sx={{ flexShrink: 0, alignItems: "center" }}>
+              <Flex sx={{ flexWrap: "wrap", alignItems: "center" }} mt={1}>
                 {sceneEntries.map((Entry, index) => (
                   <Entry key={index} scene={scene} onRefused={handleRefused} onDone={onDone} />
                 ))}
