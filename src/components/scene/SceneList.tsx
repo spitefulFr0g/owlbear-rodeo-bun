@@ -99,6 +99,25 @@ function ShowSceneEntry({ scene, onRefused, onDone }: SceneEntryProps) {
   );
 }
 
+function WelcomeSceneEntry({ scene, onRefused }: SceneEntryProps) {
+  const { sceneList, welcomeScene } = useScene();
+  const [isSending, setIsSending] = useState(false);
+  const isWelcome = sceneList?.welcomeSceneId === scene.id;
+  async function handleWelcome() {
+    setIsSending(true);
+    const answer = await welcomeScene(isWelcome ? null : scene.id);
+    setIsSending(false);
+    if (!answer.ok) onRefused(answer);
+  }
+  return (
+    <Button type="button" variant="secondary" ml={1} disabled={isSending}
+      onClick={handleWelcome}
+      aria-label={`${isWelcome ? "Stop using" : "Use"} ${scene.name} as the welcome screen`}>
+      {isWelcome ? "Stop using as welcome screen" : "Use as welcome screen"}
+    </Button>
+  );
+}
+
 function RenameSceneEntry({ scene }: SceneEntryProps) {
   const { renameScene } = useScene();
   const [isRenaming, setIsRenaming] = useState(false);
@@ -210,6 +229,7 @@ const sceneEntries: ComponentType<SceneEntryProps>[] = [
   OpenSceneEntry,
   ShowSceneEntry,
   EditSceneEntry,
+  WelcomeSceneEntry,
   RenameSceneEntry,
   DeleteSceneEntry,
 ];
@@ -218,6 +238,7 @@ const markLabels: Record<SceneMark, string> = {
   open: "Open scene",
   viewed: "Viewing",
   viewOnly: "View-only",
+  welcome: "Welcome screen",
 };
 
 type SceneListProps = {
@@ -264,7 +285,7 @@ function SceneList({ onDone }: SceneListProps) {
             <Flex
               as="li"
               key={scene.id}
-              sx={{ alignItems: "center", justifyContent: "space-between" }}
+              sx={{ alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 2 }}
               py={1}
             >
               <Box mr={2}>
@@ -275,7 +296,7 @@ function SceneList({ onDone }: SceneListProps) {
                   </Text>
                 )}
               </Box>
-              <Flex sx={{ flexShrink: 0, alignItems: "center" }}>
+              <Flex sx={{ alignItems: "center", flexWrap: "wrap", gap: 1 }}>
                 {sceneEntries.map((Entry, index) => (
                   <Entry key={index} scene={scene} onRefused={handleRefused} onDone={onDone} />
                 ))}

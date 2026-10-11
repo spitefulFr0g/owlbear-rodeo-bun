@@ -146,3 +146,10 @@ describe("sceneMarks", () => {
     expect(sceneMarks(list, undefined, "keep")).toEqual([]);
   });
 });
+
+ test("marks the welcome screen even when it is also open and viewed", () => {
+  const welcome = { ...list, welcomeSceneId: "road" };
+  expect(sceneMarks(welcome, "road", "road")).toEqual(["open", "viewed", "welcome"]);
+  expect(sceneMarks(welcome, "road", "keep")).toEqual([]);
+  expect(sceneMarks({ ...welcome, welcomeSceneId: null }, "road", "road")).toEqual(["open", "viewed"]);
+});

@@ -1,6 +1,8 @@
 import { useEffect, useRef } from "react";
 import { useToasts } from "react-toast-notifications";
 
+import { useScene } from "../scene/SceneContext";
+import { useRole, useRoom } from "../contexts/RoomContext";
 import Session from "./Session";
 
 import { useParty } from "../contexts/PartyContext";
@@ -21,6 +23,10 @@ type NetworkedPartyProps = { gameId: string; session: Session };
  * @param {NetworkedPartyProps} props
  */
 function NetworkedParty({ gameId, session }: NetworkedPartyProps) {
+  const { scene } = useScene();
+  const role = useRole();
+  const room = useRoom();
+  const waitingOnScene = role !== "gm" && room.session === false && !!scene;
   const partyState = useParty();
   const { addToast } = useToasts();
 
@@ -58,6 +64,8 @@ function NetworkedParty({ gameId, session }: NetworkedPartyProps) {
       session.off("playerLeft", handlePlayerLeft);
     };
   });
+
+  if (waitingOnScene) return null;
 
   return (
     <Party

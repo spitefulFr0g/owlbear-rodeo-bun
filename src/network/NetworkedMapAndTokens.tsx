@@ -1,4 +1,7 @@
 import { useRole, useRoom } from "../contexts/RoomContext";
+import { useScene } from "../scene/SceneContext";
+import DisplayMap from "../components/display/DisplayMap";
+import { defaultDisplayView } from "../helpers/defaultDisplayView";
 import Session from "./Session";
 import useSceneMap from "../hooks/useSceneMap";
 import WelcomeScreen from "../components/WelcomeScreen";
@@ -8,6 +11,7 @@ import GlobalImageDrop from "../components/image/GlobalImageDrop";
 import { Map as MapType } from "../types/Map";
 
 function NetworkedMapAndTokens({ session }: { session: Session }) {
+  const { scene } = useScene();
   const role = useRole();
   const room = useRoom();
   const sceneMap = useSceneMap();
@@ -19,7 +23,11 @@ function NetworkedMapAndTokens({ session }: { session: Session }) {
       console.error(error);
     }
   }
-  if (role !== "gm" && room.session === false) return <WelcomeScreen />;
+  if (role !== "gm" && room.session === false) {
+    return scene
+      ? <DisplayMap key={scene.id} view={defaultDisplayView(scene)} session={session} interactive />
+      : <WelcomeScreen />;
+  }
   return (
     <GlobalImageDrop onMapChange={handleMapChange}>
       <Map session={session} />

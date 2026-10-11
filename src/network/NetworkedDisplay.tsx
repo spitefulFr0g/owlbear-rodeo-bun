@@ -42,11 +42,11 @@ function NetworkedDisplay({ session }: { session: Session }) {
     return () => { session.off("room", clearOutsideSession); };
   }, [session]);
 
-  if (waiting) return <WelcomeScreen />;
+  if (waiting && !scene) return <WelcomeScreen />;
 
   // Fit the scene until a view of it arrives
   const view =
-    displayView && scene && displayView.sceneId === scene.id
+    !waiting && displayView && scene && displayView.sceneId === scene.id
       ? displayView
       : defaultDisplayView(scene);
 
