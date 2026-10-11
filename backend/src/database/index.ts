@@ -148,6 +148,10 @@ export class OwlbearDatabase {
       ), 0) AS sizeBytes FROM rooms WHERE id = ?`).get(roomId)?.sizeBytes ?? 0;
   }
 
+  roomHasAsset(roomId: string, assetId: string): boolean {
+    return !!this.connection.query("SELECT 1 FROM room_assets WHERE roomId = ? AND assetId = ?").get(roomId, assetId);
+  }
+
   recordRoomAsset(roomId: string, assetId: string): void {
     this.connection.query(`INSERT OR IGNORE INTO room_assets (roomId, assetId)
       SELECT rooms.id, assets.id FROM rooms, assets WHERE rooms.id = ? AND assets.id = ?`)

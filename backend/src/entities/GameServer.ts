@@ -29,7 +29,7 @@ export default class GameServer {
   private readonly attempts: AttemptLimiter;
   private readonly joinTokens: JoinTokens;
 
-  constructor(io: IOServer, joinTokens: JoinTokens, database?: OwlbearDatabase, private readonly clock: Clock = realClock, attempts?: AttemptLimiter, private readonly behindProxy = false, private readonly accounts?: Accounts) {
+  constructor(io: IOServer, joinTokens: JoinTokens, private readonly database?: OwlbearDatabase, private readonly clock: Clock = realClock, attempts?: AttemptLimiter, private readonly behindProxy = false, private readonly accounts?: Accounts) {
     this.attempts = attempts ?? new AttemptLimiter(clock ?? realClock);
     this.io = io;
     this.joinTokens = joinTokens;
@@ -319,7 +319,10 @@ export default class GameServer {
           const refusedItem = before && visibleTo(person, before) ? before : null;
           if (batch.sceneId !== game.scene.id || (socket.data.role !== "gm" && !game.session) ||
               checkChange(game.scene, change) ||
-              !mayChange(person, { switches: game.switches },
+              !mayChange(person, { switches: game.switches, knownImage: image =>
+                image.type === "default" || [image.file, image.thumbnail, ...Object.values(image.resolutions ?? {})]
+                  .filter((id): id is string => id !== undefined)
+                  .every(id => this.database?.roomHasAsset(gameId, id) ?? false) },
                 change.type === "add" ? undefined : before, change) ||
               (socket.data.role !== "gm" && !socket.data.playerId)) {
             refused.push({ id, item: refusedItem });
