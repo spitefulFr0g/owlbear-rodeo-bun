@@ -42,9 +42,9 @@ export function getToolPermissions(role: Role, switches = defaultRoomSwitches) {
   };
 }
 
-/** Local images require uploads unless their file is already in the room manifest. */
+/** Local images require uploads unless all their files are already named by scene images. */
 export function canPlaceImage(
-  image: { type: string; file?: string },
+  image: { type: string; file?: string; thumbnail?: string },
   permissions: ReturnType<typeof getToolPermissions>,
   roomAssetIds: string[]
 ) {
@@ -52,6 +52,7 @@ export function canPlaceImage(
     permissions.tokens &&
     (image.type === "default" ||
       permissions.uploads ||
-      (!!image.file && roomAssetIds.includes(image.file)))
+      (!!image.file && roomAssetIds.includes(image.file) &&
+        (!image.thumbnail || roomAssetIds.includes(image.thumbnail))))
   );
 }
