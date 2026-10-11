@@ -6,7 +6,7 @@ import RadioIconButton from "../RadioIconButton";
 import Divider from "../Divider";
 import SceneGridControls from "../scene/SceneGridControls";
 
-import SelectMapButton from "./SelectMapButton";
+import ScenesButton from "../scene/ScenesButton";
 
 import ExpandMoreIcon from "../../icons/ExpandMoreIcon";
 import FullScreenIcon from "../../icons/FullScreenIcon";
@@ -91,9 +91,9 @@ function MapContols({
     {
       id: "map",
       component: (
-        <SelectMapButton
+        <ScenesButton
           onMapChange={onMapChange}
-          disabled={disabledControls.includes("map")}
+          allowMapChange={!disabledControls.includes("map")}
         />
       ),
     },

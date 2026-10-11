@@ -19,6 +19,7 @@ import { snapPosition } from "./grid";
 import { useUserId } from "../contexts/UserIdContext";
 
 import { canPlaceImage, getToolPermissions, defaultRoomSwitches } from "../helpers/roomControls";
+import { SceneList } from "../helpers/sceneList";
 
 import { downloadAsset, hasAsset, uploadAsset } from "../network/assetStore";
 import Session, { SessionStatus } from "../network/Session";
@@ -66,7 +67,9 @@ type SceneStore = {
   setSelection: React.Dispatch<React.SetStateAction<string[]>>;
   person: Person;
   switches: RoomSwitches;
-  /** Not connected, or no snapshot yet */
+  /** The room's scenes as the server last listed them, null for anyone but a GM */
+  sceneList: SceneList | null;
+  /** Not connected, no snapshot yet, or waiting for the scene asked for */
   readOnly: boolean;
   /**
    * One action: every change in it shows at once and goes to the server as
@@ -85,9 +88,19 @@ type SceneStore = {
    * server has accepted it, which it does from a GM only.
    */
   setGrid: (grid: SceneGrid) => void;
+  /**
+   * Moves this GM connection to another scene. The canvas is read-only until
+   * its snapshot arrives. Not in the undo history.
+   */
+  viewScene: (sceneId: string) => Promise<SceneAnswer>;
+  /** Makes an empty scene and moves this GM connection to it, as viewScene does */
+  createScene: (name: string) => Promise<SceneAnswer>;
   /** Puts stored files this browser holds on the server, for an item to name */
   share: (files: string[]) => Promise<void>;
 };
+
+/** The server's answer to a scene action */
+export type SceneAnswer = { ok: boolean; error?: string; sceneId?: string };
 
 const SceneContext = React.createContext<SceneStore | undefined>(undefined);
 
@@ -139,10 +152,21 @@ export function SceneProvider({
 
   sceneRef.current = scene;
 
+  const [sceneList, setSceneList] = useState<SceneList | null>(null);
+  // The latest request for another scene the server has not answered yet
+  const [asking, setAsking] = useState<object | null>(null);
+  const askingRef = useRef(asking);
+  function changeAsking(next: object | null) {
+    askingRef.current = next;
+    setAsking(next);
+  }
+
   const [connected, setConnected] = useState(!!session.joinToken);
   useEffect(() => {
     function handleStatus(status: SessionStatus) {
       setConnected(status === "joined");
+      // An answer to a request made before the connection dropped never comes
+      if (status !== "joined") changeAsking(null);
     }
     session.on("status", handleStatus);
     return () => {
@@ -178,11 +202,13 @@ export function SceneProvider({
     function handleGrid(change: GridChange) {
       changeHeld((held) => ({ ...held, server: afterGrid(held.server, change) }));
     }
+    session.socket?.on("scene_list", setSceneList);
     session.socket?.on("scene_snapshot", handleSnapshot);
     session.socket?.on("scene_changes", handleChanges);
     session.socket?.on("scene_answer", handleAnswer);
     session.socket?.on("scene_grid", handleGrid);
     return () => {
+      session.socket?.off("scene_list", setSceneList);
       session.socket?.off("scene_snapshot", handleSnapshot);
       session.socket?.off("scene_changes", handleChanges);
       session.socket?.off("scene_answer", handleAnswer);
@@ -227,7 +253,7 @@ export function SceneProvider({
     }
   }, [scene, connected, session, getAsset, putAsset]);
 
-  const readOnly = !connected || !scene;
+  const readOnly = !connected || !scene || !!asking;
 
   const person = useMemo<Person>(() => {
     if (display) return { role: "display", id: "" };
@@ -256,7 +282,7 @@ export function SceneProvider({
     (changes: Change[], recordHistory = true) => {
       const scene = shownScene(heldRef.current.server, heldRef.current.unconfirmed);
       // Nothing is queued while the connection is being restored
-      if (!scene || !session.socket?.connected || !session.joinToken) {
+      if (!scene || !session.socket?.connected || !session.joinToken || askingRef.current) {
         return false;
       }
       changes = changes.filter(change => mayChange(person, { switches, knownImage: () => true },
@@ -281,7 +307,7 @@ export function SceneProvider({
 
   const replay = useCallback((direction: "undo" | "redo") => {
     const scene = shownScene(heldRef.current.server, heldRef.current.unconfirmed);
-    if (!scene || !session.socket?.connected || !session.joinToken) return;
+    if (!scene || !session.socket?.connected || !session.joinToken || askingRef.current) return;
     const opposite = direction === "undo" ? "redo" : "undo";
     let next = historyRef.current;
     while (next[direction].length) {
@@ -322,6 +348,32 @@ export function SceneProvider({
     [session]
   );
 
+  // The snapshot of the scene asked for is sent just before the answer
+  const askForScene = useCallback(
+    (event: "scene_view" | "scene_create", payload: Record<string, unknown>) =>
+      new Promise<SceneAnswer>((resolve) => {
+        if (!session.socket?.connected || !session.joinToken) {
+          resolve({ ok: false, error: "offline" });
+          return;
+        }
+        const request = {};
+        changeAsking(request);
+        session.socket.emit(event, payload, (answer: SceneAnswer) => {
+          if (askingRef.current === request) changeAsking(null);
+          resolve(answer);
+        });
+      }),
+    [session]
+  );
+  const viewScene = useCallback(
+    (sceneId: string) => askForScene("scene_view", { sceneId }),
+    [askForScene]
+  );
+  const createScene = useCallback(
+    (name: string) => askForScene("scene_create", { name }),
+    [askForScene]
+  );
+
   const share = useCallback(
     async (files: string[]) => {
       const token = session.joinToken;
@@ -352,20 +404,28 @@ export function SceneProvider({
       setSelection,
       person,
       switches,
+      sceneList: role === "gm" ? sceneList : null,
       readOnly,
       act,
       undo, redo, canUndo, canRedo,
       canChange,
       canSelect,
       setGrid,
+      viewScene,
+      createScene,
       share,
     }),
-    [scene, selection, person, switches, readOnly, act, undo, redo, canUndo, canRedo, canChange, canSelect, setGrid, share]
+    [scene, selection, person, switches, role, sceneList, readOnly, act, undo, redo, canUndo, canRedo, canChange, canSelect, setGrid, viewScene, createScene, share]
   );
 
   return (
     <SceneContext.Provider value={store}>{children}</SceneContext.Provider>
   );
+}
+
+/** The scene list, null for anyone but a GM */
+export function useSceneList() {
+  return useScene().sceneList;
 }
 
 export function useScene() {
