@@ -350,7 +350,7 @@ test("freeze holds the shown view for joining displays and unfreeze sends the la
   expect(lateEvents).toEqual([
     ["party_state", expect.any(Object)], ["map_state", undefined],
     ["map", { id: "map-1", owner: "gm" }], ["manifest", undefined],
-    ["joined_display", lateDisplay.id, expect.any(String), { room: { name: "display-freeze", session: true, hasPassword: true, switches: { tokens: true, drawing: true, notes: true, fog: false, uploads: false } } }],
+    ["joined_display", lateDisplay.id, expect.any(String), { room: { name: "display-freeze", session: true, hasPassword: true, switches: { tokens: true, drawing: true, notes: true, fog: false, uploads: false, ownerOnly: false } } }],
     ["scene_snapshot", { scene: expect.objectContaining({ id: expect.any(String), items: {} }) }],
     ["display_frozen", true], ["display_view", view],
   ]);

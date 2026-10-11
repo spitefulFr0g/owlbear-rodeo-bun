@@ -121,7 +121,7 @@ export class OwlbearDatabase {
       passwordHash = excluded.passwordHash, displayToken = excluded.displayToken,
       documentVersion = excluded.documentVersion, document = excluded.document,
       name = excluded.name, gmAccountId = excluded.gmAccountId, hasPassword = excluded.hasPassword, switches = excluded.switches, trustedPlayerIds = excluded.trustedPlayerIds`)
-      .run(record.id, record.passwordHash, record.displayToken, record.documentVersion, record.document, record.name, record.gmAccountId, record.hasPassword, record.switches ?? JSON.stringify({ tokens: true, drawing: true, notes: true, fog: false, uploads: false }), record.trustedPlayerIds ?? "[]");
+      .run(record.id, record.passwordHash, record.displayToken, record.documentVersion, record.document, record.name, record.gmAccountId, record.hasPassword, record.switches ?? JSON.stringify({ tokens: true, drawing: true, notes: true, fog: false, uploads: false, ownerOnly: false }), record.trustedPlayerIds ?? "[]");
   }
 
   roomsForGM(accountId: string): RoomRecord[] {
