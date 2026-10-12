@@ -53,8 +53,8 @@ test("joining carries the name and renaming reaches players and cast displays wi
     expect((await joined)[2]).toEqual({ role: "gm", color: "blue", room: { name: "Before", session: false, hasPassword: false, switches: { tokens: true, drawing: true, notes: true, fog: false, uploads: false, ownerOnly: false } } });
     await new Promise(resolve => player.emit("session", true, resolve));
     const peer = await server.joinRoom(room.id);
-    const party = nextMessage(peer.socket, "party_state");
-    player.emit("player_state", { userId: "gm" });
+    const party = nextMessage(peer.socket, "presence_state");
+    player.emit("presence_update", { nickname: "", color: "blue", dice: { share: false, rolls: [] }, userId: "gm" });
     await party;
     await sendBatch(player, { id: "map", sceneId: peer.snapshot!.scene!.id, changes: [{ type: "add", item: { ...tokenItem, layer: "map", locked: true } }] });
     const scene = (await server.joinRoomAsGM(room.id, cookie)).snapshot!.scene!;

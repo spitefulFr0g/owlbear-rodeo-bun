@@ -76,14 +76,14 @@ export async function startTestServer(prepare?: (dataDir: string) => Promise<voi
     const socket = connect(cookie);
     let snapshot: { scene: Scene | null } | undefined;
     socket.on("scene_snapshot", value => { snapshot = value; });
-    const party = nextMessage(socket, "party_state");
+    const party = nextMessage(socket, "presence_state");
     const joined = nextMessage(socket, event === "join_game" ? "joined_game" : "joined_display");
     const frozen = nextMessage(socket, "display_frozen");
     if (event === "join_game") socket.emit(event, roomId, credential, undefined, { playerId });
     else socket.emit(event, roomId, credential);
     const [[, token, info], [displayFrozen]] = await Promise.all([joined, frozen]);
-    const [partyState] = await party;
-    return { socket, info, snapshot, token: token as string, state: { partyState }, displayFrozen };
+    const [presenceState] = await party;
+    return { socket, info, snapshot, token: token as string, state: { presenceState }, displayFrozen };
   };
   return {
     clock,

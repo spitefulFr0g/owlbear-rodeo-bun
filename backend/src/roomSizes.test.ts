@@ -70,8 +70,8 @@ test("cast display downloads do not record legacy images as used by the room", a
     const player = await server.joinRoomAsGM(room.id, cookie);
     await new Promise(resolve => player.socket.emit("session", true, resolve));
     const observer = await server.joinRoom(room.id);
-    const party = nextMessage(observer.socket, "party_state");
-    player.socket.emit("player_state", { userId: "gm" });
+    const party = nextMessage(observer.socket, "presence_state");
+    player.socket.emit("presence_update", { nickname: "", color: "blue", dice: { share: false, rolls: [] }, userId: "gm" });
     await party;
     const displayToken = await new Promise<string>(resolve => player.socket.emit("get_display_token", resolve));
     const display = server.connect();

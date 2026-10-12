@@ -90,7 +90,7 @@ describe("asset routes", () => {
     test("cast display tokens allow downloads but refuse uploads", async () => {
       await upload("display-download");
       const owner = await server.joinRoomAsGM(roomId, gmCookie);
-      owner.socket.emit("player_state", { userId: "gm" });
+      owner.socket.emit("presence_update", { nickname: "", color: "blue", dice: { share: false, rolls: [] }, userId: "gm" });
       owner.socket.emit("map", { id: "map", owner: "gm" });
       const link = await new Promise<string>(resolve => owner.socket.emit("get_display_token", resolve));
       const { socket: display, token: displayToken } = await server.joinDisplay(roomId, link);

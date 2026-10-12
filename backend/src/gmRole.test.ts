@@ -16,7 +16,7 @@ test("the room's signed-in GM joins on every device without the room password", 
   } finally { await server.dispose(); }
 });
 
-test("party roles come from the server even when a browser claims to be GM", async () => {
+test("presence roles come from the server even when a browser claims to be GM", async () => {
   const server = await startTestServer();
   try {
     const { cookie } = await setupAdministrator(server);
@@ -24,8 +24,8 @@ test("party roles come from the server even when a browser claims to be GM", asy
     const gm = await server.joinRoomAsGM(room.id, cookie);
     const player = await server.joinRoom(room.id);
     for (const [sender, observer, claimed, expected] of [[gm, player, "player", "gm"], [player, gm, "gm", "player"]] as const) {
-      const party = nextMessage(observer.socket, "party_state");
-      sender.socket.emit("player_state", { nickname: "Someone", dice: {}, role: claimed });
+      const party = nextMessage(observer.socket, "presence_state");
+      sender.socket.emit("presence_update", { color: "blue", nickname: "Someone", dice: { share: false, rolls: [] }, role: claimed });
       expect((await party)[0][sender.socket.id!].role).toBe(expected);
     }
   } finally { await server.dispose(); }
