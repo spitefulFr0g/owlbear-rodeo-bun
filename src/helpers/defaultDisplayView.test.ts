@@ -5,7 +5,7 @@ const image: ImageItem = { id: "map", kind: "image", layer: "map", position: { x
   rotation: 0, scale: { x: 2, y: 3 }, order: 0, owner: "gm", locked: true, hidden: false,
   metadata: {}, image: { type: "default", key: "test" }, width: 100, height: 100,
   label: "", outline: { type: "circle", x: 50, y: 50, radius: 50 } };
-function scene(items: Scene["items"]): Scene { return { id: "scene", grid: defaultSceneGrid, items }; }
+function scene(items: Scene["items"]): Scene { return { id: "scene", grid: defaultSceneGrid, fogFill: false, viewOnly: false, items }; }
 
 test("opens on an area centred on the origin when nothing was sent", () => {
   expect(defaultDisplayView(scene({}))).toEqual({ x: -750, y: -750, width: 1500, height: 1500 });

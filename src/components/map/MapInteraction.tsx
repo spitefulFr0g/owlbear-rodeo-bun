@@ -1,4 +1,4 @@
-import React, { useRef, useState } from "react";
+import React, { useMemo, useRef, useState } from "react";
 import { Box } from "theme-ui";
 import ReactResizeDetector from "react-resize-detector";
 import { Stage, Layer, Group } from "react-konva";
@@ -8,6 +8,7 @@ import usePreventOverscroll from "../../hooks/usePreventOverscroll";
 import useStageInteraction from "../../hooks/useStageInteraction";
 import usePreventContextMenu from "../../hooks/usePreventContextMenu";
 import useFollowMapRect from "../../hooks/useFollowMapRect";
+import useFitPlayerView from "../../hooks/useFitPlayerView";
 
 import { useScene } from "../../scene/SceneContext";
 
@@ -34,6 +35,8 @@ type MapInteractionProps = {
   onSelectedToolChange: SelectedToolChangeEventHanlder;
   // Keep this part of the map fitted to the window and ignore all input
   followRect?: MapRect;
+  // Fit once when the scene arrives, leaving pan and zoom available
+  initialRect?: MapRect;
 };
 
 function MapInteraction({
@@ -42,6 +45,7 @@ function MapInteraction({
   selectedToolId,
   onSelectedToolChange,
   followRect,
+  initialRect,
 }: MapInteractionProps) {
   const [stageWidth, setStageWidth] = useState(1);
   const [stageHeight, setStageHeight] = useState(1);
@@ -67,10 +71,22 @@ function MapInteraction({
   const mapWidth = stageWidth;
   const mapHeight = stageHeight;
 
-  const { scene } = useScene();
+  const { scene, playerView } = useScene();
   const isFollowing = followRect !== undefined;
   useFollowMapRect(
     followRect,
+    scene?.id,
+    mapStageRef,
+    { stageWidth, stageHeight },
+    stageTranslateRef,
+    setStageScale
+  );
+
+  const sceneId = scene?.id;
+  const initialView = useMemo(() => initialRect && sceneId
+    ? { ...initialRect, sceneId } : null, [initialRect, sceneId]);
+  useFitPlayerView(
+    playerView || initialView,
     scene?.id,
     mapStageRef,
     { stageWidth, stageHeight },

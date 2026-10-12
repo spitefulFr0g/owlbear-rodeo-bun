@@ -1,4 +1,4 @@
-import { mayChange, TextItem, RoomRules, Person, Change } from "./index";
+import { mayChange, mayChangeNothing, TextItem, RoomRules, Person, Change } from "./index";
 const rules: RoomRules = { switches: { tokens: true, drawing: true, notes: true, fog: true, uploads: true, ownerOnly: false } };
 const map: TextItem = { id: "map", kind: "text", layer: "map", position: { x: 0, y: 0 }, rotation: 0,
   scale: { x: 1, y: 1 }, order: 0, owner: "gm", locked: true, hidden: false, metadata: {},
@@ -157,4 +157,56 @@ test("uploads off limits only players adding unknown file images", () => {
   }
   expect(mayChange({ role: "player", id: "player" }, { switches: { ...rules.switches, uploads: false } },
     undefined, { type: "add", item: image })).toBe(false);
+});
+
+test("view-only scenes permit only the GM for every role, item kind, layer and change", () => {
+  for (const example of examples) {
+    for (const layer of ["map", "grid", "drawing", "prop", "mount", "character", "attachment", "note", "text", "ruler", "fog"] as const) {
+      const item = { ...example, layer };
+      const changes: Change[] = [
+        { type: "add", item },
+        { type: "update", id: item.id, fields: { position: { x: 10, y: 20 } } },
+        { type: "delete", id: item.id },
+      ];
+      for (const role of ["gm", "trusted", "player", "display"] as const) {
+        for (const change of changes) {
+          expect(mayChange({ role, id: "player" }, { ...rules, viewOnly: true },
+            change.type === "add" ? undefined : item, change)).toBe(role === "gm");
+        }
+      }
+    }
+  }
+});
+
+test("only the GM can change anything on a view-only scene, and a cast display nothing anywhere", () => {
+  for (const role of ["gm", "trusted", "player", "display"] as const) {
+    expect(mayChangeNothing(role, { viewOnly: true })).toBe(role !== "gm");
+    expect(mayChangeNothing(role, { viewOnly: false })).toBe(role === "display");
+    expect(mayChangeNothing(role, {})).toBe(role === "display");
+  }
+});
+
+test("welcome-screen scenes permit only the GM for every role, item kind, layer and change", () => {
+  for (const role of ["gm", "trusted", "player", "display"] as const) {
+    for (const viewOnly of [false, true]) {
+      expect(mayChangeNothing(role, { viewOnly, welcomeScreen: true })).toBe(role !== "gm");
+      expect(mayChangeNothing(role, { viewOnly, welcomeScreen: false })).toBe(role === "display" || (viewOnly && role !== "gm"));
+    }
+  }
+  for (const example of examples) {
+    for (const layer of ["map", "grid", "drawing", "prop", "mount", "character", "attachment", "note", "text", "ruler", "fog"] as const) {
+      const item = { ...example, layer };
+      const changes: Change[] = [
+        { type: "add", item },
+        { type: "update", id: item.id, fields: { position: { x: 10, y: 20 } } },
+        { type: "delete", id: item.id },
+      ];
+      for (const role of ["gm", "trusted", "player", "display"] as const) {
+        for (const change of changes) {
+          expect(mayChange({ role, id: "player" }, { ...rules, viewOnly: false, welcomeScreen: true },
+            change.type === "add" ? undefined : item, change)).toBe(role === "gm");
+        }
+      }
+    }
+  }
 });

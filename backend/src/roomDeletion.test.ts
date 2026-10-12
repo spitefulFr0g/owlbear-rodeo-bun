@@ -49,7 +49,7 @@ test("an administrator deleting another GM's room tells every player and cast di
     const party = nextMessage(player.socket, "party_state");
     writer.socket.emit("player_state", { userId: "gm" });
     await party;
-    await sendBatch(writer.socket, { id: "map", sceneId: writer.snapshot!.scene.id, changes: [{ type: "add", item: { ...tokenItem, layer: "map", locked: true } }] });
+    await sendBatch(writer.socket, { id: "map", sceneId: writer.snapshot!.scene!.id, changes: [{ type: "add", item: { ...tokenItem, layer: "map", locked: true } }] });
     const displayToken = await new Promise<string>(resolve => writer.socket.emit("get_display_token", resolve));
     const display = await server.joinDisplay(room.id, displayToken);
     const connections = [writer, player, display];

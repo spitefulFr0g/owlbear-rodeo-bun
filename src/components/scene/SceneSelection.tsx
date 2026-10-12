@@ -1,8 +1,9 @@
+import SceneFogFill from "./SceneFogFill";
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import Konva from "konva";
 import { Group } from "react-konva";
 import { v4 as uuid } from "uuid";
-import { useScene } from "../../scene/SceneContext";
+import { useScene, useToolPermissions } from "../../scene/SceneContext";
 import { worldNodeId } from "../../scene/worldPosition";
 import {
   attachesTo,
@@ -15,7 +16,6 @@ import { useSetPreventMapInteraction } from "../../contexts/MapInteractionContex
 import { useKeyboard } from "../../contexts/KeyboardContext";
 import { useGridSnappingSensitivity } from "../../contexts/GridContext";
 import useSetting from "../../hooks/useSetting";
-import { useToolPermissions } from "../../contexts/RoomContext";
 import useSceneSnapping from "../../hooks/useSceneSnapping";
 import shortcuts from "../../shortcuts";
 import World from "./World";
@@ -388,7 +388,7 @@ export function SceneItems({
     if (!scene || placement !== "aboveRuler" || !fogShapes || editsFog) return [];
     const fog = fogItems(scene);
     // Hidden owned shapes remain a hint, but never contribute to coverage.
-    return [...coveredFog(fog), ...fog.filter(item => item.hidden).map(fogShape)];
+    return [...(scene.fogFill ? [] : coveredFog(fog)), ...fog.filter(item => item.hidden).map(fogShape)];
   }, [scene, placement, fogShapes, editsFog]);
   if (!scene) return null;
   const items = Object.values(scene.items)
@@ -412,6 +412,7 @@ export function SceneItems({
     );
   return (
     <World id={placement === "aboveGrid" ? worldNodeId : undefined}>
+      {placement === "aboveRuler" && fogShapes && <SceneFogFill opacity={person.role === "gm" && editsFog ? fogOpacity : 1} />}
       {cover.map(shape => (
         <SceneDrawing key={shape.id} item={fogItem(shape, "gm", false, false)} listening={false} />
       ))}

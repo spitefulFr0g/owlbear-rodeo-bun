@@ -1,3 +1,4 @@
+import SceneFogFill from "../scene/SceneFogFill";
 import { useState, useEffect, useCallback, useMemo } from "react";
 import shortid from "shortid";
 import { Group, Line } from "react-konva";
@@ -58,12 +59,12 @@ function FogTool({ onShapeError, active, toolSettings, editable: permitted, visi
   const shapes = useMemo(() => items.map(fogShape), [items]);
   const snap = useSceneSnapping();
   const addShapes = useCallback((shapes: Fog[], cut: boolean) => {
-    if (cut && !shapes.some(shape => cutsFog(shape, items))) { onShapeError("No fog to cut"); return; }
+    if (cut && !shapes.some(shape => cutsFog(shape, items, scene?.fogFill))) { onShapeError("No fog to cut"); return; }
     const clipped = toolSettings.multilayer ? shapes : shapes.flatMap(shape =>
-      clipFog(shape, cut ? items.filter(item => item.cut && !item.hidden).map(fogShape) : coveredFog(items)));
+      cut && scene?.fogFill ? coveredFog(items, shape) : clipFog(shape, cut ? items.filter(item => item.cut && !item.hidden).map(fogShape) : coveredFog(items, scene?.fogFill ? shape : undefined)));
     if (!clipped.length) { onShapeError(cut ? "Fog already cut" : "Fog already placed"); return; }
     act(clipped.map(shape => ({ type: "add", item: fogItem(shape, person.id, cut, toolSettings.type === "brush") })));
-  }, [items, onShapeError, toolSettings, act, person.id]);
+  }, [items, scene?.fogFill, onShapeError, toolSettings, act, person.id]);
   const onShapesAdd = useCallback((shapes: Fog[]) => addShapes(shapes, false), [addShapes]);
   const onShapesCut = useCallback((shapes: Fog[]) => addShapes(shapes, true), [addShapes]);
   const onShapesRemove = (ids: string[]) => act(ids.map(id => ({ type: "delete", id })));
@@ -601,12 +602,13 @@ function FogTool({ onShapeError, active, toolSettings, editable: permitted, visi
       setFogShapes(visibleShapes);
     } else {
       // Hidden shapes are an owner-only hint, never part of the fog cover.
-      setFogShapes([...coveredFog(items), ...shapes.filter(shape => !shape.visible && !toolSettings.preview)]);
+      setFogShapes([...(scene?.fogFill ? [] : coveredFog(items)), ...shapes.filter(shape => !shape.visible && !toolSettings.preview)]);
     }
-  }, [shapes, items, editable, active, toolSettings, shouldRenderGuides]);
+  }, [shapes, items, scene?.fogFill, editable, active, toolSettings, shouldRenderGuides]);
 
   return (
     <World visible={visible}>
+      <SceneFogFill opacity={person.role === "gm" && editable ? editOpacity : 1} />
       <Group>{fogShapes.map(renderShape)}</Group>
       {shouldRenderGuides && renderGuides()}
       {drawingShape && renderDrawingShape(drawingShape)}

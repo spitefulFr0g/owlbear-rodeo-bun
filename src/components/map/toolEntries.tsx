@@ -40,7 +40,7 @@ export function createToolEntries({
     { id: "move", icon: <MoveToolIcon />, title: "Move Tool (W)",
       shortcut: shortcuts.moveTool, mayUse: true },
     { id: "select", icon: <SelectToolIcon />, title: "Select Tool (S)",
-      shortcut: shortcuts.selectTool, mayUse: !readOnly },
+      shortcut: shortcuts.selectTool, mayUse: !readOnly && permissions.select },
     { id: "fog", icon: <FogToolIcon />, title: "Fog Tool (F)",
       shortcut: shortcuts.fogTool, mayUse: !readOnly && permissions.fog,
       settingsPanel: <FogToolSettings settings={toolSettings.fog}

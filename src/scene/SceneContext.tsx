@@ -19,6 +19,9 @@ import { snapPosition } from "./grid";
 import { useUserId } from "../contexts/UserIdContext";
 
 import { canPlaceImage, getToolPermissions, defaultRoomSwitches } from "../helpers/roomControls";
+import { MapRect } from "../helpers/displayView";
+import { PlayerView } from "../helpers/playerView";
+import { SceneList } from "../helpers/sceneList";
 
 import { downloadAsset, hasAsset, uploadAsset } from "../network/assetStore";
 import Session, { SessionStatus } from "../network/Session";
@@ -29,6 +32,7 @@ import {
   gmOwner,
   Item,
   mayChange,
+  mayChangeNothing,
   Scene,
   SceneGrid,
   Vector2,
@@ -40,17 +44,18 @@ import { Token } from "../types/Token";
 import {
   afterAnswer,
   afterChanges,
-  afterGrid,
+  afterSettings,
   BatchAnswer,
-  GridChange,
   imageFiles,
   imagesInOrder,
   RelayedChanges,
+  SceneSettings,
+  SettingsChange,
   shownScene,
 } from "./shown";
 import { emptyHistory, History, remember, historyChanges, dropStep } from "./history";
 import { tokenItem } from "./tokenItem";
-import { clientPositionToWorld } from "./worldPosition";
+import { clientPositionToWorld, visibleWorldRect } from "./worldPosition";
 
 /** Who this connection is to the scene rules */
 export type Person = {
@@ -66,7 +71,14 @@ type SceneStore = {
   setSelection: React.Dispatch<React.SetStateAction<string[]>>;
   person: Person;
   switches: RoomSwitches;
-  /** Not connected, or no snapshot yet */
+  /** The room's scenes as the server last listed them, null for anyone but a GM */
+  sceneList: SceneList | null;
+  /**
+   * The view a GM last carried to this player or trusted player, a new object
+   * each time. Null once another snapshot arrives, and for a GM and a cast display.
+   */
+  playerView: PlayerView | null;
+  /** Not connected, no snapshot yet, or waiting for the scene asked for */
   readOnly: boolean;
   /**
    * One action: every change in it shows at once and goes to the server as
@@ -81,13 +93,54 @@ type SceneStore = {
   canChange: (change: Change) => boolean;
   canSelect: (item: Item) => boolean;
   /**
-   * Changes the scene's grid for everyone viewing it. It shows once the
-   * server has accepted it, which it does from a GM only.
+   * Changes settings of the scene for everyone viewing it: any of its grid,
+   * Fog Fill and view-only. They show once the server has accepted them,
+   * which it does from a GM only. Not in the undo history.
    */
-  setGrid: (grid: SceneGrid) => void;
+  setSettings: (settings: Partial<SceneSettings>) => void;
+  /**
+   * Moves this GM connection to another scene. The canvas is read-only until
+   * its snapshot arrives. Not in the undo history.
+   */
+  viewScene: (sceneId: string) => Promise<SceneAnswer>;
+  /**
+   * Makes a scene and moves this GM connection to it, as viewScene does. It is
+   * empty unless made from a map, whose files the server must already hold.
+   */
+  createScene: (
+    name: string,
+    from?: { grid: SceneGrid; map: Item; fogFill?: boolean }
+  ) => Promise<SceneAnswer>;
+  /** Sets a scene's name. The scene list shows it once the server has */
+  renameScene: (sceneId: string, name: string) => Promise<SceneAnswer>;
+  /** Copies a scene in this room without moving anyone. Not in undo history. */
+  duplicateScene: (sceneId: string) => Promise<SceneAnswer>;
+  /**
+   * Removes a scene and everything on it, for good. The server refuses the
+   * open scene, and moves a GM connection viewing the scene to the open scene.
+   */
+  deleteScene: (sceneId: string) => Promise<SceneAnswer>;
+  /** Assigns a welcome-screen scene, or restores the default welcome screen */
+  welcomeScene: (sceneId: string | null) => Promise<SceneAnswer>;
+  /**
+   * Show to players: makes the scene this GM connection is viewing the open
+   * scene, carrying a view of it in world units for players and cast displays
+   * to start at. Not in the undo history.
+   */
+  showScene: (sceneId: string, view: MapRect) => Promise<SceneAnswer>;
+  /**
+   * Bring players here: moves every player and trusted player on the open
+   * scene to a view of it in world units, once. The server refuses it outside
+   * a session and from a GM connection viewing another scene. Nothing is
+   * saved, and it is not in the undo history.
+   */
+  bringPlayers: (view: MapRect) => Promise<SceneAnswer>;
   /** Puts stored files this browser holds on the server, for an item to name */
   share: (files: string[]) => Promise<void>;
 };
+
+/** The server's answer to a scene action */
+export type SceneAnswer = { ok: boolean; error?: string; sceneId?: string };
 
 const SceneContext = React.createContext<SceneStore | undefined>(undefined);
 
@@ -139,10 +192,22 @@ export function SceneProvider({
 
   sceneRef.current = scene;
 
+  const [sceneList, setSceneList] = useState<SceneList | null>(null);
+  const [playerView, setPlayerView] = useState<PlayerView | null>(null);
+  // The latest request for another scene the server has not answered yet
+  const [asking, setAsking] = useState<object | null>(null);
+  const askingRef = useRef(asking);
+  function changeAsking(next: object | null) {
+    askingRef.current = next;
+    setAsking(next);
+  }
+
   const [connected, setConnected] = useState(!!session.joinToken);
   useEffect(() => {
     function handleStatus(status: SessionStatus) {
       setConnected(status === "joined");
+      // An answer to a request made before the connection dropped never comes
+      if (status !== "joined") changeAsking(null);
     }
     session.on("status", handleStatus);
     return () => {
@@ -151,8 +216,10 @@ export function SceneProvider({
   }, [session]);
 
   useEffect(() => {
-    function handleSnapshot({ scene }: { scene: Scene }) {
+    function handleSnapshot({ scene }: { scene: Scene | null }) {
       setSelection([]);
+      // A carried view follows the snapshot of its scene
+      setPlayerView(null);
       changeHeld(() => ({ server: scene, unconfirmed: [] }));
       changeHistory(emptyHistory);
       pendingHistory.current = {};
@@ -175,29 +242,26 @@ export function SceneProvider({
         ),
       }));
     }
-    function handleGrid(change: GridChange) {
-      changeHeld((held) => ({ ...held, server: afterGrid(held.server, change) }));
+    function handleSettings(change: SettingsChange) {
+      changeHeld((held) => ({ ...held, server: afterSettings(held.server, change) }));
     }
+    session.socket?.on("scene_list", setSceneList);
     session.socket?.on("scene_snapshot", handleSnapshot);
     session.socket?.on("scene_changes", handleChanges);
     session.socket?.on("scene_answer", handleAnswer);
-    session.socket?.on("scene_grid", handleGrid);
+    session.socket?.on("scene_settings", handleSettings);
+    session.socket?.on("player_view", setPlayerView);
     return () => {
+      session.socket?.off("scene_list", setSceneList);
       session.socket?.off("scene_snapshot", handleSnapshot);
       session.socket?.off("scene_changes", handleChanges);
       session.socket?.off("scene_answer", handleAnswer);
-      session.socket?.off("scene_grid", handleGrid);
+      session.socket?.off("scene_settings", handleSettings);
+      session.socket?.off("player_view", setPlayerView);
     };
   }, [session.socket]);
 
-  // Outside a session only the GM is sent the scene
   const waiting = role !== "gm" && room.session === false;
-  useEffect(() => {
-    if (waiting) {
-      changeHeld(() => nothingHeld);
-      changeHistory(emptyHistory);
-    }
-  }, [waiting]);
 
   // Fetch the files the scene's images name, the local database then draws them
   const fetchedRef = useRef(new Set<string>());
@@ -227,7 +291,7 @@ export function SceneProvider({
     }
   }, [scene, connected, session, getAsset, putAsset]);
 
-  const readOnly = !connected || !scene;
+  const readOnly = !connected || !scene || !!asking;
 
   const person = useMemo<Person>(() => {
     if (display) return { role: "display", id: "" };
@@ -236,12 +300,13 @@ export function SceneProvider({
   }, [display, role, userId]);
 
   const switches = room.switches || defaultRoomSwitches;
+  const viewOnly = waiting || !!scene?.viewOnly;
 
   // Image availability is handled by the token bar; this gate covers item actions.
   const canChange = useCallback((change: Change) =>
-    !readOnly && mayChange(person, { switches, knownImage: () => true },
+    !readOnly && mayChange(person, { switches, viewOnly, knownImage: () => true },
       change.type === "add" ? undefined : scene?.items[change.id], change),
-    [readOnly, person, switches, scene]);
+    [readOnly, person, switches, viewOnly, scene]);
   const canSelect = useCallback((item: Item) => canChange({
     type: "update", id: item.id, fields: { position: item.position },
   }), [canChange]);
@@ -256,10 +321,11 @@ export function SceneProvider({
     (changes: Change[], recordHistory = true) => {
       const scene = shownScene(heldRef.current.server, heldRef.current.unconfirmed);
       // Nothing is queued while the connection is being restored
-      if (!scene || !session.socket?.connected || !session.joinToken) {
+      if (!scene || !session.socket?.connected || !session.joinToken || askingRef.current) {
         return false;
       }
-      changes = changes.filter(change => mayChange(person, { switches, knownImage: () => true },
+      const rules = { switches, viewOnly: waiting || scene.viewOnly, knownImage: () => true };
+      changes = changes.filter(change => mayChange(person, rules,
         change.type === "add" ? undefined : scene.items[change.id], change));
       if (changes.length === 0) {
         return false;
@@ -276,12 +342,12 @@ export function SceneProvider({
       session.socket.emit("scene_changes", batch);
       return true;
     },
-    [session, person, switches]
+    [session, person, switches, waiting]
   );
 
   const replay = useCallback((direction: "undo" | "redo") => {
     const scene = shownScene(heldRef.current.server, heldRef.current.unconfirmed);
-    if (!scene || !session.socket?.connected || !session.joinToken) return;
+    if (!scene || !session.socket?.connected || !session.joinToken || askingRef.current) return;
     const opposite = direction === "undo" ? "redo" : "undo";
     let next = historyRef.current;
     while (next[direction].length) {
@@ -300,26 +366,103 @@ export function SceneProvider({
   }, [session]);
   const undo = useCallback(() => replay("undo"), [replay]);
   const redo = useCallback(() => replay("redo"), [replay]);
-  const canUndo = !readOnly && history.undo.length > 0;
-  const canRedo = !readOnly && history.redo.length > 0;
+  // A step made before the scene became view-only would only be refused
+  const replays = !readOnly && !mayChangeNothing(person.role, { viewOnly });
+  const canUndo = replays && history.undo.length > 0;
+  const canRedo = replays && history.redo.length > 0;
 
-  const setGrid = useCallback(
-    (grid: SceneGrid) => {
+  const setSettings = useCallback(
+    (settings: Partial<SceneSettings>) => {
       const scene = sceneRef.current;
       if (!scene || !session.socket?.connected || !session.joinToken) {
         return;
       }
       session.socket.emit(
-        "scene_grid",
-        { sceneId: scene.id, grid },
+        "scene_settings",
+        { sceneId: scene.id, ...settings },
         (answer: { ok: boolean; error?: string }) => {
           if (!answer.ok) {
-            console.error(`Unable to change the grid: ${answer.error}`);
+            console.error(`Unable to change the scene's settings: ${answer.error}`);
           }
         }
       );
     },
     [session]
+  );
+
+  // The snapshot of the scene asked for is sent just before the answer
+  const askForScene = useCallback(
+    (event: "scene_view" | "scene_create", payload: Record<string, unknown>) =>
+      new Promise<SceneAnswer>((resolve) => {
+        if (!session.socket?.connected || !session.joinToken) {
+          resolve({ ok: false, error: "offline" });
+          return;
+        }
+        const request = {};
+        changeAsking(request);
+        session.socket.timeout(10000).emit(event, payload, (error: Error | null, answer: SceneAnswer) => {
+          if (askingRef.current === request) changeAsking(null);
+          resolve(error ? { ok: false, error: "timeout" } : answer);
+        });
+      }),
+    [session]
+  );
+  const viewScene = useCallback(
+    (sceneId: string) => askForScene("scene_view", { sceneId }),
+    [askForScene]
+  );
+  const createScene = useCallback(
+    (name: string, from?: { grid: SceneGrid; map: Item; fogFill?: boolean }) =>
+      askForScene("scene_create", { name, ...from }),
+    [askForScene]
+  );
+
+  // Scene actions that move this connection nowhere by asking
+  const askForList = useCallback(
+    (
+      event: "scene_rename" | "scene_delete" | "scene_show" | "scene_bring" | "scene_welcome" | "scene_duplicate",
+      payload: Record<string, unknown>
+    ) =>
+      new Promise<SceneAnswer>((resolve) => {
+        if (!session.socket?.connected || !session.joinToken) {
+          resolve({ ok: false, error: "offline" });
+          return;
+        }
+        session.socket.timeout(10000).emit(event, payload, (error: Error | null, answer: SceneAnswer) => {
+          resolve(error ? { ok: false, error: "timeout" } : answer);
+        });
+      }),
+    [session]
+  );
+  const renameScene = useCallback(
+    (sceneId: string, name: string) =>
+      askForList("scene_rename", { sceneId, name }),
+    [askForList]
+  );
+  const duplicateScene = useCallback(
+    (sceneId: string) => askForList("scene_duplicate", { sceneId }),
+    [askForList]
+  );
+  const deleteScene = useCallback(
+    (sceneId: string) => askForList("scene_delete", { sceneId }),
+    [askForList]
+  );
+
+  const welcomeScene = useCallback(
+    (sceneId: string | null) => askForList("scene_welcome", { sceneId }),
+    [askForList]
+  );
+
+  const showScene = useCallback(
+    (sceneId: string, { x, y, width, height }: MapRect) =>
+      askForList("scene_show", { sceneId, view: { x, y, width, height } }),
+    [askForList]
+  );
+
+  const bringPlayers = useCallback(
+    ({ x, y, width, height }: MapRect) =>
+      askForList("scene_bring", { view: { x, y, width, height } }),
+    [askForList]
   );
 
   const share = useCallback(
@@ -352,20 +495,35 @@ export function SceneProvider({
       setSelection,
       person,
       switches,
+      sceneList: role === "gm" ? sceneList : null,
+      playerView,
       readOnly,
       act,
       undo, redo, canUndo, canRedo,
       canChange,
       canSelect,
-      setGrid,
+      setSettings,
+      viewScene,
+      createScene,
+      renameScene,
+      deleteScene,
+      welcomeScene,
+      duplicateScene,
+      showScene,
+      bringPlayers,
       share,
     }),
-    [scene, selection, person, switches, readOnly, act, undo, redo, canUndo, canRedo, canChange, canSelect, setGrid, share]
+    [scene, selection, person, switches, role, sceneList, playerView, readOnly, act, undo, redo, canUndo, canRedo, canChange, canSelect, setSettings, viewScene, createScene, renameScene, deleteScene, welcomeScene, duplicateScene, showScene, bringPlayers, share]
   );
 
   return (
     <SceneContext.Provider value={store}>{children}</SceneContext.Provider>
   );
+}
+
+/** The scene list, null for anyone but a GM */
+export function useSceneList() {
+  return useScene().sceneList;
 }
 
 export function useScene() {
@@ -376,13 +534,52 @@ export function useScene() {
   return context;
 }
 
+/** The tools the room's switches and the scene viewed leave this connection */
+export function useToolPermissions() {
+  const { scene, switches } = useScene();
+  return getToolPermissions(useRole(), switches, useRoom().session === false || scene?.viewOnly);
+}
+
+/**
+ * Show to players, with this window's view of the scene as the view carried.
+ * A scene this GM connection is not viewing is opened first.
+ */
+export function useShowToPlayers() {
+  const { scene, viewScene, showScene } = useScene();
+  const mapStageRef = useMapStage();
+
+  return async function showToPlayers(sceneId: string): Promise<SceneAnswer> {
+    if (scene?.id !== sceneId) {
+      const answer = await viewScene(sceneId);
+      if (!answer.ok) return answer;
+    }
+    // The stage keeps its pan and zoom from one scene to the next
+    const view = mapStageRef.current && visibleWorldRect(mapStageRef.current);
+    if (!view) return { ok: false, error: "no_view" };
+    return showScene(sceneId, view);
+  };
+}
+
+/** Bring players here, with this window's view of the open scene as the view carried */
+export function useBringPlayers() {
+  const { bringPlayers } = useScene();
+  const mapStageRef = useMapStage();
+
+  return async function bringPlayersHere(): Promise<SceneAnswer> {
+    const view = mapStageRef.current && visibleWorldRect(mapStageRef.current);
+    if (!view) return { ok: false, error: "no_view" };
+    return bringPlayers(view);
+  };
+}
+
 /** Availability uses only images this connection can see in the scene. */
 export function useCanPlaceToken() {
   const { scene, person, switches, readOnly } = useScene();
   const files = useMemo(() => scene
     ? imagesInOrder(scene).reduce<string[]>((files, item) => files.concat(imageFiles(item)), [])
     : [], [scene]);
-  const permissions = getToolPermissions(person.role === "display" ? "player" : person.role, switches);
+  const permissions = getToolPermissions(
+    person.role === "display" ? "player" : person.role, switches, useRoom().session === false || scene?.viewOnly);
   return (token: Token) => !readOnly && person.role !== "display" &&
     canPlaceImage(token, permissions, files);
 }

@@ -5,8 +5,19 @@ import { DisplayView } from "../types/DisplayView";
 import { PlayerState } from "../types/PlayerState";
 import { PartyState } from "../types/PartyState";
 
+export type StoredScene = Scene & { name: string };
+
 export default class Game {
-  scene: Scene = { id: randomBytes(16).toString("hex"), grid: JSON.parse(JSON.stringify(defaultSceneGrid)), items: {} };
+  openSceneId = randomBytes(16).toString("hex");
+  welcomeSceneId: string | null = null;
+  scenes: Record<string, StoredScene> = {
+    [this.openSceneId]: { id: this.openSceneId, name: "Scene 1", grid: JSON.parse(JSON.stringify(defaultSceneGrid)), fogFill: false, viewOnly: false, items: {} },
+  };
+
+  get scene(): StoredScene { return this.scenes[this.openSceneId]; }
+  set scene(scene: Scene) {
+    this.scenes[this.openSceneId] = { ...scene, name: this.scenes[this.openSceneId].name };
+  }
   name = "";
   session = false;
   cancelSessionCountdown?: () => void;

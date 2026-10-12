@@ -4,9 +4,9 @@ import { IconButton, Flex, Box } from "theme-ui";
 
 import RadioIconButton from "../RadioIconButton";
 import Divider from "../Divider";
-import SceneGridControls from "../scene/SceneGridControls";
+import SceneControls from "../scene/SceneControls";
 
-import SelectMapButton from "./SelectMapButton";
+import ScenesButton from "../scene/ScenesButton";
 
 import ExpandMoreIcon from "../../icons/ExpandMoreIcon";
 import FullScreenIcon from "../../icons/FullScreenIcon";
@@ -18,21 +18,18 @@ import RedoButton from "../controls/shared/RedoButton";
 import useSetting from "../../hooks/useSetting";
 
 import { MapToolId } from "../../types/Map";
-import { MapChangeEventHandler } from "../../types/Events";
 import { Settings } from "../../types/Settings";
 
 import { useKeyboard } from "../../contexts/KeyboardContext";
 
 import shortcuts from "../../shortcuts";
-import { useToolPermissions, useRole } from "../../contexts/RoomContext";
+import { useRole } from "../../contexts/RoomContext";
 import { getRoleControls } from "../../helpers/roomControls";
-import { useScene } from "../../scene/SceneContext";
+import { useScene, useToolPermissions } from "../../scene/SceneContext";
 import { fogItems } from "../../scene/fogItem";
 import { drawingsInOrder } from "../../scene/drawingItem";
 
 type MapControlsProps = {
-  onMapChange: MapChangeEventHandler;
-  allowMapChange: boolean;
   selectedToolId: MapToolId;
   onSelectedToolChange: (toolId: MapToolId) => void;
   toolSettings: Settings;
@@ -41,8 +38,6 @@ type MapControlsProps = {
 };
 
 function MapContols({
-  onMapChange,
-  allowMapChange,
   selectedToolId,
   onSelectedToolChange,
   toolSettings,
@@ -78,7 +73,6 @@ function MapContols({
   });
   const disabledControls: MapToolId[] = tools
     .filter(tool => !tool.mayUse).map(tool => tool.id);
-  if (!allowMapChange) disabledControls.push("map");
   if (!canUndo) disabledControls.push("undo");
   if (!canRedo) disabledControls.push("redo");
 
@@ -90,14 +84,9 @@ function MapContols({
   const sections = [
     {
       id: "map",
-      component: (
-        <SelectMapButton
-          onMapChange={onMapChange}
-          disabled={disabledControls.includes("map")}
-        />
-      ),
+      component: <ScenesButton />,
     },
-    { id: "grid", component: <SceneGridControls /> },
+    { id: "scene", component: <SceneControls /> },
     {
       id: "tools",
       component: tools.map((tool) => (

@@ -6,7 +6,6 @@ import {
   Item,
   layers,
   Scene,
-  SceneGrid,
   topOrder,
 } from "../sceneRules";
 
@@ -58,13 +57,20 @@ export function afterAnswer(
   return { ...scene, items };
 }
 
-/** What the server sends everyone viewing a scene when the GM changes its grid */
-export type GridChange = { sceneId: string; grid: SceneGrid };
+/** What a GM may set on a scene outside the undo history */
+export type SceneSettings = Pick<Scene, "grid" | "fogFill" | "viewOnly">;
 
-/** The scene once the server has accepted a change to its grid */
-export function afterGrid(scene: Scene | null, change: GridChange): Scene | null {
+/** What the server sends everyone viewing a scene when the GM changes its settings */
+export type SettingsChange = { sceneId: string } & SceneSettings;
+
+/** The scene once the server has accepted a change to its settings */
+export function afterSettings(
+  scene: Scene | null,
+  change: SettingsChange
+): Scene | null {
   if (!scene || scene.id !== change.sceneId) return scene;
-  return { ...scene, grid: change.grid };
+  const { grid, fogFill, viewOnly } = change;
+  return { ...scene, grid, fogFill, viewOnly };
 }
 
 /** A change with the order the server will give it, so it shows where it will land */

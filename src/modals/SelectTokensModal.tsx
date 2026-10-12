@@ -1,5 +1,4 @@
-import { useToolPermissions } from "../contexts/RoomContext";
-import { useCanPlaceToken } from "../scene/SceneContext";
+import { useCanPlaceToken, useToolPermissions } from "../scene/SceneContext";
 import { useRef, useState, useEffect } from "react";
 import { Flex, Label, Button, Box } from "theme-ui";
 import { useToasts } from "react-toast-notifications";

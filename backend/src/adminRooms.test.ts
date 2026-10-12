@@ -48,8 +48,8 @@ test("administrators see every room and actual database and image bytes includin
     const check = async () => {
       const result = await list();
       expect(result.rooms).toEqual([
-        { ...first, sizeBytes: 283, gm: { id: other.account.id, username: "Other" } },
-        { ...second, sizeBytes: 275, gm: { id: administrator.account.id, username: "Administrator" } },
+        { ...first, sizeBytes: 401, gm: { id: other.account.id, username: "Other" } },
+        { ...second, sizeBytes: 393, gm: { id: administrator.account.id, username: "Administrator" } },
       ]);
       expect(result.totalBytes).toBe((await stat(join(directory, "owlbear.db"))).size + 20);
       expect(await fileBytes(join(directory, "assets", "blobs"))).toBe(20);

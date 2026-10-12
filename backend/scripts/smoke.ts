@@ -7,11 +7,12 @@
  *   bun scripts/smoke.ts                                  the server from source
  *   bun scripts/smoke.ts <executable>                     a compiled executable
  *   bun scripts/smoke.ts <executable> --from <released>   an upgrade: the released
- *       executable (v0.2.0 or later) makes the data, <executable> opens it
+ *       executable (v0.3.0) makes the data, <executable> opens it
  */
-import { mkdtemp, rm } from "fs/promises";
+import { mkdtemp, rm, readFile } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
+import { Database } from "bun:sqlite";
 import { io } from "socket.io-client";
 import msgParser from "socket.io-msgpack-parser";
 
@@ -82,6 +83,11 @@ async function joinAsGM(address: string, roomId: string, cookie: string) {
   return { socket, token, get snapshot() { return snapshot; }, get ownerOnly() { return ownerOnly; } };
 }
 
+const note = { id: "smoke-note", kind: "text", layer: "note", position: { x: 123, y: -456 }, rotation: 0,
+  scale: { x: 1, y: 1 }, order: 0, owner: "gm", locked: false, hidden: false, metadata: {},
+  text: "Kept across the upgrade", color: "yellow", size: 150, square: true };
+let originalDatabase: Buffer | undefined;
+let savedSceneId: string;
 const image = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 1, 2, 3, 4]);
 let server = released ? await start([released], false) : await start(command);
 try {
@@ -90,6 +96,17 @@ try {
   const { room } = await (await post(server.address, "/api/rooms", { name: "Smoke room" }, cookie)).json() as { room: { id: string } };
 
   const first = await joinAsGM(server.address, room.id, cookie);
+  await new Promise(resolve => first.socket.emit("get_display_token", resolve));
+  savedSceneId = first.snapshot!.scene.id;
+  const placed = new Promise<any>(resolve => first.socket.once("scene_answer", resolve));
+  first.socket.emit("scene_changes", { id: "smoke-place", sceneId: savedSceneId, changes: [{ type: "add", item: note }] });
+  const answer = await placed;
+  if (answer.refused.length || answer.applied.length !== 1) throw new Error("The smoke note was not placed");
+  const grid = { type: "hexHorizontal", unitsPerCell: 150, measurement: { type: "euclidean", scale: "10m" }, shown: false, snap: false };
+  const styledGrid = { ...grid, opacity: 0.8, lineWidth: 3, color: "#333333" };
+  const gridAnswer = await new Promise<any>(resolve => first.socket.emit(released ? "scene_grid" : "scene_settings", { sceneId: savedSceneId,
+    grid: released ? grid : styledGrid }, resolve));
+  if (!gridAnswer.ok) throw new Error("The smoke grid was not changed");
   const upload = await fetch(`${server.address}/assets/smoke-image`, {
     method: "PUT",
     body: image,
@@ -101,6 +118,7 @@ try {
   first.socket.disconnect();
 
   await server.stop();
+  if (released) originalDatabase = await readFile(join(dataDir, "owlbear.db"));
   server = await start(command);
   const list = await fetch(`${server.address}/api/rooms`, { headers: { Cookie: cookie } });
   if (list.status !== 200) throw new Error(`The sign-in did not last through the restart: ${list.status}`);
@@ -109,17 +127,46 @@ try {
   const second = await joinAsGM(server.address, room.id, cookie);
   // The acknowledgement follows the join snapshot on the same connection.
   await new Promise(resolve => second.socket.emit("get_display_token", resolve));
-  if (!second.snapshot || Object.keys(second.snapshot.scene.items).length !== 0 ||
-      second.snapshot.scene.grid.type !== "square") {
-    throw new Error("The restarted or upgraded room did not open with an empty square-grid scene");
+  const scene = second.snapshot?.scene;
+  if (!scene || scene.id !== savedSceneId || JSON.stringify(scene.items["smoke-note"]) !== JSON.stringify(note) ||
+      Object.keys(scene.items).length !== 1 || Object.entries(styledGrid).some(([key, value]) => JSON.stringify(scene.grid[key as keyof typeof scene.grid]) !== JSON.stringify(value)) ||
+      scene.fogFill !== false || scene.viewOnly !== false || "name" in scene) {
+    throw new Error("The restarted or upgraded room did not keep its scene, note, grid and new defaults");
+  }
+  if (released) {
+    const backup = await readFile(join(dataDir, "owlbear.db.before-upgrade"));
+    if (!backup.equals(originalDatabase!)) throw new Error("The pre-upgrade copy did not preserve the released database");
+    const database = new Database(join(dataDir, "owlbear.db"), { readonly: true });
+    try {
+      const version = database.query<{ user_version: number }, []>("PRAGMA user_version").get()!.user_version;
+      if (version !== 2) throw new Error(`The upgraded layout version was ${version}, expected 2`);
+    } finally { database.close(); }
   }
   if (second.ownerOnly !== false) throw new Error("The restarted or upgraded room did not default Owner Only to off");
   const kept = await fetch(`${server.address}/assets/smoke-image`, { headers: { Authorization: `Bearer ${second.token}` } });
   if (kept.status !== 200 || !Buffer.from(await kept.arrayBuffer()).equals(Buffer.from(image))) {
     throw new Error(`The image was not there after the restart: ${kept.status}`);
   }
+  const settingsAnswer = await new Promise<any>(resolve => second.socket.emit("room_switches", { tokens: false }, resolve));
+  if (!settingsAnswer.ok) throw new Error("Could not save the upgraded room");
   await Bun.sleep(1000);
   second.socket.disconnect();
+  await server.stop();
+  const database = new Database(join(dataDir, "owlbear.db"), { readonly: true });
+  try {
+    const record = database.query<{ documentVersion: number; document: string }, [string]>("SELECT documentVersion, document FROM rooms WHERE id = ?").get(room.id)!;
+    const document = JSON.parse(record.document);
+    if (record.documentVersion !== 3 || document.openSceneId !== savedSceneId || document.welcomeSceneId !== null ||
+        document.scenes[savedSceneId].name !== "Scene 1") throw new Error("The room was not saved as document version 3 with its scene name and no welcome screen");
+  } finally { database.close(); }
+  if (released) {
+    const old = Bun.spawn([released, "--port", "0", "--data-dir", dataDir], { stdout: "ignore", stderr: "pipe" });
+    const timeout = setTimeout(() => old.kill(), 10000);
+    try {
+      const error = await new Response(old.stderr).text();
+      if (await old.exited === 0 || !error.includes("newer layout version 2")) throw new Error(`The released executable did not refuse upgraded data: ${error}`);
+    } finally { clearTimeout(timeout); old.kill(); }
+  }
 } finally {
   await server.stop();
   await rm(dataDir, { recursive: true, force: true });

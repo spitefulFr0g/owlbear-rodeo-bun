@@ -59,7 +59,7 @@ test("reopened setup preserves accounts, signed-in browsers, rooms and images wh
     const observer = await server.joinRoom(room.id, "room-password");
     const map = { ...tokenItem, layer: "map" as const, locked: true, image: { type: "file" as const, file: "kept-image" } };
     const received = nextMessage(observer.socket, "scene_changes");
-    await sendBatch(owner.socket, { id: "kept", sceneId: owner.snapshot!.scene.id, changes: [{ type: "add", item: map }] });
+    await sendBatch(owner.socket, { id: "kept", sceneId: owner.snapshot!.scene!.id, changes: [{ type: "add", item: map }] });
     await received;
     const image = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 1, 2, 3, 4]);
     expect((await fetch(`${server.address}/assets/kept-image`, { method: "PUT", body: image,
@@ -68,7 +68,7 @@ test("reopened setup preserves accounts, signed-in browsers, rooms and images wh
     expect(await (await fetch(`${server.address}/api/status`, { headers: { Cookie: original.cookie } })).json()).toEqual({ setup: "open", account: original.account });
     expect((await signIn(server, "administrator", "test-password")).account).toEqual(original.account);
     const joined = await server.joinRoomAsGM(room.id, original.cookie);
-    expect(joined.snapshot!.scene.items.hero).toEqual(map);
+    expect(joined.snapshot!.scene!.items.hero).toEqual(map);
     const download = await fetch(`${server.address}/assets/kept-image`, { headers: { Authorization: `Bearer ${joined.token}` } });
     expect(download.status).toBe(200);
     expect(new Uint8Array(await download.arrayBuffer())).toEqual(image);
@@ -77,7 +77,7 @@ test("reopened setup preserves accounts, signed-in browsers, rooms and images wh
     expect((await signIn(server, "Administrator", "test-password")).account).toEqual(original.account);
     expect((await signIn(server, "Recovered", "test-password")).account.administrator).toBe(true);
     const kept = await server.joinRoomAsGM(room.id, original.cookie);
-    expect(kept.snapshot!.scene.items.hero).toEqual(map);
+    expect(kept.snapshot!.scene!.items.hero).toEqual(map);
     expect(new Uint8Array(await (await fetch(`${server.address}/assets/kept-image`, { headers: { Authorization: `Bearer ${kept.token}` } })).arrayBuffer())).toEqual(image);
   } finally { await server.dispose(); }
 });

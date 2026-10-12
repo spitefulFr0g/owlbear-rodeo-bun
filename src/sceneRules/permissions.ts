@@ -1,5 +1,15 @@
 import { Person, RoomRules, Item, Change, statusRingsKey } from "./types";
 
+/**
+ * Whether the rule refuses every change this role could make, whatever the
+ * item: a cast display always, and anyone but the GM on a view-only scene
+ * or a scene serving as the welcome screen.
+ * The interface asks this to show tools as unavailable.
+ */
+export function mayChangeNothing(role: Person["role"], rules: Pick<RoomRules, "viewOnly" | "welcomeScreen">): boolean {
+  return role === "display" || (role !== "gm" && !!(rules.viewOnly || rules.welcomeScreen));
+}
+
 /** Item permissions; shape validation and visibility are separate. */
 export function mayChange(
   person: Person,
@@ -7,7 +17,7 @@ export function mayChange(
   item: Item | undefined,
   change: Change
 ): boolean {
-  if (person.role === "display") return false;
+  if (mayChangeNothing(person.role, rules)) return false;
   if (person.role === "gm") return true;
   const target = change.type === "add" ? change.item : item;
   if (!target || target.layer === "map") return false;

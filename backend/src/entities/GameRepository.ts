@@ -2,7 +2,8 @@ import { Clock } from "../clock";
 import { OwlbearDatabase } from "../database";
 import { PlayerState } from "../types/PlayerState";
 import { PartyState } from "../types/PartyState";
-import Game from "./Game";
+import Game, { StoredScene } from "./Game";
+import { defaultSceneGrid } from "../../../src/sceneRules";
 
 export default class GameRepository {
   games: Record<string, Game>;
@@ -30,9 +31,17 @@ export default class GameRepository {
       game.trustedPlayerIds = new Set(JSON.parse(record.trustedPlayerIds ?? "[]"));
       game.gmAccountId = record.gmAccountId;
       game.hasPassword = !!record.hasPassword;
-      if (record.documentVersion === 2) {
+      if (record.documentVersion === 2 || record.documentVersion === 3) {
         const document = JSON.parse(record.document);
-        game.scene = document.scenes[document.openSceneId];
+        game.openSceneId = document.openSceneId;
+        game.welcomeSceneId = record.documentVersion === 3 ? document.welcomeSceneId : null;
+        game.scenes = Object.fromEntries(Object.entries(document.scenes).map(([id, value]) => {
+          const scene = value as StoredScene;
+          return [id, record.documentVersion === 3 ? scene : {
+            ...scene, name: "Scene 1", fogFill: false, viewOnly: false,
+            grid: { ...defaultSceneGrid, ...scene.grid },
+          }];
+        }));
       }
       this.games[gameId] = game;
     }
@@ -55,7 +64,7 @@ export default class GameRepository {
     this.database?.saveRoom({ id: game.gameId, passwordHash: game.passwordHash,
       name: game.name, gmAccountId: game.gmAccountId, hasPassword: Number(game.hasPassword),
       trustedPlayerIds: JSON.stringify([...game.trustedPlayerIds]),
-      switches: JSON.stringify(game.switches), displayToken: game.displayToken, documentVersion: 2, document: JSON.stringify({ openSceneId: game.scene.id, scenes: { [game.scene.id]: game.scene } }) });
+      switches: JSON.stringify(game.switches), displayToken: game.displayToken, documentVersion: 3, document: JSON.stringify({ openSceneId: game.openSceneId, welcomeSceneId: game.welcomeSceneId, scenes: game.scenes }) });
     this.pending.get(gameId)?.cancel();
     this.pending.delete(gameId);
   }

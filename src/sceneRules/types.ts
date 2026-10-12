@@ -118,6 +118,9 @@ export type SceneGrid = {
   };
   shown: boolean;
   snap: boolean;
+  opacity: number;
+  lineWidth: number; // world units
+  color: string; // six-digit hex colour
 };
 export const defaultSceneGrid: SceneGrid = {
   type: "square",
@@ -125,11 +128,18 @@ export const defaultSceneGrid: SceneGrid = {
   measurement: { type: "chebyshev", scale: "5ft" },
   shown: true,
   snap: true,
+  // The v0.3.0 dark square pattern: #333333, 80% opacity,
+  // six texture pixels at half scale, or three world units.
+  opacity: 0.8,
+  lineWidth: 3,
+  color: "#333333",
 };
 
 export type Scene = {
   id: string;
   grid: SceneGrid;
+  fogFill: boolean;
+  viewOnly: boolean;
   items: Record<string, Item>;
 };
 
@@ -159,5 +169,7 @@ export type RoomSwitches = {
 };
 export type RoomRules = {
   switches: RoomSwitches;
+  viewOnly?: boolean;
+  welcomeScreen?: boolean; // the scene is serving as the welcome screen outside a session
   knownImage?: (image: ImageSource) => boolean;
 };

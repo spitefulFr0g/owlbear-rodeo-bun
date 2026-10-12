@@ -1,3 +1,4 @@
+import { mayChangeNothing } from "../sceneRules";
 import { Role, RoomSwitches } from "../types/Room";
 
 /** What a role may do in a room, whatever the room's switches say */
@@ -28,14 +29,19 @@ export const defaultRoomSwitches: RoomSwitches = {
   ownerOnly: false,
 };
 
-/** Trusted players bypass switches, but retain the GM-only boundaries above. */
-export function getToolPermissions(role: Role, switches = defaultRoomSwitches) {
+/**
+ * Trusted players bypass switches, but retain the GM-only boundaries above.
+ * On a view-only scene only the GM keeps the tools that change the scene.
+ */
+export function getToolPermissions(role: Role, switches = defaultRoomSwitches, viewOnly = false) {
+  const changes = !mayChangeNothing(role, { viewOnly });
   const bypass = role === "gm" || role === "trusted";
   return {
-    tokens: bypass || switches.tokens,
-    drawing: bypass || switches.drawing,
-    notes: bypass || switches.notes,
-    fog: bypass || switches.fog,
+    select: changes,
+    tokens: changes && (bypass || switches.tokens),
+    drawing: changes && (bypass || switches.drawing),
+    notes: changes && (bypass || switches.notes),
+    fog: changes && (bypass || switches.fog),
     uploads: bypass || switches.uploads,
     measure: true,
     pointer: true,

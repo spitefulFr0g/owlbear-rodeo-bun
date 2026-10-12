@@ -79,8 +79,11 @@ export function topOrder(scene: Scene, layer: Layer): number {
 }
 export { checkChange } from "./validation";
 
-export { mayChange } from "./permissions";
+export { mayChange, mayChangeNothing } from "./permissions";
 
 export { visibleTo, changeFor } from "./visibility";
 
 export { invertChange } from "./invert";
+
+export { checkGrid } from "./grid";
+export { checkSceneName } from "./name";

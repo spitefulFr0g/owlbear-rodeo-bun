@@ -38,7 +38,7 @@ test("notes and text edits reach everyone and survive a restart", async () => {
       gm.socket.emit("get_display_token", resolve),
     );
     const display = await server.joinDisplay(room.id, displayToken);
-    const sceneId = gm.snapshot!.scene.id;
+    const sceneId = gm.snapshot!.scene!.id;
     const gmAdd = nextMessage(gm.socket, "scene_changes");
     const displayAdd = nextMessage(display.socket, "scene_changes");
     const added = await sendBatch(player.socket, {
@@ -71,7 +71,7 @@ test("notes and text edits reach everyone and survive a restart", async () => {
     expect(edited.refused).toEqual([]);
     expect((await gmEdit)[0].changes).toEqual(edited.applied);
     expect((await displayEdit)[0].changes).toEqual(edited.applied);
-    const before = (await server.joinRoomAsGM(room.id, cookie)).snapshot!.scene;
+    const before = (await server.joinRoomAsGM(room.id, cookie)).snapshot!.scene!;
     expect(before.items.note).toEqual({
       ...note,
       owner: "note-owner",
@@ -96,7 +96,7 @@ test("the text cap accepts its boundary and refuses longer adds and edits withou
     const gm = await server.joinRoomAsGM(room.id, cookie);
     await new Promise((resolve) => gm.socket.emit("session", true, resolve));
     const player = await server.joinRoom(room.id);
-    const sceneId = gm.snapshot!.scene.id;
+    const sceneId = gm.snapshot!.scene!.id;
     const accepted = await sendBatch(gm.socket, {
       id: "boundary",
       sceneId,
@@ -140,7 +140,7 @@ test("the text cap accepts its boundary and refuses longer adds and edits withou
     expect(events).toEqual([]);
     await server.restart();
     expect(
-      (await server.joinRoomAsGM(room.id, cookie)).snapshot!.scene.items,
+      (await server.joinRoomAsGM(room.id, cookie)).snapshot!.scene!.items,
     ).toEqual({
       note: { ...note, owner: "gm", text: "x".repeat(maxTextLength) },
     });

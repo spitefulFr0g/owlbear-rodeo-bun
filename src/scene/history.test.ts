@@ -3,7 +3,7 @@ import { emptyHistory, remember, historyChanges, dropStep } from "./history";
 const item: TextItem = { id: "note", kind: "text", layer: "note", position: { x: 0, y: 0 },
   scale: { x: 1, y: 1 }, rotation: 0, order: 1, owner: "gm", locked: false,
   hidden: false, metadata: {}, text: "before", color: "red", size: 150, square: true };
-const scene: Scene = { id: "scene", grid: defaultSceneGrid, items: { note: item } };
+const scene: Scene = { id: "scene", grid: defaultSceneGrid, fogFill: false, viewOnly: false, items: { note: item } };
 test("one multi-item action is one reversible step, with sequential changes undone backwards", () => {
   const changes = [{ type: "update" as const, id: item.id, fields: { text: "middle" } },
     { type: "update" as const, id: item.id, fields: { text: "after" } },

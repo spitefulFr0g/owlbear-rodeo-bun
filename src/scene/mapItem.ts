@@ -1,4 +1,6 @@
-import { gmOwner, ImageItem, Scene, SceneGrid, Vector2 } from "../sceneRules";
+import {
+  Change, defaultSceneGrid, gmOwner, ImageItem, maxSceneNameLength, Scene, SceneGrid, Vector2,
+} from "../sceneRules";
 import { Map } from "../types/Map";
 import { cellSize, snapPosition } from "./grid";
 
@@ -60,4 +62,52 @@ export function mapItem(map: Map, grid: SceneGrid, id: string, near?: Vector2): 
     width: map.width, height: map.height, label: "",
     outline: { type: "rect", x: 0, y: 0, width: map.width, height: map.height },
   };
+}
+
+/** The name the importer gives a scene: what was typed, else the map's own name. */
+export function importedSceneName(map: Map, typed: string | undefined): string {
+  return typed === undefined ? map.name.trim().slice(0, maxSceneNameLength) : typed.trim();
+}
+
+/**
+ * What one create carries for a scene made from a map: the default grid with
+ * the map's type and measurement, and the map fitted to it.
+ */
+export function sceneFromMap(map: Map, typedName: string | undefined, itemId: string) {
+  const grid = mapSceneGrid(map, defaultSceneGrid);
+  return { name: importedSceneName(map, typedName), grid, map: mapItem(map, grid, itemId) };
+}
+
+/** Whether two records of a map sit against the grid the same way: kind, cell count and inset. */
+export function sameAlignment(a: Map, b: Map): boolean {
+  const corners = (map: Map) => [map.grid.inset.topLeft, map.grid.inset.bottomRight];
+  return a.grid.type === b.grid.type &&
+    a.grid.size.x === b.grid.size.x && a.grid.size.y === b.grid.size.y &&
+    corners(a).every((corner, index) =>
+      corner.x === corners(b)[index].x && corner.y === corners(b)[index].y);
+}
+
+/**
+ * What editing a scene does to its map, and to nothing else on it. No map
+ * takes the scene's map off. The map the scene already holds is fitted again
+ * only when realigned, as the same item. Any other map goes where the old one
+ * was. The scene's grid kind follows the map's alignment, and `grid` is that
+ * grid when the kind changed; the rest of the grid is left alone.
+ */
+export function sceneMapEdit(
+  scene: Scene, map: Map | undefined, realigned: boolean, itemId: string
+): { changes: Change[]; grid?: SceneGrid } {
+  const previous = pickedMap(scene);
+  if (!map) return { changes: previous ? [{ type: "delete", id: previous.id }] : [] };
+  const held = previous && previous.metadata.pickerMapId === map.id ? previous : undefined;
+  if (held && !realigned) return { changes: [] };
+  const grid: SceneGrid = { ...scene.grid, type: map.grid.type };
+  const near = previous && mapTopLeft(previous);
+  const changes: Change[] = held
+    ? [{ type: "update", id: held.id, fields: fitMap(map, grid, near) }]
+    : [
+        ...(previous ? [{ type: "delete" as const, id: previous.id }] : []),
+        { type: "add", item: mapItem(map, grid, itemId, near) },
+      ];
+  return { changes, grid: grid.type === scene.grid.type ? undefined : grid };
 }

@@ -12,22 +12,13 @@ import { useMapData } from "../../contexts/MapDataContext";
 import { useKeyboard } from "../../contexts/KeyboardContext";
 
 import shortcuts from "../../shortcuts";
-import { Map } from "../../types/Map";
-import { MapChangeEventHandler } from "../../types/Events";
 
 type MapEditBarProps = {
-  currentMap: Map | null;
   disabled: boolean;
-  onMapChange: MapChangeEventHandler;
   onLoad: (loading: boolean) => void;
 };
 
-function MapEditBar({
-  currentMap,
-  disabled,
-  onMapChange,
-  onLoad,
-}: MapEditBarProps) {
+function MapEditBar({ disabled, onLoad }: MapEditBarProps) {
   const { maps, removeMaps } = useMapData();
   const { activeGroups, selectedGroupIds, onClearSelection } = useGroup();
 
@@ -44,10 +35,6 @@ function MapEditBar({
     const selectedMapIds = selectedMaps.map((map) => map.id);
     onClearSelection();
     await removeMaps(selectedMapIds);
-    // Removed the map from the map screen if needed
-    if (currentMap && selectedMapIds.includes(currentMap.id)) {
-      onMapChange(null);
-    }
     onLoad(false);
   }
 
