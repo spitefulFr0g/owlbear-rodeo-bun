@@ -1,0 +1,29 @@
+{
+  "status": "pass",
+  "cases": [
+    {
+      "case": "competing-move",
+      "status": "pass"
+    },
+    {
+      "case": "competing-resize",
+      "status": "pass"
+    },
+    {
+      "case": "tool-switch-move",
+      "status": "pass"
+    },
+    {
+      "case": "tool-switch-resize",
+      "status": "pass"
+    },
+    {
+      "case": "deletion",
+      "status": "pass"
+    },
+    {
+      "case": "permission-loss",
+      "status": "pass"
+    }
+  ]
+}
