@@ -125,14 +125,14 @@ Stable existing id: **selection-drag-dropped-on-scene-change** (`DEFECTS.md`). S
 
 Fresh reproduction: GM1 drags Hero from `(750,350)` to `(900,200)` and keeps its mouse held. GM2 picks up the same remotely previewed Hero and holds it at `(450,500)`. GM1 continues to render `(900,200)`, correctly overriding the remote preview. GM2 releases; **without GM1 releasing**, GM1 immediately renders `(450,500)` and loses its held interaction. `shots/verify-retry-concurrent-commit-failure.png` captures the post-commit canvas. This is the same existing item-store interaction teardown at `src/components/scene/SceneSelection.tsx:125` (the effect recreates on authoritative item-store changes), not a movement setting failure.
 
-This requires reconciling held node lifetimes with authoritative item replacement, deletion, permission changes and refused drops, plus new meaningful pure behavioural checks. It is larger than the verification worker's small-fix scope. Dispatcher must create/link a `needs-triage` issue before #130's faults-linked acceptance criterion can be checked. No GitHub mutation was performed.
+This requires reconciling held node lifetimes with authoritative item replacement, deletion, permission changes and refused drops, plus new meaningful pure behavioural checks. It is larger than the verification worker's small-fix scope. It is tracked as [#132](https://github.com/spitefulFr0g/owlbear-rodeo-bun/issues/132) with the `needs-triage` label and linked from #130. The fault-linked acceptance criterion is met; the lifecycle repair remains open for follow-up.
 
 **pre-existing-eslint-warnings** remains open: lint passes with 459 warnings, 0 errors; `logs/verify-lint-retry.log`. Reuse the existing stable id rather than silently treating warnings as new defects.
 
 ## Exact proposed #130 comment
 
-The exact body is in `comment-130.md`. It deliberately reports the failing story and the pending dispatcher fault link; it is not a claim that the release gate has passed.
+The dispatcher posted the verification summary and story results on #130, linked issue #132, and attached this report and its captures to the PR branch.
 
 ## Completion
 
-Committed retained upgrade smoke assertion as `3c2c7d75af81e68bc149b7cce1fbfa4323989ea3` on `ticket/122-verify`, with configured author and OpenAI Codex co-author attribution. Pre-commit checks passed (`logs/verify-commit-retry.log`). Integration remained `1a6e90c`, an ancestor of the verification commit; no integration changes needed merging. Worktree is clean. Closed the retry's browser tabs and stopped its port-9160 server; inherited port-9150/proxy processes were not stopped. Notes and evidence are outside the checkout, as required by NOTES.md.
+Committed retained upgrade smoke assertion as `3c2c7d75af81e68bc149b7cce1fbfa4323989ea3` on `ticket/122-verify`, with configured author and OpenAI Codex co-author attribution. Pre-commit checks passed (`logs/verify-commit-retry.log`). The dispatcher merged that assertion and published this report and captures in the PR branch, then created issue #132 and commented on #130. Closed the retry's browser tabs and stopped its port-9160 server; inherited port-9150/proxy processes were not stopped.
