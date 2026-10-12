@@ -58,3 +58,6 @@ delete it after.
 Start the backend on a spare port with its own data directory:
 `bun src/index.ts --port 9100 --data-dir <temp dir>`. A fresh data directory
 opens on the setup form.
+
+For changes to held drags, resizes, tool switching or authoritative-update
+reconciliation, run the [held interaction verification command](verification.md).

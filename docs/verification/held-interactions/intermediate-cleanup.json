@@ -1,0 +1,18 @@
+{
+  "status": "fail",
+  "cases": [
+    {
+      "case": "competing-move",
+      "status": "pass"
+    },
+    {
+      "case": "competing-resize",
+      "status": "pass"
+    },
+    {
+      "case": "tool-switch-move",
+      "status": "pass"
+    }
+  ],
+  "error": "Error: Tool switch left held resize position"
+}
