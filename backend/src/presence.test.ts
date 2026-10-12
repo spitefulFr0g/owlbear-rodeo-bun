@@ -22,8 +22,8 @@ test("presence reaches every room connection across scenes and outside sessions,
       await new Promise(resolve => gm.socket.emit("session", session, resolve));
       const messages = [gm, secondGM, player, display].map(peer => nextMessage(peer.socket, "presence_state"));
       player.socket.emit("presence_update", { ...update, userId: "forged", role: "gm", sessionId: "forged", sceneId: "secret", nested: { secret: 1 } });
-      for (const [state] of await Promise.all(messages)) {
-        expect(state[player.socket.id!]).toEqual({ ...update, userId: "browser-id", sessionId: player.socket.id, role: "player" });
+      for (const [index, [state]] of (await Promise.all(messages)).entries()) {
+        expect(state[player.socket.id!]).toEqual({ ...update, userId: "browser-id", sessionId: player.socket.id, role: "player", ...(index < 2 ? { sceneId: session ? secondGM.snapshot!.scene!.id : null } : { elsewhere: false }) });
         expect(state[gm.socket.id!].role).toBe("gm");
         expect(state[secondGM.socket.id!].role).toBe("gm");
         expect(state[display.socket.id!]).toBeUndefined();
@@ -54,7 +54,8 @@ test("malformed presence keeps the last good state, private dice are removed, an
     const states = [gm, display].map(peer => nextMessage(peer.socket, "presence_state"));
     gm.socket.emit("presence_update", { ...update, nickname: "Barrier" });
     for (const [state] of await Promise.all(states)) {
-      expect(state[player.socket.id!]).toEqual(lastGood);
+      const { sceneId, ...base } = lastGood;
+      expect(state[player.socket.id!]).toEqual(state[player.socket.id!].sceneId !== undefined ? lastGood : { ...base, elsewhere: false });
       expect(state[display.socket.id!]).toBeUndefined();
     }
     expect(received).toHaveLength(1);
@@ -82,5 +83,60 @@ test("the old party message is not relayed and changes nobody's presence", async
     player.socket.emit("presence_update", { ...update, nickname: "Barrier" });
     expect((await state)[0][player.socket.id!].nickname).toBe("Barrier");
     expect(received.map(([event]) => event)).toEqual(["presence_state"]);
+  } finally { await server.dispose(); }
+});
+
+test("scene transitions refresh private presence for players, trusted players, GMs and cast displays", async () => {
+  const server = await startTestServer();
+  try {
+    const { cookie } = await setupAdministrator(server);
+    const room = await createRoom(server, cookie, "Scenes");
+    const gm = await server.joinRoomAsGM(room.id, cookie);
+    const secondGM = await server.joinRoomAsGM(room.id, cookie);
+    const player = await server.joinRoom(room.id, "", "player");
+    const trusted = await server.joinRoom(room.id, "", "trusted");
+    await new Promise(resolve => gm.socket.emit("room_trust", "trusted", true, resolve));
+    const token = await new Promise<string>(resolve => gm.socket.emit("get_display_token", resolve));
+    const display = await server.joinDisplay(room.id, token);
+    const peers = [gm, secondGM, player, trusted, display];
+    const latest: any[] = [];
+    peers.forEach((peer, index) => peer.socket.on("presence_state", state => { latest[index] = state; }));
+    const command = async (event: string, ...args: unknown[]) => {
+      await new Promise(resolve => gm.socket.emit(event, ...args, resolve));
+      // Round trips on each recipient drain its ordered socket messages.
+      await Promise.all(peers.map(peer => new Promise(resolve => peer.socket.emit("get_display_token", resolve))));
+    };
+    const check = (sceneId: string, elsewhere: boolean) => {
+      expect(latest[0][gm.socket.id!].sceneId).toBe(sceneId);
+      expect(latest[1][gm.socket.id!].sceneId).toBe(sceneId);
+      for (const state of latest.slice(2)) {
+        expect(state[gm.socket.id!].elsewhere).toBe(elsewhere);
+        for (const presence of Object.values(state) as any[]) {
+          expect(presence).not.toHaveProperty("sceneId");
+          expect(presence).not.toHaveProperty("name");
+        }
+        expect(JSON.stringify(state)).not.toContain(sceneId);
+      }
+    };
+    const open = gm.snapshot!.scene!.id;
+    await command("session", true);
+    check(open, false);
+    const created = await new Promise<{ sceneId: string }>(resolve => gm.socket.emit("scene_create", { name: "Secret preparation" }, resolve));
+    await Promise.all(peers.map(peer => new Promise(resolve => peer.socket.emit("get_display_token", resolve))));
+    check(created.sceneId, true);
+    await command("scene_view", { sceneId: open });
+    check(open, false);
+    await command("scene_view", { sceneId: created.sceneId });
+    check(created.sceneId, true);
+    await command("scene_show", { sceneId: created.sceneId, view: { x: 0, y: 0, width: 100, height: 100 } });
+    check(created.sceneId, false);
+    await command("scene_view", { sceneId: open });
+    check(open, true);
+    await command("session", false);
+    check(open, false);
+    await command("session", true);
+    check(open, true);
+    await command("scene_delete", { sceneId: open });
+    check(created.sceneId, false);
   } finally { await server.dispose(); }
 });

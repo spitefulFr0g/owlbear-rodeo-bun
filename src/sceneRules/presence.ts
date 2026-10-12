@@ -16,6 +16,8 @@ export type Presence = PresenceUpdate & {
   sessionId: string;
   userId?: string;
   role: "gm" | "trusted" | "player";
+  sceneId?: string | null;
+  elsewhere?: boolean;
 };
 export type PresenceState = Record<string, Presence>;
 function record(value: unknown): value is Record<string, unknown> {
@@ -40,4 +42,9 @@ export function readPresence(value: unknown): PresenceUpdate | undefined {
     timer = { current: value.timer.current, max: value.timer.max };
   }
   return { nickname: value.nickname, color: value.color, dice: { share: dice.share, rolls: dice.share ? rolls : [] }, ...(timer ? { timer } : {}) };
+}
+
+/** Project server-owned viewed-scene information for one recipient. */
+export function presenceSceneFor(role: "gm" | "trusted" | "player" | "display", receiverSceneId: string | null, viewedSceneId: string | null, session: boolean): { sceneId: string | null } | { elsewhere: boolean } {
+  return role === "gm" ? { sceneId: viewedSceneId } : { elsewhere: session && viewedSceneId !== receiverSceneId };
 }
