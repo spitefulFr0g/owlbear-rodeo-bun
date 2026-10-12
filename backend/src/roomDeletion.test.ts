@@ -1,8 +1,9 @@
 import { tokenItem } from "./testing/sceneFixtures";
-import { expect, test } from "bun:test";
+import { expect, spyOn, test } from "bun:test";
 import { createHash } from "crypto";
 import { mkdir, rm, stat, writeFile } from "fs/promises";
 import { join } from "path";
+import Auth from "./entities/Auth";
 import { sendBatch, createRoom, inviteAccount, nextMessage, setupAdministrator, startTestServer } from "./testing/serverHelpers";
 
 type Server = Awaited<ReturnType<typeof startTestServer>>;
@@ -128,18 +129,26 @@ for (const method of ["HEAD", "GET", "PUT"] as const) {
 
 test("a room deleted during a password check refuses the pending join", async () => {
   const server = await startTestServer();
+  const { promise: released, resolve: releaseCheck } = Promise.withResolvers<void>();
+  const check = spyOn(Auth.prototype, "checkPassword");
   try {
     const { cookie } = await setupAdministrator(server);
     const room = await createRoom(server, cookie, "Protected", "secret");
     const socket = server.connect();
     await nextMessage(socket, "connect");
     const refused = nextMessage(socket, "room_not_found");
+    // The real hash takes about as long as the deletion, so the check is held
+    // open until the room is gone.
+    check.mockClear();
+    check.mockImplementation(async () => { await released; return true; });
     socket.emit("join_game", room.id, "secret");
-    // The next socket event is acknowledged while the password hash is pending.
+    // The server handles this next event after the join has reached the check.
     await new Promise(resolve => socket.emit("get_display_token", resolve));
+    expect(check).toHaveBeenCalledTimes(1);
     expect((await remove(server, room.id, cookie)).status).toBe(204);
+    releaseCheck();
     expect(await refused).toEqual([]);
-  } finally { await server.dispose(); }
+  } finally { releaseCheck(); check.mockRestore(); await server.dispose(); }
 });
 
 test("deleting a room frees its image files and keeps images no room has used", async () => {
