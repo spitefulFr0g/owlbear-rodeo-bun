@@ -105,6 +105,7 @@ function SceneControls() {
           <Label htmlFor="scene-grid-color">Grid colour</Label>
           <SettledInput id="scene-grid-color" type="color" value={grid.color.toLowerCase()} disabled={readOnly} onSettle={(value) => change({ color: value })} />
           <Label><Checkbox checked={scene.fogFill} disabled={readOnly} onChange={(event) => setSettings({ fogFill: event.target.checked })} />Fog Fill</Label>
+          <Label title="Show the distance moved while dragging a token."><Checkbox checked={scene.movementMode} disabled={readOnly} onChange={(event) => setSettings({ movementMode: event.target.checked })} />Movement mode</Label>
           <Label title="Only the GM can change a view-only scene. Players can still pan, zoom, point and measure."><Checkbox checked={scene.viewOnly} disabled={readOnly} onChange={(event) => setSettings({ viewOnly: event.target.checked })} />View-only</Label>
         </Box>
       </MapMenu>
