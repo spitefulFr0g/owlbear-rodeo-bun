@@ -4,6 +4,8 @@ import Konva from "konva";
 import { Group } from "react-konva";
 import { v4 as uuid } from "uuid";
 import { useScene, useToolPermissions } from "../../scene/SceneContext";
+import { useLive, useLiveDrags } from "../../scene/LiveContext";
+import { heldDrag, itemsInDrags } from "../../scene/live";
 import { worldNodeId } from "../../scene/worldPosition";
 import {
   attachesTo,
@@ -37,6 +39,7 @@ export default function SceneSelection({
   onMenuOpen: (position: { x: number; y: number } | null) => void;
 }) {
   const { scene, selection, setSelection, readOnly, act, canSelect } = useScene();
+  const { send, end, hold } = useLive();
   const stageRef = useMapStage();
   const sceneRef = useRef(scene);
   sceneRef.current = scene;
@@ -173,7 +176,33 @@ export default function SceneSelection({
         y: next.y + dx * sine + dy * cosine,
       };
     });
+    // What a held pointer gives the items, sent live to the others on the scene
+    const sendDrag = (held: Konva.Node[], pickedUp?: string) => {
+      const drag = heldDrag(
+        held.map((node) => ({
+          id: node.id(),
+          position: node.position(),
+          rotation: node.rotation(),
+          scale: node.scale(),
+        })),
+        pickedUp
+      );
+      if (drag) send("drag", drag);
+    };
+    // An abandoned drag shows the items where the store has them
+    const restore = (held: Konva.Node[]) =>
+      held.forEach((node) => {
+        const item = sceneRef.current?.items[node.id()];
+        if (!item) return;
+        node.position(item.position);
+        node.rotation(item.rotation);
+        node.scale(item.scale);
+      });
+    // Set while a drop is being committed. The store renders the batch before
+    // it is sent, which runs this effect's cleanup in the middle of the drop.
+    let landing = false;
     const finishTransform = () => {
+      landing = true;
       const changes: Change[] = selectedNodes().map((node) => ({
         type: "update",
         id: node.id(),
@@ -190,21 +219,30 @@ export default function SceneSelection({
           node.rotation(item.rotation);
           node.scale(item.scale);
         });
+      // The batch goes first, so the items land for the others with no step back
+      end("drag");
+      hold([]);
+      landing = false;
       prevent(false);
     };
-    transformer.on("transformstart", () => prevent(true));
+    transformer.on("transformstart", () => {
+      hold(selectedNodes().map((node) => node.id()));
+      prevent(true);
+    });
     transformer.on("transformend", finishTransform);
-    transformer.on("transform", () =>
+    transformer.on("transform", () => {
       transformer.rotationSnaps(
         sensitivityRef.current === -1
           ? []
           : Array.from({ length: 24 }, (_, i) => i * 15)
-      )
-    );
+      );
+      sendDrag(selectedNodes());
+    });
     let start: { x: number; y: number } | undefined;
     let moving: Konva.Node[] = [];
     let originals: Item[] = [];
     let duplicate = false;
+    let pickedUp: string | undefined;
     let box: Konva.Rect | undefined;
     const point = () =>
       world
@@ -268,6 +306,8 @@ export default function SceneSelection({
         }
         originals = moving.map((value) => scene!.items[value.id()]);
         duplicate = event.evt.altKey;
+        pickedUp = id;
+        hold(moving.map((value) => value.id()));
       } else {
         moving = [];
         box = new Konva.Rect({
@@ -302,6 +342,8 @@ export default function SceneSelection({
             y: originals[i].position.y + target.y - first.y,
           })
         );
+        // A copy is not there yet for the others to see
+        if (!duplicate) sendDrag(moving, pickedUp);
       }
       world.getLayer()?.batchDraw();
     }
@@ -321,6 +363,7 @@ export default function SceneSelection({
         box.destroy();
         box = undefined;
       } else if (moving.length) {
+        landing = true;
         const dx = moving[0].x() - originals[0].position.x;
         const dy = moving[0].y() - originals[0].position.y;
         if (duplicate) {
@@ -331,6 +374,10 @@ export default function SceneSelection({
           !act(moveSelection(originals, { x: dx, y: dy }))
         )
           moving.forEach((node, i) => node.position(originals[i].position));
+        // The batch goes first, so the items land for the others with no step back
+        end("drag");
+        hold([]);
+        landing = false;
       }
       start = undefined;
       prevent(false);
@@ -340,6 +387,12 @@ export default function SceneSelection({
     stage.on("mouseup.selection touchend.selection", up);
     return () => {
       stage.off(".selection");
+      if (!landing) {
+        if (start && moving.length) restore(moving);
+        if (transformer.isTransforming()) restore(selectedNodes());
+        end("drag");
+        hold([]);
+      }
       box?.destroy();
       // Selection effects must never reuse the destroyed transformer.
       if (transformRef.current === transformer) transformRef.current = undefined;
@@ -355,6 +408,9 @@ export default function SceneSelection({
     act,
     canSelect,
     copies,
+    send,
+    end,
+    hold,
     prevent,
     setSelection,
     stageRef,
@@ -381,17 +437,31 @@ export function SceneItems({
   fogShapes?: boolean;
 }) {
   const { scene, person } = useScene();
+  const drags = useLiveDrags();
+  // The store's items under the drags received; the store itself is not changed
+  const drawn = useMemo(
+    () => (scene ? itemsInDrags(scene.items, drags) : {}),
+    [scene, drags]
+  );
+  const fogDragged = Object.keys(drags).some(
+    (id) => drawn[id]?.layer === "fog"
+  );
+  // Fog cover is worked out again only for a drag that moves fog
+  const fogScene = useMemo(
+    () => (scene && fogDragged ? { ...scene, items: drawn } : scene),
+    [scene, fogDragged, drawn]
+  );
   const permissions = useToolPermissions();
   const [fogOpacity] = useSetting<number>("fog.editOpacity");
   const editsFog = person.role !== "display" && permissions.fog;
   const cover = useMemo(() => {
-    if (!scene || placement !== "aboveRuler" || !fogShapes || editsFog) return [];
-    const fog = fogItems(scene);
+    if (!fogScene || placement !== "aboveRuler" || !fogShapes || editsFog) return [];
+    const fog = fogItems(fogScene);
     // Hidden owned shapes remain a hint, but never contribute to coverage.
-    return [...(scene.fogFill ? [] : coveredFog(fog)), ...fog.filter(item => item.hidden).map(fogShape)];
-  }, [scene, placement, fogShapes, editsFog]);
+    return [...(fogScene.fogFill ? [] : coveredFog(fog)), ...fog.filter(item => item.hidden).map(fogShape)];
+  }, [fogScene, placement, fogShapes, editsFog]);
   if (!scene) return null;
-  const items = Object.values(scene.items)
+  const items = Object.values(drawn)
     .filter((item) =>
       placement === "belowGrid"
         ? item.layer === "map"
