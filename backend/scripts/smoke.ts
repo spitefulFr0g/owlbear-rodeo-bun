@@ -130,7 +130,7 @@ try {
   const scene = second.snapshot?.scene;
   if (!scene || scene.id !== savedSceneId || JSON.stringify(scene.items["smoke-note"]) !== JSON.stringify(note) ||
       Object.keys(scene.items).length !== 1 || Object.entries(styledGrid).some(([key, value]) => JSON.stringify(scene.grid[key as keyof typeof scene.grid]) !== JSON.stringify(value)) ||
-      scene.fogFill !== false || scene.viewOnly !== false || "name" in scene) {
+      scene.fogFill !== false || scene.viewOnly !== false || scene.movementMode !== true || "name" in scene) {
     throw new Error("The restarted or upgraded room did not keep its scene, note, grid and new defaults");
   }
   if (released) {
