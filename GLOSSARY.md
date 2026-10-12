@@ -142,8 +142,12 @@ _Avoid_: Plugin, add-on, module, mod
 ### Library
 
 **Asset**:
-A stored image that can be placed on the canvas as an image item. Every asset belongs to exactly one library.
+An image kept in a library under a name and an asset type, which can be placed on the canvas as an image item. Every asset belongs to exactly one library.
 _Avoid_: File, upload, resource
+
+**Asset type**:
+What an asset is for: Map, Prop, Mount, Character or Attachment. It is the layer the asset is placed on by default.
+_Avoid_: Category, image type, token type
 
 **Room library**:
 The assets that belong to one room. An image uploaded in a room goes here, and the library is deleted with the room.
@@ -160,6 +164,22 @@ _Avoid_: Default assets, starter set, built-ins
 **Folder**:
 A named group of assets inside one library. Folders are one level deep, and an asset is in at most one.
 _Avoid_: Group, collection, tag
+
+**Quota**:
+The most storage a library may hold. An administrator sets one for each room library and each account library.
+_Avoid_: Limit, cap, storage tier
+
+**Player quota**:
+The most storage one player's uploads may take in a room. The room's GM sets it, as one value for every player in that room.
+_Avoid_: Upload limit, allowance
+
+**Dock**:
+The strip along the bottom of a room from which assets are placed on the canvas. It has a tab for each asset type and, for the GM, a tab listing the room's scenes.
+_Avoid_: Token bar, sidebar, tray
+
+**Asset Manager**:
+The dialog in a room where a person organises the assets they can see: naming them, setting their asset type, filing them in folders, moving them between libraries and deleting them.
+_Avoid_: Map picker, token picker, library dialog
 
 **Browser library**:
 The maps and tokens a person uploaded before libraries moved to the server, kept in their own browser. It is brought into their account library once, by an import.

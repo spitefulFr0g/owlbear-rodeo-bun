@@ -26,9 +26,9 @@ A row with a split verdict names which part is which.
 
 ## Roadmap
 
-Ten steps, grouped into releases. They are built in number order, except that step 8 is built before step 7. Steps 1 to 5 run on today's canvas. Step 6 is the one large rewrite. Steps 7 to 10 build on it.
+Ten steps, grouped into releases. They are built in number order, except that step 8 is built before step 7. Steps 1 to 5 run on today's canvas. Step 6 is the one large rewrite. Steps 7 to 10 build on it. The move from Create React App to Vite is done between steps 7 and 9 and is not a numbered step.
 
-The scope through v0.4.0 is implemented. See the [v0.4.0 release notes](releases/v0.4.0.md) for scenes, live play and upgrade instructions. v0.5.0 is a forecast.
+The scope through v0.4.0 is implemented. See the [v0.4.0 release notes](releases/v0.4.0.md) for scenes, live play and upgrade instructions. v0.5.0 is planned and not built. v0.6.0 is a forecast.
 
 ### v0.1.0: the shared screen
 
@@ -131,7 +131,7 @@ Decided for this release, in [Plan v0.4.0: scenes and live play](https://github.
 - **Welcome-screen scene:** shown alone, with nothing laid over it, in place of the default welcome screen.
 - **Duplicating a scene:** an entry on a scene in the Scenes dialog makes a copy in the same room.
 - **No prototype:** step 8 is server routing and dialogs over a canvas that exists.
-- **Toolchain:** the move from Create React App to Vite is not part of this release. It is decided again before step 9.
+- **Toolchain:** the move from Create React App to Vite is not part of this release. It is done before step 9.
 - **Live play decisions:** [Live play (#122)](https://github.com/spitefulFr0g/owlbear-rodeo-bun/issues/122) records the step 7 answers.
 - **Live messages:** pointer, ruler and drag share one scene routing rule. The server checks their shape and size, sets the sender's connection id and applies a fixed rate limit. Updates are throttled to about twenty a second per kind; ends are never dropped by the transport. They are never stored, included in a snapshot or put in undo, and get no answer. Disconnecting or leaving a scene ends that connection's live marks.
 - **Live drags:** cover moving, resizing and rotating existing items, including attached items. The server keeps only items the sender may change and sends each receiver only items they may see. Hidden drags are withheld by the same owner and role rule as hidden items. A received drag selects, locks and blocks nothing; a person's own drag takes precedence on their screen. The saved change is sent before the drag ends, so the preview lands on the committed state.
@@ -142,16 +142,48 @@ Decided for this release, in [Plan v0.4.0: scenes and live play](https://github.
 - **Upgrade and rollback:** the first start upgrades the database and keeps a pre-upgrade copy beside it. Going back to v0.3.0 requires stopping the server and restoring that copy; v0.3.0 refuses upgraded data. The release notes carry this warning.
 - **Rough edges in v0.3.0:** the ones found in the hand check are fixed as v0.3.1 and are not part of either spec. See [Interface rough edges found in the v0.3.0 hand check](https://github.com/spitefulFr0g/owlbear-rodeo-bun/issues/106).
 
-### v0.5.0: libraries and tools
+### v0.5.0: libraries and dock
 
 | Step | What is built |
 | --- | --- |
-| 9. Libraries and dock | The room library, the account library and the server set ([ADR 0005](adr/0005-assets-belong-to-a-room-or-an-account.md)). A dock along the bottom and one Asset Manager, replacing the token bar, the two pickers and the Scenes dialog. Dropping an image file on the canvas with a type picker. The one-off import of a browser library into the account library. Today's Import / Export dialog and the `.owlbear` file are removed. |
+| 9. Libraries and dock | The room library, the account library and the server set ([ADR 0005](adr/0005-assets-belong-to-a-room-or-an-account.md)). A dock along the bottom and one Asset Manager, replacing the token bar, the two pickers and the Scenes dialog. Dropping image files on the canvas with a type picker. A quota on each room library and account library, and a player quota in each room. The one-off import of a browser library into the account library. Today's Import / Export dialog and the `.owlbear` file are removed. |
+
+The asset library stays in the browser until step 9. The reference suggested moving it to the server during the storage work, before the item model. It waits so that the server library is built once, against asset types that are layers, and not first against today's separate map and token tables.
+
+Decided for this release, in [Plan v0.5.0: libraries and dock](https://github.com/spitefulFr0g/owlbear-rodeo-bun/issues/136):
+
+- **One step:** v0.5.0 is step 9 alone. Step 10 was forecast for this release and moved to v0.6.0, with the removal of the browser library code.
+- **Before step 9:** the rough edges in [Interface rough edges found in the v0.3.0 hand check](https://github.com/spitefulFr0g/owlbear-rodeo-bun/issues/106) are fixed as v0.4.1, except the grid size read from a file name, which is fixed in step 9 with the merged image editor. Then the interface moves to Vite, and one throwaway prototype of the dock and the Asset Manager is built on fixed data before the spec is written.
+- **Toolchain:** the move to Vite is its own piece of work with nothing else in it. Vitest replaces Jest, the interface builds on the current Node, and the Docker build for Node 16 is removed. Yarn, React 17 and the present TypeScript stay unless Vite forces a change.
+- **Asset:** a library entry with one name, one asset type and one home library, pointing at its original image and the copies made from it. The uploading browser makes the thumbnail, the downscaled copies and the outline, and the server never parses an image.
+- **Server set:** it stays bundled in the interface and referenced by key. An administrator cannot change it.
+- **Rooms at the changeover:** the upgrade creates no library entries. Placed items keep working, every room library starts empty, and names and folders come back through the browser library import into the account library.
+- **Uploads:** every upload in a room lands in the room library, whatever filter is showing. The only ways into the account library are "Add to my library" and the browser library import. The same image uploaded twice into one library shows the existing asset.
+- **Moving:** the GM can move any room asset, including a player's upload, which then leaves that player's dock. A moved asset lands at the top level of the other library and loses its folder.
+- **Account library:** it is seen only in the rooms its account runs. An account holder in someone else's room is an ordinary player. A removed account's folders pass to the administrator with its library and merge by name.
+- **Trusted players:** their dock is a player's dock. They may upload with the uploads switch off.
+- **What a player may place:** an image in the server set, their own upload, or an image already placed in a scene of that room, with uploads on or off. A room asset the GM has not placed cannot be placed by a player.
+- **Dock:** a tab per asset type and a Scenes tab. The Map and Scenes tabs are the GM's alone. It collapses to its tab strip, is hidden in fullscreen, and carries the same filter and search as the Asset Manager, with folders as expandable groups.
+- **Asset Manager:** it exists only inside a room. The GM sees this room, then my library, then the server set, under a heading each, and a filter narrows to one. A player has it over their own uploads only, and the GM sees those ungrouped under a "from players" heading.
+- **Order:** folders first by name, then assets by name or newest first, remembered per browser. Arranging tiles by hand is dropped. Dragging a tile onto a folder still files it.
+- **Editing an asset:** it changes only items placed afterwards.
+- **Maps from the dock:** dragging a Map asset places it on the Map layer at the drop point, locked and unaligned. "New scene" in the Scenes tab is the only route through the importer, and offers a Map asset from the libraries or a fresh upload.
+- **Dropping files:** one type picker for the whole drop, defaulting to Character, with Map offered to the GM only. Each file becomes a room asset and one placed item.
+- **Live:** library changes reach every connection entitled to see them at once. The GM's connections get everything and a player's get that browser's own uploads.
+- **Player quota:** the most one player's uploads may take in a room, 100 MB by default. One value for every player in the room, trusted or not, set by the GM in the room's settings up to the room's quota.
+- **Room and account quotas:** 2 GB by default for each room library and each account library, set by an administrator alone. The room quota is the limit that holds when a player returns under a new browser id. There is no quota for the whole server and no setting for the defaults.
+- **What a quota counts:** an asset's original, thumbnail and downscaled copies. An image in two libraries counts in full in each. Deleting an asset frees quota at once. Lowering a quota below what is held deletes nothing and refuses new uploads and moves in.
+- **Caps:** the number of assets and folders in a library and the length of a name have fixed caps far above real play, checked by the server, and are not settings.
+- **Unused files:** they are cleared when the server starts and when a room is deleted, so undo within a sitting always finds its image.
+- **Sizes shown:** a room's size is its saved document, its room library and any other image its scenes place. The account library's size is one more line on the room list.
+
+### v0.6.0: small tools
+
+| Step | What is built |
+| --- | --- |
 | 10. Small tools | The text tool, with colour and size. Notes and text that start hidden. Adjustable stroke width. Duplicate numbering. Double-click to select a locked item. A check that Space pans mid-shape. |
 
-The asset library stays in the browser until step 9. The reference suggested moving it to the server during the storage work, before the item model. It waits so that the server library is built once, against image types that are layers, and not first against today's separate map and token tables.
-
-The browser library import ships in the release that contains step 9 and is removed in the release after it, with the rest of the browser library code. See [Decide how the existing browser library is imported into the account library](https://github.com/spitefulFr0g/owlbear-rodeo-bun/issues/27).
+The browser library import ships in v0.5.0 and is removed in v0.6.0, with the rest of the browser library code. See [Decide how the existing browser library is imported into the account library](https://github.com/spitefulFr0g/owlbear-rodeo-bun/issues/27). The id a browser keeps for its player, the nickname and the settings are stored beside the browser library and stay where they are.
 
 ### Not scheduled
 
@@ -171,7 +203,6 @@ Decisions that are known to be needed and are not made yet, with the step that n
 
 | Question | Needed by |
 | --- | --- |
-| Whether the interface moves from Create React App to Vite. | Step 9 |
 | Whether extensions written for `@owlbear-rodeo/sdk` should load unchanged. | The extension platform |
 
 ## Verdicts by section
@@ -261,7 +292,7 @@ Decisions: [Decide the access model: server password, local accounts, or both](h
 | Request to join with GM approval | Later | | The room password stays the only gate on joining. |
 | Invite Players button that copies the link | In | 4 | |
 | Storage manager: usage | In | 4 | Per room on the room list; the server total for the administrator. An image used in two rooms counts in both, and the server total counts disk space actually used. |
-| Storage manager: quotas | Later | | Today's per-file size cap stays. |
+| Storage manager: quotas | In: a quota per room library and per account library, and a player quota per room. Later: a quota for the whole server | 9 | Today's per-file size cap stays. |
 | Storage manager: backup export and import | In as a copy of the data directory. Later: in-app export and import of one room | 3 | Taken with the server stopped. A snapshot written by the running server is Later. |
 | Converter from 1.0 data | Out for placed state. In: the browser library import | 9 | Read from the browser's own database by any signed-in account; there is no file route. |
 | Room metadata bag | Later | | With extensions. |
@@ -323,11 +354,11 @@ Decision: [Screen asset manager and image features (sections F and G)](https://g
 
 | Feature | Verdict | Step | Note |
 | --- | --- | --- | --- |
-| Six image types | In: Map, Prop, Mount, Character, Attachment. Later: Note | 9 | A type is the image's default layer. Notes stay text items. |
+| Six image types | In: Map, Prop, Mount, Character, Attachment. Later: Note | 9 | Called asset types. A type is the layer an asset is placed on by default. Notes stay text items. |
 | Dock along the bottom, a tab per type plus Scenes | In | 9 | Replaces the token bar and the Scenes dialog. |
 | Dock search with fuzzy name match and a tag preview | In: search. Out: tag preview | 9 | |
 | Asset Manager dialog | In | 9 | One dialog replaces the map picker and the token picker. |
-| Sort by created or by name | In | 9 | |
+| Sort by created or by name | In | 9 | Replaces arranging tiles by hand. |
 | Folders | In as today's one-level groups. Later: nesting, colours, "Move to" | 9 | One list of folders per library, holding images of any type. |
 | Collections per campaign | In as the room library and the account library | 9 | There is no collection to create or switch. |
 | Tags | Out | | |
@@ -335,7 +366,7 @@ Decision: [Screen asset manager and image features (sections F and G)](https://g
 | Drop an image from another web page | Later | | What works today stays. |
 | Importer defaults | In: type, size mode, label, and a saved grid on a map. Later: visible, locked, rotation, text colour, font | 9 | Aligning a map while creating a scene saves the alignment to the asset. The scene still owns its grid. |
 | Image editor with a grid preview | In | 9 | Today's two edit dialogs, merged. |
-| Starter sets | In as the server set. Out: third-party creator sets, tutorial scene | 9 | |
+| Starter sets | In as the server set. Out: third-party creator sets, tutorial scene. Later: images added by an administrator | 9 | |
 | Video as image content | Out | | |
 
 Added by the decision:
@@ -344,6 +375,14 @@ Added by the decision:
 | --- | --- | --- | --- |
 | "Add to my library" moves an asset from a room library to the account library | In | 9 | A move, not a copy. |
 | A player's dock shows the server set and their own uploads | In | 9 | Never the room library or the GM's account library. |
+
+Added in [Plan v0.5.0: libraries and dock](https://github.com/spitefulFr0g/owlbear-rodeo-bun/issues/136):
+
+| Feature | Verdict | Step | Note |
+| --- | --- | --- | --- |
+| A player's Asset Manager over their own uploads | In | 9 | Rename, change the asset type, file in folders, delete. |
+| Arranging tiles by hand | Out | | Replaced by the two sorts and search. |
+| Moving a whole folder between libraries | Later | | A moved asset lands at the top level. |
 
 ### G. Images on the canvas
 
