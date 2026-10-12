@@ -1,4 +1,4 @@
-import { applyChange, visibleTo, changeFor, Item, Scene, mayChange, Person, checkChange, readBatch, topOrder, gmOwner, Change, SceneGrid, checkGrid, defaultSceneGrid, checkSceneName, maxScenes, readLive, LiveMessage, maxLiveMessagesPerSecond } from "../../../src/sceneRules";
+import { applyChange, visibleTo, changeFor, Item, Scene, mayChange, Person, checkChange, readBatch, topOrder, gmOwner, Change, SceneGrid, checkGrid, defaultSceneGrid, checkSceneName, maxScenes, readLive, dragFrom, dragFor, LiveMessage, maxLiveMessagesPerSecond } from "../../../src/sceneRules";
 import { randomBytes } from "crypto";
 import Accounts from "../accounts/Accounts";
 import { clientAddress } from "../clientRequest";
@@ -91,19 +91,15 @@ export default class GameServer {
     const game = this.gameRepo.games[gameId];
     const scene = game?.scenes[message.sceneId];
     if (!scene || socket.data.castDisplay || socket.data.viewedSceneId !== scene.id) return;
-    const dragItems = message.kind === "drag" && message.state ? message.state.items.filter(item => {
-      const target = Object.hasOwn(scene.items, item.id) ? scene.items[item.id] : undefined;
-      return !!target && mayChange(this.person(socket, gameId), {
-        switches: game.switches, viewOnly: scene.viewOnly,
-        welcomeScreen: !game.session && game.welcomeSceneId === scene.id,
-      }, target, { type: "update", id: item.id,
-        fields: { position: item.position, rotation: item.rotation, scale: item.scale } });
-    }) : undefined;
+    const dragItems = message.kind === "drag" && message.state ? dragFrom(this.person(socket, gameId), {
+      switches: game.switches, viewOnly: scene.viewOnly,
+      welcomeScreen: !game.session && game.welcomeSceneId === scene.id,
+    }, scene.items, message.state.items) : undefined;
     if (dragItems && !dragItems.length) return;
     for (const id of this.io.sockets.adapter.rooms.get(gameId) || []) {
       const peer = this.io.sockets.sockets.get(id);
       if (!peer || peer.id === socket.id || peer.data.viewedSceneId !== scene.id) continue;
-      const items = dragItems?.filter(item => visibleTo(this.person(peer, gameId), scene.items[item.id]));
+      const items = dragItems && dragFor(this.person(peer, gameId), scene.items, dragItems);
       if (items && !items.length) continue;
       peer.emit("live", { sceneId: scene.id, kind: message.kind,
         state: items ? { items } : message.state, connectionId: socket.id });

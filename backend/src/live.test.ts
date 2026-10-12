@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { Socket } from "socket.io-client";
-import { maxLiveMessagesPerSecond, ReceivedLiveMessage } from "../../src/sceneRules";
+import { maxLiveMessagesPerSecond, maxChanges, ReceivedLiveMessage } from "../../src/sceneRules";
 import { createRoom, nextMessage, setupAdministrator, startTestServer, sendBatch } from "./testing/serverHelpers";
 import { tokenItem } from "./testing/sceneFixtures";
 const action = (socket: Socket, event: string, value: unknown) => new Promise<{ ok: boolean; sceneId: string }>(resolve => socket.emit(event, value, resolve));
@@ -128,11 +128,75 @@ test("live drags use current change permissions and visibility for each receiver
     const results = await Promise.all(messages);
     expect(results[0][0].state.items).toEqual(drag.state.items);
     for (const result of results.slice(1)) expect(result[0].state.items).toEqual([transform("hero")]);
+    const playerDrag = [gm, other, display].map(peer => nextMessage(peer.socket, "live"));
+    player.socket.emit("live", { ...drag, connectionId: "forged" });
+    const playerResults = await Promise.all(playerDrag);
+    expect(playerResults[0][0]).toEqual({ ...drag, connectionId: player.socket.id });
+    for (const result of playerResults.slice(1)) expect(result[0]).toEqual({
+      ...drag, state: { items: [transform("hero")] }, connectionId: player.socket.id,
+    });
+    const hiddenOnly: unknown[] = []; other.socket.on("live", value => hiddenOnly.push(value));
+    const hiddenSeen = nextMessage(player.socket, "live");
+    gm.socket.emit("live", { ...drag, state: { items: [transform("hidden")] } }); await hiddenSeen;
+    const shownSeen = nextMessage(other.socket, "live"); gm.socket.emit("live", pointer(sceneId)); await shownSeen;
+    expect(hiddenOnly).toEqual([{ ...pointer(sceneId), connectionId: gm.socket.id }]);
+    // A permission change takes effect on the very next preview.
+    await sendBatch(gm.socket, { id: "lock", sceneId, changes: [{ type: "update", id: "hero", fields: { locked: true } }] });
     const received: unknown[] = []; gm.socket.on("live", value => received.push(value));
-    player.socket.emit("live", { ...drag, state: { items: [transform("locked"), transform("missing")] } });
+    player.socket.emit("live", { ...drag, state: { items: [transform("hero"), transform("locked"), transform("missing")] } });
     await action(gm.socket, "scene_settings", { sceneId, viewOnly: true });
     player.socket.emit("live", drag);
     const sentinel = nextMessage(gm.socket, "live"); player.socket.emit("live", pointer(sceneId)); await sentinel;
     expect(received).toEqual([{ ...pointer(sceneId), connectionId: player.socket.id }]);
+  } finally { await server.dispose(); }
+});
+
+test("drags relay without persistence or replay, discard invalid packets, and end after the committed drop", async () => {
+  const server = await startTestServer();
+  try {
+    const { cookie } = await setupAdministrator(server), room = await createRoom(server, cookie, "Drags");
+    const gm = await server.joinRoomAsGM(room.id, cookie);
+    await action(gm.socket, "session", true);
+    const player = await server.joinRoom(room.id, "", "player");
+    const sceneId = gm.snapshot!.scene!.id;
+    await sendBatch(gm.socket, { id: "seed", sceneId, changes: [{ type: "add", item: tokenItem }] });
+    const transform = { id: "hero", position: { x: 42, y: 67 }, rotation: 90, scale: { x: 2, y: 3 } };
+    const drag = { sceneId, kind: "drag", state: { items: [transform] } };
+    const received: unknown[] = []; gm.socket.on("live", value => received.push(value));
+    player.socket.emit("live", { ...drag, state: { items: Array(maxChanges + 1).fill(transform) } });
+    player.socket.emit("live", { ...drag, state: { items: [{ ...transform, rotation: "bad" }] } });
+    const valid = nextMessage(gm.socket, "live"); player.socket.emit("live", drag); await valid;
+    expect(received).toEqual([{ ...drag, connectionId: player.socket.id }]);
+    const newcomer = await server.joinRoomAsGM(room.id, cookie);
+    expect(newcomer.snapshot!.scene!.items.hero.position).toEqual(tokenItem.position);
+    await server.restart();
+    const restarted = await server.joinRoomAsGM(room.id, cookie);
+    expect(restarted.snapshot!.scene!.items.hero).toEqual(newcomer.snapshot!.scene!.items.hero);
+    const sender = await server.joinRoomAsGM(room.id, cookie), events: string[] = [];
+    restarted.socket.on("scene_changes", () => events.push("change"));
+    restarted.socket.on("live", () => events.push("end"));
+    await sendBatch(sender.socket, { id: "drop", sceneId, changes: [{ type: "update", id: "hero", fields: { position: transform.position } }] });
+    const ended = nextMessage(restarted.socket, "live");
+    sender.socket.emit("live", { sceneId, kind: "drag", state: null }); await ended;
+    expect(events).toEqual(["change", "end"]);
+  } finally { await server.dispose(); }
+});
+
+test("welcome scenes relay GM drags and reliable player ends but refuse player updates", async () => {
+  const server = await startTestServer();
+  try {
+    const { cookie } = await setupAdministrator(server), room = await createRoom(server, cookie, "Welcome drags");
+    const gm = await server.joinRoomAsGM(room.id, cookie), sceneId = gm.snapshot!.scene!.id;
+    await sendBatch(gm.socket, { id: "seed", sceneId, changes: [{ type: "add", item: tokenItem }] });
+    await action(gm.socket, "scene_welcome", { sceneId });
+    const player = await server.joinRoom(room.id, "", "player");
+    const drag = { sceneId, kind: "drag", state: { items: [{ id: "hero", position: { x: 42, y: 67 }, rotation: 90, scale: { x: 2, y: 3 } }] } };
+    const seen = nextMessage(player.socket, "live"); gm.socket.emit("live", drag);
+    expect((await seen)[0]).toEqual({ ...drag, connectionId: gm.socket.id });
+    const received: unknown[] = []; gm.socket.on("live", value => received.push(value));
+    player.socket.emit("live", drag);
+    const end = { sceneId, kind: "drag", state: null };
+    const ended = nextMessage(gm.socket, "live"); player.socket.emit("live", end); await ended;
+    expect(received).toEqual([{ ...end, connectionId: player.socket.id }]);
   } finally { await server.dispose(); }
 });

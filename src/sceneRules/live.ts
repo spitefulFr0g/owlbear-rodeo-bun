@@ -1,5 +1,7 @@
 import { maxChanges } from "./caps";
-import { Vector2 as Point } from "./types";
+import { Vector2 as Point, Item, Person, RoomRules } from "./types";
+import { mayChange } from "./permissions";
+import { visibleTo } from "./visibility";
 
 export type LiveKind = "pointer" | "ruler" | "drag";
 export type LiveTransform = { id: string; position: Point; rotation: number; scale: Point };
@@ -42,4 +44,18 @@ export function readLive(value: unknown): LiveMessage | undefined {
     }
     return { sceneId, kind, state: { items } };
   }
+}
+
+/** Filter against authoritative items, never metadata supplied in a live packet. */
+export function dragFrom(person: Person, rules: RoomRules, items: Record<string, Item>, drag: LiveTransform[]): LiveTransform[] {
+  return drag.filter(transform => {
+    const item = Object.prototype.hasOwnProperty.call(items, transform.id) ? items[transform.id] : undefined;
+    return !!item && mayChange(person, rules, item, { type: "update", id: transform.id,
+      fields: { position: transform.position, rotation: transform.rotation, scale: transform.scale } });
+  });
+}
+
+/** Keep the same order while showing only items this receiver can see. */
+export function dragFor(person: Person, items: Record<string, Item>, drag: LiveTransform[]): LiveTransform[] {
+  return drag.filter(transform => Object.prototype.hasOwnProperty.call(items, transform.id) && visibleTo(person, items[transform.id]));
 }
