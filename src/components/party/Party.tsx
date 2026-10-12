@@ -15,7 +15,9 @@ import DiceTrayButton from "./DiceTrayButton";
 
 import useSetting from "../../hooks/useSetting";
 
-import { useRole } from "../../contexts/RoomContext";
+import { useRole, useRoom } from "../../contexts/RoomContext";
+import { useScene } from "../../scene/SceneContext";
+import { presenceSceneMark } from "../../helpers/presenceScene";
 import { useParty } from "../../contexts/PartyContext";
 import { usePlayerState, usePlayerUpdater } from "../../contexts/PlayerContext";
 import { DiceRoll } from "../../types/Dice";
@@ -32,6 +34,8 @@ function Party({ gameId, roomSettings, onTrustChange }: PartyProps) {
   const playerState = usePlayerState();
   const partyState = useParty();
   const role = useRole();
+  const room = useRoom();
+  const { scene, sceneList } = useScene();
 
   const [fullScreen] = useSetting<boolean>("map.fullScreen");
   const [shareDice, setShareDice] = useSetting<boolean>("dice.shareDice");
@@ -80,13 +84,10 @@ function Party({ gameId, roomSettings, onTrustChange }: PartyProps) {
   }
 
   function handleDiceRollsChange(newDiceRolls: DiceRoll[]) {
-    setPlayerState(
-      (prevState) => ({
-        ...prevState,
-        dice: { share: shareDice, rolls: newDiceRolls },
-      }),
-      shareDice
-    );
+    setPlayerState((prevState) => ({
+      ...prevState,
+      dice: { share: shareDice, rolls: newDiceRolls },
+    }));
   }
 
   function handleShareDiceChange(newShareDice: boolean) {
@@ -141,26 +142,30 @@ function Party({ gameId, roomSettings, onTrustChange }: PartyProps) {
             role={role}
             color={playerState.color}
           />
-          {Object.entries(partyState).map(([id, { nickname, dice, role: playerRole, userId, color }]) => (
-            <Box key={id} mb={2}>
-              <Nickname
-                nickname={nickname}
-                diceRolls={dice.share ? dice.rolls : undefined}
-                role={playerRole}
-                color={color}
-              />
-              {role === "gm" && playerRole !== "gm" && userId && onTrustChange && (
-                <Button
-                  variant="secondary"
-                  sx={{ fontSize: 0, width: "100%", padding: 1 }}
-                  aria-label={`${playerRole === "trusted" ? "Unmark" : "Mark"} ${nickname} as trusted`}
-                  onClick={() => onTrustChange(userId, playerRole !== "trusted")}
-                >
-                  {playerRole === "trusted" ? "Unmark trusted" : "Mark trusted"}
-                </Button>
-              )}
-            </Box>
-          ))}
+          {Object.entries(partyState).map(([id, presence]) => {
+            const { nickname, dice, role: playerRole, userId, color } = presence;
+            return (
+              <Box key={id} mb={2}>
+                <Nickname
+                  nickname={nickname}
+                  diceRolls={dice.share ? dice.rolls : undefined}
+                  role={playerRole}
+                  color={color}
+                  sceneMark={presenceSceneMark(presence, role, room.session, scene?.id, sceneList)}
+                />
+                {role === "gm" && playerRole !== "gm" && userId && onTrustChange && (
+                  <Button
+                    variant="secondary"
+                    sx={{ fontSize: 0, width: "100%", padding: 1 }}
+                    aria-label={`${playerRole === "trusted" ? "Unmark" : "Mark"} ${nickname} as trusted`}
+                    onClick={() => onTrustChange(userId, playerRole !== "trusted")}
+                  >
+                    {playerRole === "trusted" ? "Unmark trusted" : "Mark trusted"}
+                  </Button>
+                )}
+              </Box>
+            );
+          })}
           {playerState.timer && <Timer timer={playerState.timer} index={0} />}
           {Object.entries(partyState)
             .filter(([_, { timer }]) => timer)

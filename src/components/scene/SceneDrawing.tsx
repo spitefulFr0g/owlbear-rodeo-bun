@@ -1,3 +1,4 @@
+import { memo } from "react";
 import Konva from "konva";
 import { Circle, Group, Line, Rect } from "react-konva";
 import colors from "../../helpers/colors";
@@ -54,4 +55,4 @@ function SceneDrawing({ item, ...props }: { item: DrawingItem } & Konva.NodeConf
   );
 }
 
-export default SceneDrawing;
+export default memo(SceneDrawing);

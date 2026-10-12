@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import Konva from "konva";
 import { Group, Rect, Text } from "react-konva";
 import colors from "../../helpers/colors";
@@ -77,4 +77,4 @@ function SceneText({ item, ...props }: { item: TextItem } & Konva.NodeConfig) {
     </Group>
   );
 }
-export default SceneText;
+export default memo(SceneText);

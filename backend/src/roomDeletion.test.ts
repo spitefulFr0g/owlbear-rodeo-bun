@@ -46,8 +46,8 @@ test("an administrator deleting another GM's room tells every player and cast di
     const writer = await server.joinRoomAsGM(room.id, other.cookie);
     await new Promise(resolve => writer.socket.emit("session", true, resolve));
     const player = await server.joinRoom(room.id);
-    const party = nextMessage(player.socket, "party_state");
-    writer.socket.emit("player_state", { userId: "gm" });
+    const party = nextMessage(player.socket, "presence_state");
+    writer.socket.emit("presence_update", { nickname: "", color: "blue", dice: { share: false, rolls: [] }, userId: "gm" });
     await party;
     await sendBatch(writer.socket, { id: "map", sceneId: writer.snapshot!.scene!.id, changes: [{ type: "add", item: { ...tokenItem, layer: "map", locked: true } }] });
     const displayToken = await new Promise<string>(resolve => writer.socket.emit("get_display_token", resolve));

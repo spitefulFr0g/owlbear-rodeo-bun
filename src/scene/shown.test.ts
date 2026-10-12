@@ -33,7 +33,7 @@ function image(id: string, fields: Partial<ImageItem> = {}): ImageItem {
 function scene(...items: ImageItem[]): Scene {
   const byId: Scene["items"] = {};
   for (const item of items) byId[item.id] = item;
-  return { id: "scene", grid: defaultSceneGrid, fogFill: false, viewOnly: false, items: byId };
+  return { id: "scene", grid: defaultSceneGrid, fogFill: false, viewOnly: false, movementMode: true, items: byId };
 }
 
 describe("changes another connection made", () => {
@@ -275,22 +275,23 @@ test("an image names every stored file it can be drawn from", () => {
 describe("scene settings the server accepted", () => {
   const hex = { ...defaultSceneGrid, type: "hexVertical" as const };
 
-  test("replace the grid, Fog Fill and view-only of the scene they name and keep the items", () => {
+  test("replace the grid, Fog Fill, view-only and movement mode of the scene they name and keep the items", () => {
     const before = scene(image("a"));
-    const after = afterSettings(before, { sceneId: "scene", grid: hex, fogFill: true, viewOnly: true });
+    const after = afterSettings(before, { sceneId: "scene", grid: hex, fogFill: true, viewOnly: true, movementMode: false });
     expect(after?.grid).toEqual(hex);
     expect(after?.fogFill).toBe(true);
     expect(after?.viewOnly).toBe(true);
+    expect(after?.movementMode).toBe(false);
     expect(after?.id).toBe("scene");
     expect(after?.items).toEqual(before.items);
   });
 
   test("are ignored when they name another scene", () => {
     const before = scene();
-    expect(afterSettings(before, { sceneId: "other", grid: hex, fogFill: true, viewOnly: true })).toBe(before);
+    expect(afterSettings(before, { sceneId: "other", grid: hex, fogFill: true, viewOnly: true, movementMode: true })).toBe(before);
   });
 
   test("are ignored before the scene has arrived", () => {
-    expect(afterSettings(null, { sceneId: "scene", grid: hex, fogFill: true, viewOnly: true })).toBeNull();
+    expect(afterSettings(null, { sceneId: "scene", grid: hex, fogFill: true, viewOnly: true, movementMode: true })).toBeNull();
   });
 });

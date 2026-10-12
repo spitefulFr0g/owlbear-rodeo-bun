@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useContext } from "react";
 import Session from "../network/Session";
 
-import { PartyState } from "../types/PartyState";
+import { PresenceState } from "../sceneRules";
 
-const PartyContext = React.createContext<PartyState | undefined>(undefined);
+/** The presences of everyone else in the room */
+const PartyContext = React.createContext<PresenceState | undefined>(undefined);
 
 type PartyProviderProps = {
   session: Session;
@@ -11,10 +12,10 @@ type PartyProviderProps = {
 };
 
 export function PartyProvider({ session, children }: PartyProviderProps) {
-  const [partyState, setPartyState] = useState<PartyState>({});
+  const [partyState, setPartyState] = useState<PresenceState>({});
 
   useEffect(() => {
-    function handleSocketPartyState(partyState: PartyState) {
+    function handleSocketPartyState(partyState: PresenceState) {
       if (partyState && session.id) {
         const { [session.id]: _, ...otherMembersState } = partyState;
         setPartyState(otherMembersState);
@@ -23,10 +24,10 @@ export function PartyProvider({ session, children }: PartyProviderProps) {
       }
     }
 
-    session.socket?.on("party_state", handleSocketPartyState);
+    session.socket?.on("presence_state", handleSocketPartyState);
 
     return () => {
-      session.socket?.off("party_state", handleSocketPartyState);
+      session.socket?.off("presence_state", handleSocketPartyState);
     };
   });
 

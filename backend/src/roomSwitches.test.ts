@@ -18,7 +18,7 @@ test("room switches default, reject players and malformed changes, broadcast and
     for (const invalid of [null, [], { ownerOnly: 1 }, { tokens: false, unknown: true }]) {
       expect(await change(gm.socket, invalid)).toEqual({ ok: false, error: "invalid" });
     }
-    gm.socket.emit("player_state", { userId: "gm" });
+    gm.socket.emit("presence_update", { nickname: "", color: "blue", dice: { share: false, rolls: [] }, userId: "gm" });
     const token = await new Promise<string>(resolve => gm.socket.emit("get_display_token", resolve));
     const display = await server.joinDisplay(room.id, token);
     expect(display.info.room.switches).toEqual(defaults);

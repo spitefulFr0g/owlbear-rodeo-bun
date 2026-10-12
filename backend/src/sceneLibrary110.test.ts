@@ -5,6 +5,7 @@ import { createRoom, nextMessage, sendBatch, setupAdministrator, startTestServer
 
 const action = (socket: Socket, event: string, value: unknown): Promise<any> =>
   new Promise(resolve => socket.emit(event, value, resolve));
+const pointer = (sceneId: string, x: number) => ({ sceneId, kind: "pointer", state: { position: { x, y: 2 }, visible: true } });
 const barrier = (socket: Socket) => new Promise(resolve => socket.emit("get_display_token", resolve));
 const token: ImageItem = { id: "hero", kind: "image", layer: "character", position: { x: 150, y: 300 }, rotation: 0,
   scale: { x: 1, y: 1 }, order: 999, owner: "forged", locked: false, hidden: false, metadata: {},
@@ -29,7 +30,7 @@ test("GM scene lists arrive between join and snapshot, and creating a scene save
     const updated = nextMessage(socket, "scene_list");
     const result = await action(socket, "scene_create", { name: "  Ambush  " });
     expect(result.ok).toBe(true);
-    expect((await snapshot)[0]).toEqual({ scene: { id: result.sceneId, grid: defaultSceneGrid, fogFill: false, viewOnly: false, items: {} } });
+    expect((await snapshot)[0]).toEqual({ scene: { id: result.sceneId, grid: defaultSceneGrid, fogFill: false, viewOnly: false, movementMode: true, items: {} } });
     expect((await updated)[0].scenes).toContainEqual({ id: result.sceneId, name: "Ambush", viewOnly: false });
     const copy = await server.durableCopy();
     try {
@@ -59,7 +60,9 @@ test("GM connections prepare independently while changes, grids and pointers sta
     const display = await server.joinDisplay(room.id, displayToken);
     const unwanted: unknown[] = [];
     for (const peer of [other, player, display]) {
-      for (const event of ["scene_snapshot", "scene_changes", "scene_settings", "player_pointer"]) peer.socket.on(event, value => unwanted.push(value));
+      for (const event of ["scene_snapshot", "scene_changes", "scene_settings"]) peer.socket.on(event, value => unwanted.push(value));
+      // The GM leaving the open scene ends its live marks there; nothing else live may follow.
+      peer.socket.on("live", value => { if (value.state !== null) unwanted.push(value); });
     }
     const otherList = nextMessage(other.socket, "scene_list");
     const { sceneId } = await action(gm.socket, "scene_create", { name: "Preparation" });
@@ -67,7 +70,7 @@ test("GM connections prepare independently while changes, grids and pointers sta
     const answer = await sendBatch(gm.socket, { id: "prepare", sceneId, changes: [{ type: "add", item: token }] });
     expect(answer.applied).toHaveLength(1);
     expect(await action(gm.socket, "scene_settings", { sceneId, grid: { ...defaultSceneGrid, shown: true } })).toEqual({ ok: true });
-    gm.socket.emit("player_pointer", { x: 12, y: 34 });
+    gm.socket.emit("live", pointer(sceneId, 12));
     await barrier(gm.socket);
     for (const peer of [other, player, display]) await barrier(peer.socket);
     expect(unwanted).toEqual([]);
@@ -78,13 +81,13 @@ test("GM connections prepare independently while changes, grids and pointers sta
     expect(wrong.refused).toEqual([{ id: "hero", item: null }, { id: "intruder", item: null }]);
     const privateEvents: unknown[] = [];
     gm.socket.on("scene_changes", value => privateEvents.push(value));
-    gm.socket.on("player_pointer", value => privateEvents.push(value));
+    gm.socket.on("live", value => privateEvents.push(value));
     const liveRelay = nextMessage(display.socket, "scene_changes");
     expect((await sendBatch(player.socket, { id: "live", sceneId: openId, changes: [{ type: "add", item: token }] })).applied).toHaveLength(1);
     expect((await liveRelay)[0].sceneId).toBe(openId);
-    const pointer = nextMessage(other.socket, "player_pointer");
-    player.socket.emit("player_pointer", { x: 56, y: 78 });
-    expect((await pointer)[0]).toEqual({ x: 56, y: 78 });
+    const relayed = nextMessage(other.socket, "live");
+    player.socket.emit("live", pointer(openId, 56));
+    expect((await relayed)[0]).toEqual({ ...pointer(openId, 56), connectionId: player.socket.id });
     await barrier(gm.socket);
     expect(privateEvents).toEqual([]);
     const viewed = nextMessage(other.socket, "scene_snapshot");
@@ -92,7 +95,7 @@ test("GM connections prepare independently while changes, grids and pointers sta
     expect((await viewed)[0].scene.items.hero.owner).toBe("gm");
     const gridRelay = nextMessage(other.socket, "scene_settings");
     expect(await action(gm.socket, "scene_settings", { sceneId, grid: { ...defaultSceneGrid, opacity: 0.25 } })).toEqual({ ok: true });
-    expect((await gridRelay)[0]).toEqual({ sceneId, grid: { ...defaultSceneGrid, opacity: 0.25 }, fogFill: false, viewOnly: false });
+    expect((await gridRelay)[0]).toEqual({ sceneId, grid: { ...defaultSceneGrid, opacity: 0.25 }, fogFill: false, viewOnly: false, movementMode: true });
     const preparationRelay = nextMessage(other.socket, "scene_changes");
     await sendBatch(gm.socket, { id: "edit", sceneId, changes: [{ type: "update", id: "hero", fields: { label: "Prepared" } }] });
     expect((await preparationRelay)[0].sceneId).toBe(sceneId);

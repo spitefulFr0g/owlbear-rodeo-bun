@@ -75,7 +75,7 @@ test("a mixed move keeps accepted positions and restores only refused items", ()
   const scene = {
     id: "scene",
     grid: defaultSceneGrid,
-    fogFill: false, viewOnly: false,
+    fogFill: false, viewOnly: false, movementMode: true,
     items: Object.fromEntries(items.map((item) => [item.id, item])),
   };
   const changes = moveSelection(items, { x: 150, y: 0 });

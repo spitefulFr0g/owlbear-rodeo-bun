@@ -1,35 +1,48 @@
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import { Box } from "theme-ui";
 
 import MapInteraction from "../map/MapInteraction";
 import SceneGrid from "../scene/SceneGrid";
 
 import { SceneItems } from "../scene/SceneSelection";
-import NetworkedMapPointer from "../../network/NetworkedMapPointer";
+import ScenePointers from "../scene/ScenePointers";
+import SceneRulers from "../scene/SceneRulers";
+import SceneMovement from "../scene/SceneMovement";
+import MeasureTool from "../tools/MeasureTool";
 
-import Session from "../../network/Session";
+import { useKeyboard } from "../../contexts/KeyboardContext";
+
+import shortcuts from "../../shortcuts";
 
 import { MapRect } from "../../helpers/displayView";
 
 type DisplayMapProps = {
   // The part of the map to show
   view: MapRect;
-  session: Session;
-  /** Waiting players may pan, zoom and point, with no interface */
+  /**
+   * Waiting players may pan, zoom, point and measure, with no interface: the
+   * measure and pointer tools' own keys choose what the left button does
+   */
   interactive?: boolean;
 };
 
 function ignore() {}
 
 /** The map as a player sees it with nothing to press, for a cast display */
-function DisplayMap({ view, session, interactive = false }: DisplayMapProps) {
+function DisplayMap({ view, interactive = false }: DisplayMapProps) {
+  const [tool, setTool] = useState<"pointer" | "measure">("pointer");
+  useKeyboard((event: KeyboardEvent) => {
+    if (!interactive) return;
+    if (shortcuts.measureTool(event)) setTool("measure");
+    if (shortcuts.pointerTool(event)) setTool("pointer");
+  });
 
   const initialRect = useRef(view).current;
   return (
     <Box sx={{ flexGrow: 1, height: "100%" }}>
       <MapInteraction
         controls={null}
-        selectedToolId="pointer"
+        selectedToolId={tool}
         onSelectedToolChange={ignore}
         followRect={interactive ? undefined : view}
         initialRect={interactive ? initialRect : undefined}
@@ -37,8 +50,11 @@ function DisplayMap({ view, session, interactive = false }: DisplayMapProps) {
         <SceneItems placement="belowGrid" />
         <SceneGrid />
         <SceneItems placement="aboveGrid" />
+        <SceneRulers />
+        <SceneMovement movement={null} />
+        <MeasureTool active={interactive && tool === "measure"} />
         <SceneItems placement="aboveRuler" />
-        <NetworkedMapPointer active={interactive} session={session} />
+        <ScenePointers active={interactive && tool === "pointer"} />
       </MapInteraction>
     </Box>
   );

@@ -1,9 +1,7 @@
-import { Scene, defaultSceneGrid } from "../../../src/sceneRules";
+import { PresenceState, Scene, defaultSceneGrid } from "../../../src/sceneRules";
 import { RoomSwitches } from "../types/RoomSwitches";
 import { randomBytes } from "crypto";
 import { DisplayView } from "../types/DisplayView";
-import { PlayerState } from "../types/PlayerState";
-import { PartyState } from "../types/PartyState";
 
 export type StoredScene = Scene & { name: string };
 
@@ -11,7 +9,7 @@ export default class Game {
   openSceneId = randomBytes(16).toString("hex");
   welcomeSceneId: string | null = null;
   scenes: Record<string, StoredScene> = {
-    [this.openSceneId]: { id: this.openSceneId, name: "Scene 1", grid: JSON.parse(JSON.stringify(defaultSceneGrid)), fogFill: false, viewOnly: false, items: {} },
+    [this.openSceneId]: { id: this.openSceneId, name: "Scene 1", grid: JSON.parse(JSON.stringify(defaultSceneGrid)), fogFill: false, viewOnly: false, movementMode: true, items: {} },
   };
 
   get scene(): StoredScene { return this.scenes[this.openSceneId]; }
@@ -30,19 +28,13 @@ export default class Game {
   shownDisplayView?: DisplayView;
   displayToken: string;
   gameId: string;
-  partyState: PartyState;
+  presenceState: PresenceState = {};
   passwordHash: string;
 
   constructor(gameId: string, hash: string, displayToken = randomBytes(32).toString("base64url")) {
     this.displayToken = displayToken;
     this.gameId = gameId;
-    this.partyState = {};
     this.passwordHash = hash;
-  }
-
-  getPartyState(): PartyState {
-    const result = this.partyState;
-    return result;
   }
 
   getGamePasswordHash(): string {
@@ -52,13 +44,5 @@ export default class Game {
 
   setGamePasswordHash(hash: string): void {
     this.passwordHash = hash;
-  }
-
-  setPlayerState(playerState: PlayerState, playerId: string): void {
-    this.partyState[playerId] = playerState;
-  }
-
-  deletePlayer(playerId: string): void {
-    delete this.partyState[playerId];
   }
 }

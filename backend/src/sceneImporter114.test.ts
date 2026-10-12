@@ -19,7 +19,7 @@ test("creating from a map delivers and immediately saves the complete aligned sc
     const snapshot = nextMessage(gm.socket, "scene_snapshot");
     const result = await create(gm.socket, { name: "Map scene", grid, fogFill: true, map });
     expect(result.ok).toBe(true);
-    const expected = { id: result.sceneId, grid, fogFill: true, viewOnly: false,
+    const expected = { id: result.sceneId, grid, fogFill: true, viewOnly: false, movementMode: true,
       items: { map: { ...map, owner: "gm", locked: true, order: 0 } } };
     expect((await snapshot)[0].scene).toEqual(expected);
     const copy = await server.durableCopy();

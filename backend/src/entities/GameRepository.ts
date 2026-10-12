@@ -1,7 +1,5 @@
 import { Clock } from "../clock";
 import { OwlbearDatabase } from "../database";
-import { PlayerState } from "../types/PlayerState";
-import { PartyState } from "../types/PartyState";
 import Game, { StoredScene } from "./Game";
 import { defaultSceneGrid } from "../../../src/sceneRules";
 
@@ -37,8 +35,8 @@ export default class GameRepository {
         game.welcomeSceneId = record.documentVersion === 3 ? document.welcomeSceneId : null;
         game.scenes = Object.fromEntries(Object.entries(document.scenes).map(([id, value]) => {
           const scene = value as StoredScene;
-          return [id, record.documentVersion === 3 ? scene : {
-            ...scene, name: "Scene 1", fogFill: false, viewOnly: false,
+          return [id, record.documentVersion === 3 ? { ...scene, movementMode: scene.movementMode ?? true } : {
+            ...scene, name: "Scene 1", fogFill: false, viewOnly: false, movementMode: true,
             grid: { ...defaultSceneGrid, ...scene.grid },
           }];
         }));
@@ -85,14 +83,6 @@ export default class GameRepository {
     return { name: game.name, switches: { ...game.switches }, session: game.session, hasPassword: game.hasPassword };
   }
 
-  getPartyState(gameId: string): PartyState {
-    const game = this.games[gameId];
-
-    const result = game.getPartyState();
-
-    return result;
-  }
-
   getGamePasswordHash(gameId: string): string {
     const game = this.games[gameId];
 
@@ -106,19 +96,5 @@ export default class GameRepository {
 
     game.setGamePasswordHash(hash);
     this.changed(gameId);
-  }
-
-  setPlayerState(
-    gameId: string,
-    playerState: PlayerState,
-    playerId: string
-  ): void {
-    const game = this.games[gameId];
-    game.setPlayerState(playerState, playerId);
-  }
-
-  deletePlayer(gameId: string, playerId: string): void {
-    const game = this.games[gameId];
-    game.deletePlayer(playerId);
   }
 }

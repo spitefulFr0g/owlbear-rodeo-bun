@@ -94,7 +94,7 @@ type SceneStore = {
   canSelect: (item: Item) => boolean;
   /**
    * Changes settings of the scene for everyone viewing it: any of its grid,
-   * Fog Fill and view-only. They show once the server has accepted them,
+   * Fog Fill, view-only and movement mode. They show once the server has accepted them,
    * which it does from a GM only. Not in the undo history.
    */
   setSettings: (settings: Partial<SceneSettings>) => void;

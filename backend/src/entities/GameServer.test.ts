@@ -105,7 +105,7 @@ function displayToken(socket: Socket): Promise<string | null> {
 async function owner(gameId: string) {
   const socket = client(true);
   await join(socket, gameId, "secret", "gm");
-  socket.emit("player_state", { userId: "gm", nickname: "GM" });
+  socket.emit("presence_update", { color: "blue", dice: { share: false, rolls: [] }, userId: "gm", nickname: "GM" });
   return { socket, token: await displayToken(socket) };
 }
 
@@ -117,7 +117,7 @@ describe("cast displays", () => {
     const other = client();
     expect(await displayToken(other)).toBeNull();
     await join(other, "display-token", "secret");
-    other.emit("player_state", { userId: "other" });
+    other.emit("presence_update", { nickname: "", color: "blue", dice: { share: false, rolls: [] }, userId: "other" });
     expect(await displayToken(other)).toBeNull();
     expect(await displayToken(socket)).toBe(token);
     const secondGM = client(true);
@@ -138,7 +138,8 @@ async function joinDisplay(socket: Socket, gameId: string, token: string | null)
 
 function record(socket: Socket) {
   const events: any[][] = [];
-  socket.onAny((...args) => events.push(args));
+  // The paired UI migration removes the temporary legacy party transport.
+  socket.onAny((...args) => { events.push(args); });
   return events;
 }
 
@@ -155,9 +156,9 @@ test("a cast display receives initial and live state without player presence", a
   expect(await assetStatus(joinToken)).toBe(404);
   expect(await assetStatus(joinToken, "PUT")).toBe(403);
   expect(events.map(([event]) => event)).toEqual([
-    "party_state", "joined_display", "scene_snapshot", "display_frozen",
+    "joined_display", "presence_state", "scene_snapshot", "display_frozen",
   ]);
-  expect(events[0][1]).toEqual({ [player.id!]: { userId: "gm", nickname: "GM", role: "gm", color: "blue" } });
+  expect(events[1][1]).toEqual({ [player.id!]: { elsewhere: false, userId: "gm", nickname: "GM", role: "gm", color: "blue", sessionId: player.id, dice: { share: false, rolls: [] } } });
   expect(events[2][1].scene.items).toEqual({});
   expect(await displayToken(display)).toBeNull();
   const sceneId = scenes.get("display-live")!;
@@ -171,9 +172,12 @@ test("a cast display receives initial and live state without player presence", a
     expect(await received).toEqual([{ sceneId, changes: answer.applied }]);
   }
   playerEvents.splice(0);
-  const party = next(display, "party_state");
-  player.emit("player_state", { userId: "gm", nickname: "Changed" });
+  const party = next(display, "presence_state");
+  const ownPresence = next(player, "presence_state");
+  player.emit("presence_update", { color: "blue", dice: { share: false, rolls: [] }, userId: "gm", nickname: "Changed" });
   expect(Object.keys((await party)[0])).toEqual([player.id!]);
+  await ownPresence;
+  playerEvents.splice(0);
   display.disconnect();
   await pause();
   expect(await assetStatus(joinToken)).toBe(401);
@@ -201,8 +205,8 @@ for (const [label, room, token] of [
 
 for (const [event, payload] of [
   ["scene_changes", { id: "evil", sceneId: "wrong", changes: [{ type: "delete", id: "hero" }] }],
-  ["player_state", { userId: "gm", nickname: "Display" }],
-  ["player_pointer", { x: 1, y: 2 }],
+  ["presence_update", { userId: "gm", nickname: "Display", color: "blue", dice: { share: false, rolls: [] } }],
+  ["live", { sceneId: "wrong", kind: "pointer", state: { position: { x: 1, y: 2 }, visible: true } }],
   ["display_view", { sceneId: "wrong", x: 0, y: 0, width: 1, height: 1 }],
   ["display_freeze", true],
 ] as const) {
@@ -220,7 +224,7 @@ for (const [event, payload] of [
     const observer = client();
     const snapshot = record(observer);
     await joinDisplay(observer, gameId, token);
-    expect(snapshot[0][1]).toEqual({ [player.id!]: { userId: "gm", nickname: "GM", role: "gm", color: "blue" } });
+    expect(snapshot.find(([event]) => event === "presence_state")?.[1]).toEqual({ [player.id!]: { elsewhere: false, userId: "gm", nickname: "GM", role: "gm", color: "blue", sessionId: player.id, dice: { share: false, rolls: [] } } });
     expect(snapshot.find(([name]) => name === "scene_snapshot")![1].scene.items).toEqual({});
     expect(snapshot.filter(([name]) => name === "display_frozen")).toEqual([["display_frozen", false]]);
     expect(snapshot.filter(([name]) => name === "display_view")).toEqual([]);
@@ -272,7 +276,7 @@ test("only a GM connection's valid scene views reach cast displays without a map
   const view = { ...worldView, sceneId: scenes.get("display-follow")! };
   const other = client();
   await join(other, "display-follow", "secret");
-  other.emit("player_state", { userId: "other" });
+  other.emit("presence_update", { nickname: "", color: "blue", dice: { share: false, rolls: [] }, userId: "other" });
   const display = client();
   await joinDisplay(display, "display-follow", token);
   const displayEvents = record(display);
@@ -306,7 +310,7 @@ test("freeze holds the shown view for joining displays and unfreeze sends the la
   const joinEvents = record(other);
   await join(other, "display-freeze", "secret");
   expect(joinEvents.find(([event]) => event === "display_frozen")).toEqual(["display_frozen", false]);
-  other.emit("player_state", { userId: "other" });
+  other.emit("presence_update", { nickname: "", color: "blue", dice: { share: false, rolls: [] }, userId: "other" });
   await displayToken(other);
   await pause();
   const events = record(display);
@@ -332,8 +336,8 @@ test("freeze holds the shown view for joining displays and unfreeze sends the la
   const lateEvents = record(lateDisplay);
   await joinDisplay(lateDisplay, "display-freeze", token);
   expect(lateEvents).toEqual([
-    ["party_state", expect.any(Object)],
     ["joined_display", lateDisplay.id, expect.any(String), { room: { name: "display-freeze", session: true, hasPassword: true, switches: { tokens: true, drawing: true, notes: true, fog: false, uploads: false, ownerOnly: false } } }],
+    ["presence_state", expect.any(Object)],
     ["scene_snapshot", { scene: expect.objectContaining({ id: expect.any(String), items: {} }) }],
     ["display_frozen", true], ["display_view", view],
   ]);
@@ -381,7 +385,7 @@ test("the last GM device's view wins even when a player owns the map", async () 
   const view = { ...worldView, sceneId: scenes.get(gameId)! };
   const player = client();
   await join(player, gameId, "secret");
-  player.emit("player_state", { userId: "map-owner" });
+  player.emit("presence_update", { nickname: "", color: "blue", dice: { share: false, rolls: [] }, userId: "map-owner" });
   await sendBatch(gm, { id: "map-owner", sceneId: scenes.get(gameId)!, changes: [{ type: "add", item: { ...tokenItem, id: "map", layer: "map" } }, { type: "update", id: "map", fields: { owner: "map-owner" } }] });
   const secondGM = client(true);
   await join(secondGM, gameId);
