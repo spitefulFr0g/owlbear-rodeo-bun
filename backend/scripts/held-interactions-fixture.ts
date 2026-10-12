@@ -42,6 +42,7 @@ if (args[0] === "control") {
     return { socket, scene: (value as { scene: Scene }).scene, presences: presences as PresenceState };
   };
   const peer = await connect();
+  let barrierId = 1_000_000;
   const sceneId = peer.scene.id;
   const ack = (event: string, value: unknown) => new Promise<void>((resolve, reject) => {
     peer.socket.timeout(5000).emit(event, value, (error: Error | null, result: { ok?: boolean }) => {
@@ -62,6 +63,13 @@ if (args[0] === "control") {
     return observer.scene;
   };
   const change = async (action: string) => {
+    if (action === "barrier-frame") {
+      const id = barrierId++;
+      const encoded = new parser.Encoder().encode({ type: 2, nsp: "/", id, data: ["room_switches", null] });
+      const frame = Array.isArray(encoded) ? encoded[0] : encoded;
+      if (!(frame instanceof Uint8Array || frame instanceof ArrayBuffer)) throw new Error("Unsupported MessagePack encoder output");
+      return { id, frame: Buffer.from(frame instanceof ArrayBuffer ? new Uint8Array(frame) : frame).toString("base64") };
+    }
     if (action === "state") return { scene: await snapshot() };
     const current = await snapshot();
     const changes: Change[] = [];

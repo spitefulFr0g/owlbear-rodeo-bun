@@ -10,7 +10,7 @@
     throw new Error('Missing T3 preview result');
   };
   const command = async args => {
-    let result = await tools.exec_command({...args, yield_time_ms: 1000, max_output_tokens: 1500});
+    let result = await tools.exec_command({...args, yield_time_ms: 1000, max_output_tokens: args.max_output_tokens ?? 1500});
     let output = result.output ?? '';
     while (result.session_id != null) {
       result = await tools.write_stdin({session_id: result.session_id, chars: '', yield_time_ms: 1000, max_output_tokens: 1500});
@@ -20,7 +20,7 @@
     return output.trim();
   };
   // Observes actual rendered Konva nodes; gestures are dispatched as DOM mouse events.
-  async function page({action, marker, kind, dx = 100, dy = 80}) {
+  async function page({action, marker, kind, frame, id, dx = 100, dy = 80}) {
     const settle = () => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
     const wait = async predicate => {
       const end = Date.now() + 10000;
@@ -28,6 +28,25 @@
     };
     await wait(() => window.Konva?.stages?.length);
     const stage = window.Konva.stages[0];
+    if (action === 'protocol') {
+      const socket = window.__heldVerificationSocket;
+      if (!socket || socket.readyState !== 1) throw new Error('The application WebSocket is unavailable for its barrier');
+      await new Promise((resolve, reject) => {
+        const clean = () => { clearTimeout(timeout); socket.removeEventListener('message', receive); };
+        const timeout = setTimeout(() => { clean(); reject(new Error('Application protocol barrier timed out')); }, 5000);
+        const receive = async event => {
+          if (typeof event.data === 'string') return;
+          try {
+            const bytes = event.data instanceof Blob ? await event.data.arrayBuffer() : event.data;
+            const packet = window.__heldVerificationDecode(bytes);
+            if (packet.type === 3 && packet.id === id) { clean(); resolve(); }
+          } catch { /* Unrelated transport packets cannot satisfy the barrier. */ }
+        };
+        socket.addEventListener('message', receive);
+        socket.send(Uint8Array.from(atob(frame), char => char.charCodeAt(0)));
+      });
+      await settle(); return {barrier: id};
+    }
     const node = () => stage.findOne('#held-check');
     const transformer = () => stage.find('Transformer').find(t => t.nodes().some(n => n.id() === 'held-check'));
     const geometry = () => {
@@ -90,14 +109,19 @@
       const response = await control(action);
       return {scene: response.scene, rendered: await evaluate({action: 'barrier', marker: response.marker})};
     };
+    const installTransport = async () => {
+      const decoder = await command({cmd: `cat ${quote(repo + '/backend/node_modules/notepack.io/browser/decode.js')}`, max_output_tokens: 10000});
+      await tools.mcp__t3_code__preview_evaluate({tabId, expression: `(()=>{const module={exports:{}};${decoder}\nwindow.__heldVerificationDecode=module.exports;const original=WebSocket.prototype.send;WebSocket.prototype.send=function(data){if(this.url.includes('/socket.io/'))window.__heldVerificationSocket=this;return original.call(this,data)};return true})()`});
+    };
+    const release = async () => {
+      await evaluate({action: 'release'});
+      const packet = await control('barrier-frame');
+      await evaluate({action: 'protocol', ...packet});
+    };
     const savedGeometry = async expected => {
-      for (let attempt = 0; attempt < 20; attempt++) {
-        const state = await control('state'), item = state.scene.items['held-check'];
-        try { equal(item?.position ?? null, expected.position, 'Position not committed');
-          equal(item?.scale ?? null, expected.scale, 'Scale not committed'); return; } catch {}
-        await new Promise(resolve => setTimeout(resolve, 100));
-      }
-      throw new Error('Released geometry did not reach the public scene');
+      const state = await control('state'), item = state.scene.items['held-check'];
+      equal(item?.position ?? null, expected.position, 'Released position differs from the public scene');
+      equal(item?.scale ?? null, expected.scale, 'Released scale differs from the public scene');
     };
     try {
       const status = unwrap(await tools.mcp__t3_code__preview_status({}));
@@ -123,6 +147,7 @@
       if (signin !== 200) throw new Error('Fixture browser sign-in failed');
       await tools.mcp__t3_code__preview_navigate({tabId, url: `${config.address}/game/${config.roomId}`});
       await tools.mcp__t3_code__preview_snapshot({tabId});
+      await installTransport();
       for (const kind of ['move', 'resize']) {
         onProgress(`Checking competing ${kind}`);
         const baseline = (await barrier('reset')).rendered;
@@ -134,7 +159,7 @@
         equal(committed.scale, held.scale, `Competing commit changed held ${kind} scale`);
         if (kind === 'resize' && !committed.transforming) throw new Error('Competing commit stopped resize');
         const continued = await evaluate({action: 'continue'});
-        await evaluate({action: 'release'}); await savedGeometry(continued);
+        await release(); await savedGeometry(continued);
         results.push({case: `competing-${kind}`, status: 'pass'});
       }
       for (const kind of ['move', 'resize']) {
@@ -144,13 +169,13 @@
         equal(cancelled.position, baseline.position, `Tool switch left held ${kind} position`);
         equal(cancelled.scale, baseline.scale, `Tool switch left held ${kind} scale`);
         if (cancelled.transforming || cancelled.selected.length) throw new Error('Tool switch left an active transformer');
-        await evaluate({action: 'continue'}); await evaluate({action: 'release'}); await savedGeometry(baseline);
+        await evaluate({action: 'continue'}); await release(); await savedGeometry(baseline);
         results.push({case: `tool-switch-${kind}`, status: 'pass'});
       }
       await barrier('reset'); await evaluate({action: 'begin', kind: 'move'});
       const deleted = (await barrier('delete')).rendered;
       if (deleted.position || deleted.selected.length || deleted.transforming) throw new Error('Deletion left a held item');
-      await evaluate({action: 'continue'}); await evaluate({action: 'release'});
+      await evaluate({action: 'continue'}); await release();
       if ((await control('state')).scene.items['held-check']) throw new Error('Release recreated a deleted item');
       results.push({case: 'deletion', status: 'pass'});
       onProgress('Checking player permission loss');
@@ -159,6 +184,7 @@
       if (signout !== 204) throw new Error(`Fixture browser sign-out failed: ${signout}`);
       await tools.mcp__t3_code__preview_navigate({tabId, url: `${config.address}/game/${config.roomId}`});
       await tools.mcp__t3_code__preview_snapshot({tabId});
+      await installTransport();
       await barrier('reset');
       const unlocked = (await barrier('player-owner')).rendered;
       const playerHeld = await evaluate({action: 'begin', kind: 'move'});
@@ -166,7 +192,7 @@
       const locked = (await barrier('lock')).rendered;
       equal(locked.position, unlocked.position, 'Permission loss did not restore authoritative position');
       if (locked.selected.length || locked.transforming) throw new Error('Permission loss left an active transformer');
-      await evaluate({action: 'continue'}); await evaluate({action: 'release'}); await savedGeometry(unlocked);
+      await evaluate({action: 'continue'}); await release(); await savedGeometry(unlocked);
       results.push({case: 'permission-loss', status: 'pass'});
       const response = {status: 'pass', cases: results};
       if (report) await command({cmd: `cat > ${quote(report)} <<'HELD_REPORT_JSON'\n${JSON.stringify(response, null, 2)}\nHELD_REPORT_JSON`});
