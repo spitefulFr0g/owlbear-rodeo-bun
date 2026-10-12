@@ -33,3 +33,25 @@ test("only positional moves of tokens carry a distance", () => {
   expect(tokenMovement(scene, [])).toBeUndefined();
   expect(tokenMovement(scene, [{ ...move(), id: "__proto__" }, move(second)])?.id).toBe("second");
 });
+
+test("a receiver missing the picked-up hidden token measures the first shown moved token", () => {
+  const receivedScene = { ...scene, items: { second } };
+  expect(tokenMovement(receivedScene, [move(second)])).toEqual({ id: "second", start: second.position, end: move(second).position });
+  expect(tokenMovement(receivedScene, [move(), move(second)])?.id).toBe("second");
+});
+
+for (const type of ["square", "hexVertical", "hexHorizontal"] as const) {
+  test(`sender and receiver measure the same group move on a ${type} grid`, () => {
+    const shared = { ...scene, grid: { ...scene.grid, type } };
+    const transforms = [move(), move(second)];
+    const local = tokenMovement(shared, transforms, token.id)!;
+    const remote = tokenMovement(shared, transforms)!;
+    expect(rulerDistance(shared.grid, remote.start, remote.end)).toBe(rulerDistance(shared.grid, local.start, local.end));
+  });
+}
+
+test("ending a received drag or turning movement mode off clears its distance", () => {
+  expect(tokenMovement(scene, [move()])).toBeDefined();
+  expect(tokenMovement(scene, [])).toBeUndefined();
+  expect(tokenMovement({ ...scene, movementMode: false }, [move()])).toBeUndefined();
+});

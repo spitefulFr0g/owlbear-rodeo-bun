@@ -7,6 +7,7 @@ import SceneGrid from "../scene/SceneGrid";
 import { SceneItems } from "../scene/SceneSelection";
 import ScenePointers from "../scene/ScenePointers";
 import SceneRulers from "../scene/SceneRulers";
+import SceneMovement from "../scene/SceneMovement";
 import MeasureTool from "../tools/MeasureTool";
 
 import { useKeyboard } from "../../contexts/KeyboardContext";
@@ -50,6 +51,7 @@ function DisplayMap({ view, interactive = false }: DisplayMapProps) {
         <SceneGrid />
         <SceneItems placement="aboveGrid" />
         <SceneRulers />
+        <SceneMovement movement={null} />
         <MeasureTool active={interactive && tool === "measure"} />
         <SceneItems placement="aboveRuler" />
         <ScenePointers active={interactive && tool === "pointer"} />
