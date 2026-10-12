@@ -28,6 +28,7 @@ import NoteTool from "../tools/NoteTool";
 import SceneItemMenu from "../scene/SceneItemMenu";
 import SceneNotice from "../scene/SceneNotice";
 import ScenePointers from "../scene/ScenePointers";
+import SceneRulers from "../scene/SceneRulers";
 import SceneSelection, { SceneItems } from "../scene/SceneSelection";
 
 type MapProps = {
@@ -122,6 +123,7 @@ function Map({ session }: MapProps) {
               });
           }}
         />
+        <SceneRulers />
         <MeasureTool active={selectedToolId === "measure"} />
         <SceneItems placement="aboveRuler" fogShapes={selecting} />
         <FogTool

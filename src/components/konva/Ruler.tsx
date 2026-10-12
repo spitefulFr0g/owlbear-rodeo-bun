@@ -1,66 +1,42 @@
 import { Group, Label, Line, Tag, Text } from "react-konva";
 
-import { useGridStrokeWidth } from "../../contexts/GridContext";
-import {
-  useDebouncedStageScale,
-  useMapHeight,
-  useMapWidth,
-} from "../../contexts/MapInteractionContext";
+import { useStageScale } from "../../contexts/MapInteractionContext";
 
-import { scaleAndFlattenPoints } from "../../helpers/konva";
-import Vector2 from "../../helpers/Vector2";
+import useWorldPlacement from "../../hooks/useWorldPlacement";
 
-import { GridScale } from "../../types/Grid";
+import { Vector2 } from "../../sceneRules";
+
+const background = "hsla(230, 25%, 18%, 0.8)";
 
 type RulerProps = {
-  points: Vector2[];
-  scale: GridScale;
-  length: number;
+  /** In world units, drawn inside the world */
+  start: Vector2;
+  end: Vector2;
+  /** The distance as written */
+  text: string;
+  /** Its owner's colour */
+  color: string;
 };
 
-function Ruler({ points, scale, length }: RulerProps) {
-  const stageScale = useDebouncedStageScale();
-  const mapWidth = useMapWidth();
-  const mapHeight = useMapHeight();
-  const mapSize = new Vector2(mapWidth, mapHeight);
-
-  const gridStrokeWidth = useGridStrokeWidth();
-
-  const linePoints = scaleAndFlattenPoints(points, mapSize);
-
-  const lineCenter = Vector2.multiply(Vector2.centroid(points), mapSize);
+function Ruler({ start, end, text, color }: RulerProps) {
+  const stageScale = useStageScale();
+  const placement = useWorldPlacement();
+  // The distance stays one size on screen however far the canvas is zoomed
+  const zoom = stageScale * placement.scale;
+  const line = [start.x, start.y, end.x, end.y];
 
   return (
     <Group>
-      <Line
-        points={linePoints}
-        strokeWidth={1.5 * gridStrokeWidth}
-        stroke="hsla(230, 25%, 18%, 0.8)"
-        lineCap="round"
-      />
-      <Line
-        points={linePoints}
-        strokeWidth={0.25 * gridStrokeWidth}
-        stroke="white"
-        lineCap="round"
-      />
+      <Line points={line} stroke={background} strokeWidth={15} lineCap="round" />
+      <Line points={line} stroke={color} strokeWidth={4} lineCap="round" />
       <Label
-        x={lineCenter.x}
-        y={lineCenter.y}
-        offsetX={26}
-        offsetY={26}
-        scaleX={1 / stageScale}
-        scaleY={1 / stageScale}
+        x={(start.x + end.x) / 2}
+        y={(start.y + end.y) / 2}
+        scaleX={1 / zoom}
+        scaleY={1 / zoom}
       >
-        <Tag fill="hsla(230, 25%, 18%, 0.8)" cornerRadius={4} />
-        <Text
-          text={`${(length * scale.multiplier).toFixed(scale.digits)}${
-            scale.unit
-          }`}
-          fill="white"
-          fontSize={24}
-          padding={4}
-        />
+        <Tag fill={background} stroke={color} strokeWidth={2} cornerRadius={4} />
+        <Text text={text} fill="white" fontSize={24} padding={4} />
       </Label>
     </Group>
   );
