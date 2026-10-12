@@ -61,7 +61,7 @@ test("the picker image is locked, GM owned and retains all stored resolution ids
   expect(item.locked).toBe(true);
   expect(item.owner).toBe("gm");
   expect(item.metadata.mapQuality).toBe("low");
-  expect(pickedMap({ id: "scene", grid: defaultSceneGrid, fogFill: false, viewOnly: false, items: { placed: item } })).toEqual(item);
+  expect(pickedMap({ id: "scene", grid: defaultSceneGrid, fogFill: false, viewOnly: false, movementMode: true, items: { placed: item } })).toEqual(item);
 });
 
 test("a scene made from a map is one create the server's rules accept", () => {
@@ -72,7 +72,7 @@ test("a scene made from a map is one create the server's rules accept", () => {
     measurement: { type: "euclidean", scale: "10m" } });
   expect(checkGrid(create.grid)).toBe(true);
   expect(create.map).toEqual(mapItem(map, create.grid, "first"));
-  const empty = { id: "scene", grid: create.grid, fogFill: false, viewOnly: false, items: {} };
+  const empty = { id: "scene", grid: create.grid, fogFill: false, viewOnly: false, movementMode: true, items: {} };
   expect(checkChange(empty, { type: "add", item: create.map })).toBeUndefined();
 });
 
@@ -101,7 +101,7 @@ const token: Item = { ...mapItem(savedMap(), defaultSceneGrid, "token"), layer: 
 function editedScene(map = savedMap()): Scene {
   const made = sceneFromMap(map, undefined, "first");
   const placed = { ...made.map, position: { x: made.map.position.x + 300, y: made.map.position.y - 150 } };
-  return { id: "scene", fogFill: false, viewOnly: false,
+  return { id: "scene", fogFill: false, viewOnly: false, movementMode: true,
     grid: { ...made.grid, shown: false, opacity: 0.4, color: "#336699",
       measurement: { type: "manhattan", scale: "5ft" } },
     items: { first: placed, token, note } };

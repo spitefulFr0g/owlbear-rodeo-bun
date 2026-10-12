@@ -23,7 +23,7 @@ test("settings on any named scene reach only its viewers and are saved immediate
     const { sceneId } = await action(gm.socket, "scene_create", { name: "Preparation" });
     const unexpected: unknown[] = [];
     gm.socket.on("scene_settings", value => unexpected.push(value));
-    const expected = { sceneId: openId, grid, fogFill: true, viewOnly: true };
+    const expected = { sceneId: openId, grid, fogFill: true, viewOnly: true, movementMode: true };
     const relays = [other, player, display].map(peer => nextMessage(peer.socket, "scene_settings"));
     const lists = [gm, other].map(peer => nextMessage(peer.socket, "scene_list"));
     expect(await action(gm.socket, "scene_settings", expected)).toEqual({ ok: true });
@@ -33,11 +33,11 @@ test("settings on any named scene reach only its viewers and are saved immediate
     expect(unexpected).toEqual([]);
     const own = nextMessage(gm.socket, "scene_settings");
     expect(await action(gm.socket, "scene_settings", { sceneId, fogFill: true })).toEqual({ ok: true });
-    expect((await own)[0]).toEqual({ sceneId, grid: defaultSceneGrid, fogFill: true, viewOnly: false });
+    expect((await own)[0]).toEqual({ sceneId, grid: defaultSceneGrid, fogFill: true, viewOnly: false, movementMode: true });
     const copy = await server.durableCopy();
     try {
       const saved = await copy.joinRoomAsGM(room.id, cookie);
-      expect(saved.snapshot!.scene).toMatchObject({ id: openId, grid, fogFill: true, viewOnly: true });
+      expect(saved.snapshot!.scene).toMatchObject({ id: openId, grid, fogFill: true, viewOnly: true, movementMode: true });
       const snapshot = nextMessage(saved.socket, "scene_snapshot");
       await action(saved.socket, "scene_view", { sceneId });
       expect((await snapshot)[0].scene.fogFill).toBe(true);
@@ -62,7 +62,7 @@ test("players, trusted players and cast displays cannot change scene settings", 
       for (const event of ["scene_settings", "scene_list"]) peer.socket.on(event, value => messages.push(value));
     }
     for (const peer of [player, trusted, display]) {
-      expect(await action(peer.socket, "scene_settings", { sceneId: gm.snapshot!.scene!.id, grid, fogFill: true, viewOnly: true }))
+      expect(await action(peer.socket, "scene_settings", { sceneId: gm.snapshot!.scene!.id, grid, fogFill: true, viewOnly: true, movementMode: true }))
         .toEqual({ ok: false, error: "not_room_gm" });
     }
     for (const peer of [gm, player, trusted, display]) await barrier(peer.socket);
@@ -106,10 +106,10 @@ test("partial settings preserve other values and refresh the list only when view
     const lists: unknown[] = [];
     gm.socket.on("scene_list", value => lists.push(value));
     const settings = [
-      { patch: { grid }, expected: { grid, fogFill: false, viewOnly: false } },
-      { patch: { fogFill: true }, expected: { grid, fogFill: true, viewOnly: false } },
-      { patch: { viewOnly: false }, expected: { grid, fogFill: true, viewOnly: false } },
-      { patch: { fogFill: false }, expected: { grid, fogFill: false, viewOnly: false } },
+      { patch: { grid }, expected: { grid, fogFill: false, viewOnly: false, movementMode: true } },
+      { patch: { fogFill: true }, expected: { grid, fogFill: true, viewOnly: false, movementMode: true } },
+      { patch: { viewOnly: false }, expected: { grid, fogFill: true, viewOnly: false, movementMode: true } },
+      { patch: { fogFill: false }, expected: { grid, fogFill: false, viewOnly: false, movementMode: true } },
     ];
     for (const { patch, expected } of settings) {
       const relay = nextMessage(gm.socket, "scene_settings");

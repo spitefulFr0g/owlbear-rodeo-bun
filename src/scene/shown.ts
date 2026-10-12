@@ -58,7 +58,7 @@ export function afterAnswer(
 }
 
 /** What a GM may set on a scene outside the undo history */
-export type SceneSettings = Pick<Scene, "grid" | "fogFill" | "viewOnly">;
+export type SceneSettings = Pick<Scene, "grid" | "fogFill" | "viewOnly" | "movementMode">;
 
 /** What the server sends everyone viewing a scene when the GM changes its settings */
 export type SettingsChange = { sceneId: string } & SceneSettings;
@@ -69,8 +69,8 @@ export function afterSettings(
   change: SettingsChange
 ): Scene | null {
   if (!scene || scene.id !== change.sceneId) return scene;
-  const { grid, fogFill, viewOnly } = change;
-  return { ...scene, grid, fogFill, viewOnly };
+  const { grid, fogFill, viewOnly, movementMode } = change;
+  return { ...scene, grid, fogFill, viewOnly, movementMode };
 }
 
 /** A change with the order the server will give it, so it shows where it will land */

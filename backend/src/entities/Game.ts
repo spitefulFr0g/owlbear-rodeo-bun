@@ -11,7 +11,7 @@ export default class Game {
   openSceneId = randomBytes(16).toString("hex");
   welcomeSceneId: string | null = null;
   scenes: Record<string, StoredScene> = {
-    [this.openSceneId]: { id: this.openSceneId, name: "Scene 1", grid: JSON.parse(JSON.stringify(defaultSceneGrid)), fogFill: false, viewOnly: false, items: {} },
+    [this.openSceneId]: { id: this.openSceneId, name: "Scene 1", grid: JSON.parse(JSON.stringify(defaultSceneGrid)), fogFill: false, viewOnly: false, movementMode: true, items: {} },
   };
 
   get scene(): StoredScene { return this.scenes[this.openSceneId]; }

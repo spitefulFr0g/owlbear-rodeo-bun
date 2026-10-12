@@ -139,6 +139,7 @@ export type Scene = {
   id: string;
   grid: SceneGrid;
   fogFill: boolean;
+  movementMode: boolean;
   viewOnly: boolean;
   items: Record<string, Item>;
 };
