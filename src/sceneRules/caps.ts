@@ -16,3 +16,6 @@ export const maxGridLineWidth = 10;
 // One hundred scenes in one room, with names up to one hundred characters.
 export const maxScenes = 100;
 export const maxSceneNameLength = 100;
+
+// Two hundred live updates per connection per second; reliable ends are exempt.
+export const maxLiveMessagesPerSecond = 200;
