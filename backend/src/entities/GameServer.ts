@@ -138,6 +138,7 @@ export default class GameServer {
     game.cancelSessionCountdown = undefined;
     const changed = running !== game.session;
     game.session = running;
+    if (changed) this.gameRepo.changed(gameId);
     this.broadcastPresence(gameId);
     this.io.to(gameId).emit("room_state", this.gameRepo.roomState(gameId));
     if (changed) {
@@ -149,6 +150,15 @@ export default class GameServer {
         if (running && peer.data.castDisplay && game.shownDisplayView) peer.emit("display_view", game.shownDisplayView);
       }
     }
+  }
+
+  /** A session with no GM connected ends by itself after five minutes. */
+  private startSessionCountdown(gameId: string): void {
+    const game = this.gameRepo.games[gameId];
+    game.cancelSessionCountdown?.();
+    game.cancelSessionCountdown = this.clock.after(5 * 60 * 1000, () => {
+      this.setSession(gameId, false);
+    });
   }
 
   public stop(): void {
@@ -163,6 +173,8 @@ export default class GameServer {
   }
 
   public run(): void {
+    // A session kept across a restart has no GM connected yet.
+    for (const gameId of this.gameRepo.loadRoomsInSession()) this.startSessionCountdown(gameId);
     this.io.on("connect", async (socket: Socket) => {
       const gameState = new GameState(this.io, socket, this.gameRepo);
       let _gameId: string;
@@ -243,10 +255,7 @@ export default class GameServer {
           const anotherGM = [...this.io.sockets.adapter.rooms.get(gameId) || []]
             .some(id => id !== socket.id && this.io.sockets.sockets.get(id)?.data.role === "gm");
           if (!this.stopping && game.session && socket.data.role === "gm" && !anotherGM) {
-            game.cancelSessionCountdown?.();
-            game.cancelSessionCountdown = this.clock.after(5 * 60 * 1000, () => {
-              this.setSession(gameId, false);
-            });
+            this.startSessionCountdown(gameId);
           }
           socket.to(gameId).emit("player_left", socket.id);
           delete game.presenceState[socket.id];

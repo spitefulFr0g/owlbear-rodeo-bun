@@ -9,6 +9,8 @@ export interface RoomRecord {
   name: string;
   gmAccountId: string | null;
   hasPassword: number;
+  /** 1 while the room's session is running. */
+  session: number;
   passwordHash: string;
   displayToken: string;
   switches?: string;
@@ -17,7 +19,7 @@ export interface RoomRecord {
   document: string;
 }
 
-export const LAYOUT_VERSION = 2;
+export const LAYOUT_VERSION = 3;
 
 // All v0.2.0 tables belong here, in the same layout version. Nothing in
 // this release has shipped yet, so later tickets extend this declaration.
@@ -73,8 +75,13 @@ const layout = `
     PRIMARY KEY (roomId, assetId)
   );
   CREATE INDEX IF NOT EXISTS room_assets_asset ON room_assets(assetId);
+  CREATE TABLE IF NOT EXISTS room_sessions (
+    roomId TEXT PRIMARY KEY REFERENCES rooms(id) ON DELETE CASCADE
+  );
   CREATE TABLE IF NOT EXISTS metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 `;
+
+const roomRecords = "SELECT rooms.*, EXISTS (SELECT 1 FROM room_sessions WHERE roomId = rooms.id) AS session FROM rooms";
 
 export class OwlbearDatabase {
   readonly connection: Database;
@@ -112,20 +119,27 @@ export class OwlbearDatabase {
   }
 
   room(id: string): RoomRecord | undefined {
-    return this.connection.query<RoomRecord, [string]>("SELECT * FROM rooms WHERE id = ?").get(id) ?? undefined;
+    return this.connection.query<RoomRecord, [string]>(`${roomRecords} WHERE id = ?`).get(id) ?? undefined;
   }
 
   saveRoom(record: RoomRecord): void {
-    this.connection.query(`INSERT INTO rooms (id, passwordHash, displayToken, documentVersion, document, name, gmAccountId, hasPassword, switches, trustedPlayerIds)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET
-      passwordHash = excluded.passwordHash, displayToken = excluded.displayToken,
-      documentVersion = excluded.documentVersion, document = excluded.document,
-      name = excluded.name, gmAccountId = excluded.gmAccountId, hasPassword = excluded.hasPassword, switches = excluded.switches, trustedPlayerIds = excluded.trustedPlayerIds`)
-      .run(record.id, record.passwordHash, record.displayToken, record.documentVersion, record.document, record.name, record.gmAccountId, record.hasPassword, record.switches ?? JSON.stringify({ tokens: true, drawing: true, notes: true, fog: false, uploads: false, ownerOnly: false }), record.trustedPlayerIds ?? "[]");
+    this.transaction(() => {
+      this.connection.query(`INSERT INTO rooms (id, passwordHash, displayToken, documentVersion, document, name, gmAccountId, hasPassword, switches, trustedPlayerIds)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET
+        passwordHash = excluded.passwordHash, displayToken = excluded.displayToken,
+        documentVersion = excluded.documentVersion, document = excluded.document,
+        name = excluded.name, gmAccountId = excluded.gmAccountId, hasPassword = excluded.hasPassword, switches = excluded.switches, trustedPlayerIds = excluded.trustedPlayerIds`)
+        .run(record.id, record.passwordHash, record.displayToken, record.documentVersion, record.document, record.name, record.gmAccountId, record.hasPassword, record.switches ?? JSON.stringify({ tokens: true, drawing: true, notes: true, fog: false, uploads: false, ownerOnly: false }), record.trustedPlayerIds ?? "[]");
+      this.connection.query(record.session ? "INSERT OR IGNORE INTO room_sessions (roomId) VALUES (?)" : "DELETE FROM room_sessions WHERE roomId = ?").run(record.id);
+    });
+  }
+
+  roomIdsInSession(): string[] {
+    return this.connection.query<{ id: string }, []>("SELECT roomId AS id FROM room_sessions").all().map(room => room.id);
   }
 
   roomsForGM(accountId: string): RoomRecord[] {
-    return this.connection.query<RoomRecord, [string]>("SELECT * FROM rooms WHERE gmAccountId = ? ORDER BY name, id").all(accountId);
+    return this.connection.query<RoomRecord, [string]>(`${roomRecords} WHERE gmAccountId = ? ORDER BY name, id`).all(accountId);
   }
 
   administratorRooms(): (RoomRecord & { gmUsername: string })[] {
@@ -166,6 +180,7 @@ export class OwlbearDatabase {
           SELECT 1 FROM room_assets other WHERE other.assetId = assets.id AND other.roomId != room_assets.roomId
         )`).all(roomId);
       this.connection.query("DELETE FROM room_assets WHERE roomId = ?").run(roomId);
+      this.connection.query("DELETE FROM room_sessions WHERE roomId = ?").run(roomId);
       this.connection.query("DELETE FROM rooms WHERE id = ?").run(roomId);
       for (const asset of unused) this.deleteAsset(asset.id);
       return unused;

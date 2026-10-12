@@ -96,13 +96,30 @@ test("deleting a room or stopping the server clears a pending session countdown"
     const otherPlayer = await server.joinRoom(other.id);
     await session(otherGM.socket, true);
     await leave(otherGM.socket, otherPlayer.socket);
-    await server.restart();
-    const restartedGM = await server.joinRoomAsGM(other.id, cookie);
-    expect(restartedGM.info.room.session).toBe(false);
-    await session(restartedGM.socket, true);
-    await server.clock.advance(300000);
-    expect((await server.joinRoom(other.id)).info.room.session).toBe(true);
     await server.stop();
     await server.clock.advance(300000);
+  } finally { await server.dispose(); }
+}, 15000);
+
+test("a session kept across a restart ends five minutes after the start unless the GM returns", async () => {
+  const server = await startTestServer();
+  try {
+    const { cookie } = await setupAdministrator(server);
+    const left = await createRoom(server, cookie, "Left table");
+    const kept = await createRoom(server, cookie, "Kept table");
+    for (const room of [left, kept]) await session((await server.joinRoomAsGM(room.id, cookie)).socket, true);
+    await server.restart();
+    await server.clock.advance(299999);
+    const player = await server.joinRoom(left.id, "", "player");
+    expect(player.info.room.session).toBe(true);
+    const returning = await server.joinRoomAsGM(kept.id, cookie);
+    const ended = nextMessage(player.socket, "room_state");
+    await server.clock.advance(1);
+    expect((await ended)[0].session).toBe(false);
+    await server.clock.advance(600000);
+    expect((await server.joinRoom(kept.id)).info.room.session).toBe(true);
+    returning.socket.disconnect();
+    await server.restart();
+    expect((await server.joinRoom(left.id)).info.room.session).toBe(false);
   } finally { await server.dispose(); }
 }, 15000);

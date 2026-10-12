@@ -5,7 +5,7 @@ import type { Socket } from "socket.io-client";
 const pointer = (sceneId: string, x: number) => ({ sceneId, kind: "pointer", state: { position: { x, y: 2 }, visible: true } });
 const session = (socket: Socket, running: unknown) => new Promise<any>(resolve => socket.emit("session", running, resolve));
 
-test("only the GM controls a room session, which survives refresh but ends on restart", async () => {
+test("only the GM controls a room session, which survives a refresh and a restart", async () => {
   const server = await startTestServer();
   try {
     const { cookie } = await setupAdministrator(server);
@@ -25,7 +25,12 @@ test("only the GM controls a room session, which survives refresh but ends on re
     const refreshed = await server.joinRoomAsGM(room.id, cookie);
     expect(refreshed.info.room.session).toBe(true);
     await server.restart();
-    expect((await server.joinRoomAsGM(room.id, cookie)).info.room.session).toBe(false);
+    expect((await server.joinRoom(room.id)).info.room.session).toBe(true);
+    const returned = await server.joinRoomAsGM(room.id, cookie);
+    expect(returned.info.room.session).toBe(true);
+    expect(await session(returned.socket, false)).toEqual({ ok: true });
+    await server.restart();
+    expect((await server.joinRoom(room.id)).info.room.session).toBe(false);
   } finally { await server.dispose(); }
 }, 15000);
 

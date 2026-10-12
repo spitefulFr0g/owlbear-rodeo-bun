@@ -84,7 +84,8 @@ test("removing an account ends every HTTP sign-in and passes loaded and unloaded
     expect(await rooms()).toEqual(expected);
     expect((await request(server.address, "rooms", "GET", other.cookie)).status).toBe(401);
     const rejoined = await server.joinRoom(loaded.id, "room-password");
-    expect(rejoined.snapshot).toEqual({ scene: null });
+    // The session the removed owner started is still running after the restart
+    expect(rejoined.snapshot!.scene!.items.hero).toEqual(tokenItem);
     expect(await new Promise<string | null>(resolve => rejoined.socket.emit("get_display_token", resolve))).toBeNull();
     const newGM = await server.joinRoomAsGM(loaded.id, admin.cookie);
     await new Promise(resolve => newGM.socket.emit("session", true, resolve));

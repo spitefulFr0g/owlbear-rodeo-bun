@@ -32,6 +32,6 @@ test("room switches default, reject players and malformed changes, broadcast and
     expect((await renamed)[0]).toEqual({ name: "Renamed", switches, session: true, hasPassword: false });
     await server.clock.advance(3000);
     await server.restart();
-    expect((await server.joinRoom(room.id)).info.room).toEqual({ name: "Renamed", switches, session: false, hasPassword: false });
+    expect((await server.joinRoom(room.id)).info.room).toEqual({ name: "Renamed", switches, session: true, hasPassword: false });
   } finally { await server.dispose(); }
 }, 15000);

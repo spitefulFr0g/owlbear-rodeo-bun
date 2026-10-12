@@ -75,7 +75,7 @@ Decided for this release:
 - **Display link:** it no longer changes on a restart. A "new display link" action in the room's settings replaces the token and disconnects the cast displays using the old one.
 - **Trusted players:** remembered against the random id a player's browser keeps, and saved with the room. The GM marks and unmarks players from the party list. A trusted player who clears their browser or changes device is an ordinary player until marked again.
 - **Room switches:** five in this release, checked by the kind of change: tokens, drawing, notes and text, fog, and uploads. A new room has tokens, drawing, and notes and text on, and fog and uploads off. Owner Only needs a check on each item, so it arrives with step 6 and is not shown before then. Only the GM can change the map. With uploads off, a player can place only the built-in tokens and the images already in the room.
-- **Sessions:** outside a session, the server withholds the map and its state from players and cast displays. When a session ends, they return to the welcome screen at once and their changes are refused. A GM connected from two devices is the GM on both, and the five-minute timeout starts when the last of those connections drops. A server restart ends any running session.
+- **Sessions:** outside a session, the server withholds the map and its state from players and cast displays. When a session ends, they return to the welcome screen at once and their changes are refused. A GM connected from two devices is the GM on both, and the five-minute timeout starts when the last of those connections drops. A running session is kept across a server restart, and the five-minute timeout starts again when the server does.
 
 ### v0.3.0: the item model
 

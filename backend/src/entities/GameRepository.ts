@@ -29,6 +29,7 @@ export default class GameRepository {
       game.trustedPlayerIds = new Set(JSON.parse(record.trustedPlayerIds ?? "[]"));
       game.gmAccountId = record.gmAccountId;
       game.hasPassword = !!record.hasPassword;
+      game.session = !!record.session;
       if (record.documentVersion === 2 || record.documentVersion === 3) {
         const document = JSON.parse(record.document);
         game.openSceneId = document.openSceneId;
@@ -47,6 +48,11 @@ export default class GameRepository {
     return true;
   }
 
+  /** Loads every room saved with its session running and returns their ids. */
+  loadRoomsInSession(): string[] {
+    return (this.database?.roomIdsInSession() ?? []).filter(id => this.isGameCreated(id));
+  }
+
   changed(gameId: string): void {
     if (!this.database || !this.clock) return;
     const previous = this.pending.get(gameId);
@@ -60,7 +66,7 @@ export default class GameRepository {
   save(gameId: string): void {
     const game = this.games[gameId];
     this.database?.saveRoom({ id: game.gameId, passwordHash: game.passwordHash,
-      name: game.name, gmAccountId: game.gmAccountId, hasPassword: Number(game.hasPassword),
+      name: game.name, gmAccountId: game.gmAccountId, hasPassword: Number(game.hasPassword), session: Number(game.session),
       trustedPlayerIds: JSON.stringify([...game.trustedPlayerIds]),
       switches: JSON.stringify(game.switches), displayToken: game.displayToken, documentVersion: 3, document: JSON.stringify({ openSceneId: game.openSceneId, welcomeSceneId: game.welcomeSceneId, scenes: game.scenes }) });
     this.pending.get(gameId)?.cancel();

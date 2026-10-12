@@ -12,6 +12,7 @@ import {
   minGridLineWidth,
   SceneGrid,
 } from "../../sceneRules";
+import { measurementShown, measurementsOffered, withGridType } from "../../helpers/gridMeasurement";
 
 type SettledInputProps = {
   id: string;
@@ -56,6 +57,13 @@ function SettledInput({ type, value, onSettle, ...props }: SettledInputProps) {
   );
 }
 
+const measurementLabels: Record<SceneGrid["measurement"]["type"], string> = {
+  chebyshev: "Chebyshev",
+  alternating: "Alternating",
+  euclidean: "Euclidean",
+  manhattan: "Manhattan",
+};
+
 /** The GM changes the settings of the scene they are viewing, open or not */
 function SceneControls() {
   const { scene, person, readOnly, setSettings } = useScene();
@@ -82,7 +90,7 @@ function SceneControls() {
       >
         <Box p={3} onKeyDown={(event) => { if (event.key !== "Escape" && event.key !== "Tab") event.stopPropagation(); }} onKeyUp={(event) => event.stopPropagation()}>
           <Label htmlFor="scene-grid-type">Grid type</Label>
-          <Select id="scene-grid-type" value={grid.type} disabled={readOnly} onChange={(event) => change({ type: event.target.value as GridType })}>
+          <Select id="scene-grid-type" value={grid.type} disabled={readOnly} onChange={(event) => change(withGridType(grid, event.target.value as GridType))}>
             <option value="square">Square</option>
             <option value="hexVertical">Vertical Hex</option>
             <option value="hexHorizontal">Horizontal Hex</option>
@@ -90,11 +98,8 @@ function SceneControls() {
           <Label><Checkbox checked={grid.shown} disabled={readOnly} onChange={(event) => change({ shown: event.target.checked })} />Show grid</Label>
           <Label><Checkbox checked={grid.snap} disabled={readOnly} onChange={(event) => change({ snap: event.target.checked })} />Snap to grid</Label>
           <Label htmlFor="scene-measurement">Measurement</Label>
-          <Select id="scene-measurement" value={grid.measurement.type} disabled={readOnly} onChange={(event) => change({ measurement: { ...grid.measurement, type: event.target.value as SceneGrid["measurement"]["type"] } })}>
-            <option value="chebyshev">Chebyshev</option>
-            <option value="alternating">Alternating</option>
-            <option value="euclidean">Euclidean</option>
-            <option value="manhattan">Manhattan</option>
+          <Select id="scene-measurement" value={measurementShown(grid)} disabled={readOnly} onChange={(event) => change({ measurement: { ...grid.measurement, type: event.target.value as SceneGrid["measurement"]["type"] } })}>
+            {measurementsOffered(grid.type).map((type) => <option key={type} value={type}>{measurementLabels[type]}</option>)}
           </Select>
           <Label htmlFor="scene-scale">Measurement scale</Label>
           <Input id="scene-scale" value={scale} disabled={readOnly} onChange={(event) => setScale(event.target.value)} onBlur={() => change({ measurement: { ...grid.measurement, scale } })} onKeyDown={(event) => { if (event.key === "Enter") event.currentTarget.blur(); }} />
