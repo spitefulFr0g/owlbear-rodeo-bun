@@ -28,7 +28,7 @@ A row with a split verdict names which part is which.
 
 Ten steps, grouped into releases. They are built in number order, except that step 8 is built before step 7. Steps 1 to 5 run on today's canvas. Step 6 is the one large rewrite. Steps 7 to 10 build on it.
 
-v0.1.0, v0.2.0 and v0.3.0 are released. v0.4.0 is firm. v0.5.0 is a forecast.
+The scope through v0.4.0 is implemented. See the [v0.4.0 release notes](releases/v0.4.0.md) for scenes, live play and upgrade instructions. v0.5.0 is a forecast.
 
 ### v0.1.0: the shared screen
 
