@@ -12,7 +12,6 @@ import { drawingsInOrder, deleteDrawings } from "../../scene/drawingItem";
 import DrawingTool from "../tools/DrawingTool";
 import FogTool from "../tools/FogTool";
 import MeasureTool from "../tools/MeasureTool";
-import NetworkedMapPointer from "../../network/NetworkedMapPointer";
 import NetworkedDisplayView from "../../network/NetworkedDisplayView";
 
 import DisplayControls from "../display/DisplayControls";
@@ -28,6 +27,7 @@ import { Settings } from "../../types/Settings";
 import NoteTool from "../tools/NoteTool";
 import SceneItemMenu from "../scene/SceneItemMenu";
 import SceneNotice from "../scene/SceneNotice";
+import ScenePointers from "../scene/ScenePointers";
 import SceneSelection, { SceneItems } from "../scene/SceneSelection";
 
 type MapProps = {
@@ -131,10 +131,7 @@ function Map({ session }: MapProps) {
           toolSettings={settings.fog}
           editable={permissions.fog && !settings.fog.preview}
         />
-        <NetworkedMapPointer
-          active={selectedToolId === "pointer"}
-          session={session}
-        />
+        <ScenePointers active={selectedToolId === "pointer"} />
         {scene && roleControls.room && (
           <NetworkedDisplayView session={session} sceneId={scene.id} />
         )}

@@ -25,7 +25,7 @@ function NetworkedMapAndTokens({ session }: { session: Session }) {
   }
   if (role !== "gm" && room.session === false) {
     return scene
-      ? <DisplayMap key={scene.id} view={defaultDisplayView(scene)} session={session} interactive />
+      ? <DisplayMap key={scene.id} view={defaultDisplayView(scene)} interactive />
       : <WelcomeScreen />;
   }
   return (

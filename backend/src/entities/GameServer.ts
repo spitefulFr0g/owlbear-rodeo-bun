@@ -15,7 +15,6 @@ import GameState from "./GameState";
 import JoinTokens from "./JoinTokens";
 import { PlayerState } from "../types/PlayerState";
 import { playerColours, isPlayerColour } from "../types/PlayerColour";
-import { Pointer } from "../types/Pointer";
 
 export default class GameServer {
   private readonly io: IOServer;
@@ -154,10 +153,6 @@ export default class GameServer {
       // Cast displays may only request read access. New write events are
       // refused here too, before any handler can change or forward state.
       socket.use(([event], next) => {
-        const roomId = gameState.getGameId();
-        // A connection on the default welcome screen has no canvas to point at.
-        if (roomId && socket.data.viewedSceneId == null &&
-          event === "player_pointer") return;
         if (
           socket.data.castDisplay && !["get_display_token", "join_display", "room_switches", "room_trust", "room_password", "new_display_link", "session", "scene_create", "scene_view", "scene_rename", "scene_delete", "scene_show", "scene_settings", "scene_bring", "scene_welcome", "scene_duplicate"].includes(event)
         ) {
@@ -858,27 +853,6 @@ export default class GameServer {
           if (++liveCount > maxLiveMessagesPerSecond) return;
         }
         this.relayLive(socket, gameId, message);
-      });
-
-      socket.on("player_pointer", async (playerPointer: Pointer) => {
-        try {
-          let gameId: string;
-          if (_gameId) {
-            gameId = _gameId;
-          } else {
-            const result = gameState.getGameId();
-            if (result) {
-              gameId = result;
-              _gameId = result;
-            } else {
-              return;
-            }
-          }
-
-          this.broadcastCanvas(socket, gameId, "player_pointer", playerPointer);
-        } catch (error) {
-          console.error("POINTER_ERROR", error);
-        }
       });
     });
   }
