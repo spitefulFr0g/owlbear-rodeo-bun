@@ -28,13 +28,13 @@ test("only the GM controls a room session, which survives refresh but ends on re
   } finally { await server.dispose(); }
 }, 15000);
 
-test("waiting players and cast displays receive party data and no pointers or display view", async () => {
+test("waiting players and cast displays receive presence and no pointers or display view", async () => {
   const server = await startTestServer();
   try {
     const { cookie } = await setupAdministrator(server);
     const room = await createRoom(server, cookie, "Table");
     const gm = await server.joinRoomAsGM(room.id, cookie);
-    gm.socket.emit("player_state", { name: "Keeper" });
+    gm.socket.emit("presence_update", { color: "blue", dice: { share: false, rolls: [] }, nickname: "Keeper" });
     const preparingGM = await server.joinRoomAsGM(room.id, cookie);
     const gmPointers = nextMessage(preparingGM.socket, "player_pointer");
     const token = await new Promise<string>(resolve => gm.socket.emit("get_display_token", resolve));
@@ -48,7 +48,7 @@ test("waiting players and cast displays receive party data and no pointers or di
       for (const event of ["scene_snapshot", "scene_changes", "player_pointer", "display_view"])
         peer.on(event, () => received[i].push(event));
     });
-    expect(player.state.partyState[gm.socket.id!].name).toBe("Keeper");
+    expect(player.state.presenceState[gm.socket.id!].nickname).toBe("Keeper");
     gm.socket.emit("player_pointer", { x: 1, y: 2 });
     gm.socket.emit("display_view", { sceneId: gm.snapshot!.scene!.id, x: 0, y: 0, width: 10, height: 10 });
     await gmPointers;
