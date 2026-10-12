@@ -139,7 +139,7 @@ try {
     const database = new Database(join(dataDir, "owlbear.db"), { readonly: true });
     try {
       const version = database.query<{ user_version: number }, []>("PRAGMA user_version").get()!.user_version;
-      if (version !== 2) throw new Error(`The upgraded layout version was ${version}, expected 2`);
+      if (version !== 3) throw new Error(`The upgraded layout version was ${version}, expected 3`);
     } finally { database.close(); }
   }
   if (second.ownerOnly !== false) throw new Error("The restarted or upgraded room did not default Owner Only to off");
@@ -164,7 +164,7 @@ try {
     const timeout = setTimeout(() => old.kill(), 10000);
     try {
       const error = await new Response(old.stderr).text();
-      if (await old.exited === 0 || !error.includes("newer layout version 2")) throw new Error(`The released executable did not refuse upgraded data: ${error}`);
+      if (await old.exited === 0 || !error.includes("newer layout version 3")) throw new Error(`The released executable did not refuse upgraded data: ${error}`);
     } finally { clearTimeout(timeout); old.kill(); }
   }
 } finally {

@@ -12,7 +12,7 @@ test("a newer database refuses startup without changing the file and explains re
   try {
     const path = join(dir, "owlbear.db");
     const db = new Database(path);
-    db.exec("PRAGMA user_version = 3; CREATE TABLE future (value TEXT)");
+    db.exec("PRAGMA user_version = 4; CREATE TABLE future (value TEXT)");
     db.close();
     const before = await readFile(path);
     await expect(startTestServer(undefined, dir)).rejects.toThrow("newer");
