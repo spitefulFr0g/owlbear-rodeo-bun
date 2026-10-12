@@ -25,8 +25,6 @@ export default class GameState {
   async joinGame(gameId: string, castDisplay = false): Promise<void> {
     await this.socket.join(gameId);
 
-    if (castDisplay) this.socket.emit("presence_state", this.gameRepository.games[gameId].presenceState);
-
     if (!castDisplay) this.socket.to(gameId).emit("player_joined", this.socket.id);
   }
 }

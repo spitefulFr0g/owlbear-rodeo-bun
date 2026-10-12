@@ -156,9 +156,9 @@ test("a cast display receives initial and live state without player presence", a
   expect(await assetStatus(joinToken)).toBe(404);
   expect(await assetStatus(joinToken, "PUT")).toBe(403);
   expect(events.map(([event]) => event)).toEqual([
-    "presence_state", "joined_display", "scene_snapshot", "display_frozen",
+    "joined_display", "presence_state", "scene_snapshot", "display_frozen",
   ]);
-  expect(events[0][1]).toEqual({ [player.id!]: { userId: "gm", nickname: "GM", role: "gm", color: "blue", sessionId: player.id, dice: { share: false, rolls: [] } } });
+  expect(events[1][1]).toEqual({ [player.id!]: { elsewhere: false, userId: "gm", nickname: "GM", role: "gm", color: "blue", sessionId: player.id, dice: { share: false, rolls: [] } } });
   expect(events[2][1].scene.items).toEqual({});
   expect(await displayToken(display)).toBeNull();
   const sceneId = scenes.get("display-live")!;
@@ -224,7 +224,7 @@ for (const [event, payload] of [
     const observer = client();
     const snapshot = record(observer);
     await joinDisplay(observer, gameId, token);
-    expect(snapshot[0][1]).toEqual({ [player.id!]: { userId: "gm", nickname: "GM", role: "gm", color: "blue", sessionId: player.id, dice: { share: false, rolls: [] } } });
+    expect(snapshot.find(([event]) => event === "presence_state")?.[1]).toEqual({ [player.id!]: { elsewhere: false, userId: "gm", nickname: "GM", role: "gm", color: "blue", sessionId: player.id, dice: { share: false, rolls: [] } } });
     expect(snapshot.find(([name]) => name === "scene_snapshot")![1].scene.items).toEqual({});
     expect(snapshot.filter(([name]) => name === "display_frozen")).toEqual([["display_frozen", false]]);
     expect(snapshot.filter(([name]) => name === "display_view")).toEqual([]);
@@ -336,8 +336,8 @@ test("freeze holds the shown view for joining displays and unfreeze sends the la
   const lateEvents = record(lateDisplay);
   await joinDisplay(lateDisplay, "display-freeze", token);
   expect(lateEvents).toEqual([
-    ["presence_state", expect.any(Object)],
     ["joined_display", lateDisplay.id, expect.any(String), { room: { name: "display-freeze", session: true, hasPassword: true, switches: { tokens: true, drawing: true, notes: true, fog: false, uploads: false, ownerOnly: false } } }],
+    ["presence_state", expect.any(Object)],
     ["scene_snapshot", { scene: expect.objectContaining({ id: expect.any(String), items: {} }) }],
     ["display_frozen", true], ["display_view", view],
   ]);

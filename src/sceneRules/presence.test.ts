@@ -1,4 +1,4 @@
-import { readPresence, maxPresenceNameLength, maxPresenceRolls, playerColours } from "./presence";
+import { presenceSceneFor, readPresence, maxPresenceNameLength, maxPresenceRolls, playerColours } from "./presence";
 const update = { nickname: "Player", color: "blue", dice: { share: true, rolls: [{ type: "d20", roll: 20 }] } };
 test("presence accepts the name and dice caps and every player colour", () => {
   for (const color of playerColours) expect(readPresence({ ...update, color, nickname: "x".repeat(maxPresenceNameLength), dice: { share: true, rolls: Array(maxPresenceRolls).fill({ type: "d4", roll: "unknown" }) } })).toBeDefined();
@@ -17,4 +17,14 @@ test("presence copies only its allowed fields and sanitizes private rolls", () =
   expect(readPresence({ ...update, dice: { ...update.dice, share: false } })?.dice.rolls).toEqual([]);
   for (const timer of [null, {}, { current: Infinity, max: 1 }, { current: 1, max: NaN }, { current: "1", max: 1 }]) expect(readPresence({ ...update, timer })).toBeUndefined();
   for (const value of [null, [], undefined]) expect(readPresence(value)).toBeUndefined();
+});
+
+test("viewed scene projection gives only GMs ids and suppresses elsewhere outside a session", () => {
+  for (const role of ["gm", "trusted", "player", "display"] as const) {
+    for (const session of [false, true]) {
+      for (const [receiver, viewed] of [[null, null], [null, "secret"], ["open", "open"], ["open", "secret"], ["open", null]]) {
+        expect(presenceSceneFor(role, receiver, viewed, session)).toEqual(role === "gm" ? { sceneId: viewed } : { elsewhere: session && receiver !== viewed });
+      }
+    }
+  }
 });
