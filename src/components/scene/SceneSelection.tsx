@@ -1,5 +1,5 @@
 import SceneFogFill from "./SceneFogFill";
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useLayoutEffect } from "react";
 import Konva from "konva";
 import { Group } from "react-konva";
 import { v4 as uuid } from "uuid";
@@ -12,13 +12,14 @@ import {
   copySelection,
   moveSelection,
 } from "../../scene/selection";
-import { Change, Item, Layer, layers, TokenMovement, tokenMovement } from "../../sceneRules";
+import { Change, Item, Layer, layers, LiveTransform, TokenMovement, tokenMovement } from "../../sceneRules";
 import { useMapStage } from "../../contexts/MapStageContext";
 import { useSetPreventMapInteraction } from "../../contexts/MapInteractionContext";
 import { useKeyboard } from "../../contexts/KeyboardContext";
 import { useGridSnappingSensitivity } from "../../contexts/GridContext";
 import useSetting from "../../hooks/useSetting";
 import useSceneSnapping from "../../hooks/useSceneSnapping";
+import { heldTransformsAllowed } from "../../helpers/heldTransforms";
 import shortcuts from "../../shortcuts";
 import World from "./World";
 import { SceneImage } from "./SceneImages";
@@ -41,7 +42,9 @@ export default function SceneSelection({
   onMenuOpen: (position: { x: number; y: number } | null) => void;
 }) {
   const { scene, selection, setSelection, readOnly, act, canSelect } = useScene();
-  const { send, end, hold } = useLive();
+  const { send, end, hold, cleared } = useLive();
+  const reconcileRef = useRef<() => void>();
+  useLayoutEffect(() => reconcileRef.current?.(), [scene, canSelect]);
   const canSelectRef = useRef(canSelect);
   canSelectRef.current = canSelect;
   const stageRef = useMapStage();
@@ -123,11 +126,12 @@ export default function SceneSelection({
     }
   });
   useEffect(() => {
-    // Scene settings can change while the hand keeps moving; only a new item
-    // store or scene tears down the interaction. Read current rules through refs.
-    const scene = sceneRef.current;
+    // Item updates must not replace the handlers that own a held interaction.
+    // Every event reads the latest scene; pickup geometry stays fixed until release.
+    const initialScene = sceneRef.current;
     const canSelect = (item: Item) => canSelectRef.current(item);
-    if (!active || !scene || !root.current || !stageRef.current) return;
+    if (!active || !initialScene || !root.current || !stageRef.current) return;
+    const currentScene = () => sceneRef.current!;
     const world = root.current;
     const stage = stageRef.current;
     const nodes = () =>
@@ -135,9 +139,9 @@ export default function SceneSelection({
         .find(".scene-item")
         .filter(
           (node) =>
-            !!scene.items[node.id()] &&
-            canSelect(scene.items[node.id()]) &&
-            (!layer || scene.items[node.id()].layer === layer)
+            !!currentScene().items[node.id()] &&
+            canSelect(currentScene().items[node.id()]) &&
+            (!layer || currentScene().items[node.id()].layer === layer)
         );
     const selectedNodes = () =>
       nodes().filter((node) => selectedRef.current.includes(node.id()));
@@ -160,7 +164,7 @@ export default function SceneSelection({
     transformer.boundBoxFunc((old, next) => {
       if (next.width < 1 || next.height < 1) return old;
       const scale = world.getAbsoluteScale().x;
-      const grid = sceneRef.current?.grid || scene.grid;
+      const grid = sceneRef.current?.grid || currentScene().grid;
       const cell = grid.unitsPerCell * scale;
       let width = next.width;
       const nearest = Math.round(width / cell) * cell;
@@ -186,16 +190,17 @@ export default function SceneSelection({
       };
     });
     // What a held pointer gives the items, sent live to the others on the scene
+    let heldTransforms: LiveTransform[] = [];
+    const capture = (held: Konva.Node[]) =>
+      held.map((node) => ({
+        id: node.id(),
+        position: node.position(),
+        rotation: node.rotation(),
+        scale: node.scale(),
+      }));
     const sendDrag = (held: Konva.Node[], pickedUp?: string) => {
-      const drag = heldDrag(
-        held.map((node) => ({
-          id: node.id(),
-          position: node.position(),
-          rotation: node.rotation(),
-          scale: node.scale(),
-        })),
-        pickedUp
-      );
+      heldTransforms = capture(held);
+      const drag = heldDrag(heldTransforms, pickedUp);
       if (drag) send("drag", drag);
       const current = sceneRef.current;
       onMovement(pickedUp && drag && current ? tokenMovement(current, drag.items, pickedUp) || null : null);
@@ -209,8 +214,7 @@ export default function SceneSelection({
         node.rotation(item.rotation);
         node.scale(item.scale);
       });
-    // Set while a drop is being committed. The store renders the batch before
-    // it is sent, which runs this effect's cleanup in the middle of the drop.
+    // A local commit renders synchronously before the held interaction ends.
     let landing = false;
     const finishTransform = () => {
       landing = true;
@@ -225,7 +229,8 @@ export default function SceneSelection({
       }));
       if (!act(changes))
         selectedNodes().forEach((node) => {
-          const item = scene.items[node.id()];
+          const item = currentScene().items[node.id()];
+          if (!item) return;
           node.position(item.position);
           node.rotation(item.rotation);
           node.scale(item.scale);
@@ -233,11 +238,13 @@ export default function SceneSelection({
       // The batch goes first, so the items land for the others with no step back
       onMovement(null);
       end("drag");
+      heldTransforms = [];
       hold([]);
       landing = false;
       prevent(false);
     };
     transformer.on("transformstart", () => {
+      heldTransforms = capture(selectedNodes());
       hold(selectedNodes().map((node) => node.id()));
       prevent(true);
     });
@@ -271,10 +278,10 @@ export default function SceneSelection({
       )
         return;
       let node: Konva.Node | null = event.target;
-      while (node && !scene!.items[node.id()] && node !== transformer)
+      while (node && !currentScene().items[node.id()] && node !== transformer)
         node = node.getParent();
       if (node === transformer) return;
-      if (node && scene!.items[node.id()] && (!canSelect(scene!.items[node.id()]) || (layer && scene!.items[node.id()].layer !== layer)))
+      if (node && currentScene().items[node.id()] && (!canSelect(currentScene().items[node.id()]) || (layer && currentScene().items[node.id()].layer !== layer)))
         node = null;
       onMenuOpen(null);
       if (!node && !boxSelect) {
@@ -283,7 +290,7 @@ export default function SceneSelection({
       }
       start = point();
       prevent(true);
-      if (node && scene!.items[node.id()]) {
+      if (node && currentScene().items[node.id()]) {
         const id = node.id();
         if (event.evt.shiftKey) {
           setSelection((prev) =>
@@ -302,23 +309,24 @@ export default function SceneSelection({
         moving = nodes().filter((value) => ids.includes(value.id()));
         // Higher token layers attach by overlap at the start of the action.
         for (const candidate of nodes()) {
-          const item = scene!.items[candidate.id()];
+          const item = currentScene().items[candidate.id()];
           if (layer || item.kind !== "image" || moving.includes(candidate))
             continue;
           if (
             moving.some((base) =>
               attachesTo(
-                scene!.items[base.id()],
+                currentScene().items[base.id()],
                 item,
-                scene!.grid.unitsPerCell
+                currentScene().grid.unitsPerCell
               )
             )
           )
             moving.push(candidate);
         }
-        originals = moving.map((value) => scene!.items[value.id()]);
+        originals = moving.map((value) => currentScene().items[value.id()]);
         duplicate = event.evt.altKey;
         pickedUp = id;
+        heldTransforms = capture(moving);
         hold(moving.map((value) => value.id()));
       } else {
         moving = [];
@@ -356,6 +364,7 @@ export default function SceneSelection({
         );
         // A copy is not there yet for the others to see
         if (!duplicate) sendDrag(moving, pickedUp);
+        else heldTransforms = capture(moving);
       }
       world.getLayer()?.batchDraw();
     }
@@ -385,31 +394,66 @@ export default function SceneSelection({
           (dx || dy) &&
           !act(moveSelection(originals, { x: dx, y: dy }))
         )
-          moving.forEach((node, i) => node.position(originals[i].position));
+          restore(moving);
         // The batch goes first, so the items land for the others with no step back
         onMovement(null);
         end("drag");
+        heldTransforms = [];
         hold([]);
         landing = false;
       }
       start = undefined;
       prevent(false);
     }
+    // React applies authoritative props before this layout callback. Reapply the
+    // held geometry before painting, unless an item vanished or became forbidden.
+    const reconcile = () => {
+      if (landing || sceneRef.current?.id !== initialScene.id) return;
+      const held = transformer.isTransforming() ? transformer.nodes() : start ? moving : [];
+      if (!heldTransformsAllowed(heldTransforms, currentScene().items,
+        item => canSelect(item) && (!layer || item.layer === layer))) {
+        restore(held);
+        transformer.off("transformend", finishTransform);
+        transformer.stopTransform();
+        transformer.on("transformend", finishTransform);
+        start = undefined;
+        moving = [];
+        heldTransforms = [];
+        onMovement(null);
+        end("drag");
+        hold([]);
+        prevent(false);
+      } else {
+        for (const value of heldTransforms) {
+          const node = held.find(node => node.id() === value.id);
+          node?.position(value.position);
+          node?.rotation(value.rotation);
+          node?.scale(value.scale);
+        }
+      }
+      if (!transformer.isTransforming()) transformer.nodes(readOnly ? [] : selectedNodes());
+      world.getLayer()?.batchDraw();
+    };
+    reconcileRef.current = reconcile;
     stage.on("mousedown.selection touchstart.selection", down);
     stage.on("mousemove.selection touchmove.selection", move);
     stage.on("mouseup.selection touchend.selection", up);
     return () => {
       stage.off(".selection");
+      if (reconcileRef.current === reconcile) reconcileRef.current = undefined;
       if (!landing) {
         if (start && moving.length) restore(moving);
-        if (transformer.isTransforming()) restore(selectedNodes());
+        if (transformer.isTransforming()) restore(transformer.nodes());
         onMovement(null);
         end("drag");
+        heldTransforms = [];
         hold([]);
       }
       box?.destroy();
       // Selection effects must never reuse the destroyed transformer.
       if (transformRef.current === transformer) transformRef.current = undefined;
+      transformer.off("transformend", finishTransform);
+      transformer.stopTransform();
       transformer.destroy();
       prevent(false);
     };
@@ -418,7 +462,7 @@ export default function SceneSelection({
     boxSelect,
     layer,
     scene?.id,
-    scene?.items,
+    cleared,
     readOnly,
     act,
     copies,
