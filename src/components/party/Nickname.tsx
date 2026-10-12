@@ -11,9 +11,10 @@ type NicknameProps = {
   diceRolls?: DiceRoll[];
   role?: Role;
   color?: PlayerColour;
+  sceneMark?: string;
 };
 
-function Nickname({ nickname, diceRolls, role, color }: NicknameProps) {
+function Nickname({ nickname, diceRolls, role, color, sceneMark }: NicknameProps) {
   return (
     <Flex sx={{ flexDirection: "column" }}>
       <Text
@@ -34,6 +35,11 @@ function Nickname({ nickname, diceRolls, role, color }: NicknameProps) {
         >
           {role === "gm" ? "GM" : role === "trusted" ? "Trusted player" : "Player"}
         </Text>
+        {sceneMark && (
+          <Text as="span" variant="caption" sx={{ display: "block", overflowWrap: "anywhere" }}>
+            <span aria-hidden="true">↗ </span>{sceneMark}
+          </Text>
+        )}
       </Text>
       {diceRolls && <DiceRolls rolls={diceRolls} />}
     </Flex>
