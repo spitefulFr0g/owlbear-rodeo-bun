@@ -1,4 +1,4 @@
-import { Scene, defaultSceneGrid } from "../../../src/sceneRules";
+import { PresenceState, Scene, defaultSceneGrid } from "../../../src/sceneRules";
 import { RoomSwitches } from "../types/RoomSwitches";
 import { randomBytes } from "crypto";
 import { DisplayView } from "../types/DisplayView";
@@ -30,6 +30,7 @@ export default class Game {
   shownDisplayView?: DisplayView;
   displayToken: string;
   gameId: string;
+  presenceState: PresenceState = {};
   partyState: PartyState;
   passwordHash: string;
 

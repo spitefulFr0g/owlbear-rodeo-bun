@@ -50,8 +50,8 @@ test("the old display link joins after restart without restoring presence, dice,
   const server = await startRoomServer();
   try {
     const { owner, observer } = await change(server);
-    const party = nextMessage(observer.socket, "party_state");
-    owner.socket.emit("player_state", { userId: "gm", nickname: "GM", dice: { roll: 20 }, timer: { remaining: 60 } });
+    const party = nextMessage(observer.socket, "presence_state");
+    owner.socket.emit("presence_update", { color: "blue", userId: "gm", nickname: "GM", dice: { share: true, rolls: [{ type: "d20", roll: 20 }] }, timer: { current: 60, max: 60 } });
     await party;
     const token = await new Promise<string>((resolve) => owner.socket.emit("get_display_token", resolve));
     expect(token).toBeString();
@@ -63,7 +63,7 @@ test("the old display link joins after restart without restoring presence, dice,
     const display = server.connect();
     const events: string[] = [];
     display.onAny((event) => events.push(event));
-    const initialParty = nextMessage(display, "party_state");
+    const initialParty = nextMessage(display, "presence_state");
     const initialFrozen = nextMessage(display, "display_frozen");
     const joined = nextMessage(display, "joined_display");
     display.emit("join_display", server.roomId, token);
@@ -74,7 +74,10 @@ test("the old display link joins after restart without restoring presence, dice,
     // This acknowledgement follows all initial events on the same connection.
     await new Promise((resolve) => display.emit("get_display_token", resolve));
     expect(events).not.toContain("display_view");
-    expect((await server.joinRoomAsGM(server.roomId, server.cookie)).state.partyState).toEqual({});
+    const fresh = await server.joinRoomAsGM(server.roomId, server.cookie);
+    expect(Object.keys(fresh.state.presenceState)).toEqual([fresh.socket.id!]);
+    expect(fresh.state.presenceState[fresh.socket.id!].dice.rolls).toEqual([]);
+    expect(fresh.state.presenceState[fresh.socket.id!].timer).toBeUndefined();
   } finally { await server.dispose(); }
 });
 

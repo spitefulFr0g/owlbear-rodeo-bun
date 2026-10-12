@@ -25,37 +25,29 @@ test("joins reserve unused colours before player state, keep chosen duplicates a
     expect(colours).toContain(invalid.info.color);
     const second = await join(server, other.id, null);
     expect(second.info.color).not.toBe(invalid.info.color);
-    const departed = nextMessage(invalid.socket, "party_state");
+    const departed = nextMessage(invalid.socket, "presence_state");
     second.socket.disconnect();
     await departed;
     expect((await join(server, other.id)).info.color).toBe(second.info.color);
   } finally { await server.dispose(); }
 }, 15000);
 
-test("player state broadcasts valid colours and preserves the assigned colour for missing or unknown values", async () => {
+test("presence broadcasts chosen player colours and excludes cast displays", async () => {
   const server = await startTestServer();
   try {
     const { cookie } = await setupAdministrator(server);
     const room = await createRoom(server, cookie, "Live colours");
     const gm = await server.joinRoomAsGM(room.id, cookie);
-    expect(colours).toContain(gm.info.color);
     const player = await join(server, room.id, "pink");
     const token = await new Promise<string>(resolve => gm.socket.emit("get_display_token", resolve));
     const display = await server.joinDisplay(room.id, token);
-    expect(display.info.color).toBeUndefined();
-    for (const color of [undefined, "teal", "unknown", null, {}, 1, "TEAL"]) {
-      const updates = [gm, display].map(peer => nextMessage(peer.socket, "party_state"));
-      player.socket.emit("player_state", { nickname: "Player", color });
-      for (const [party] of await Promise.all(updates)) {
-        expect(party[player.socket.id!].color).toBe(color === undefined ? "pink" : "teal");
-        expect(party[display.socket.id!]).toBeUndefined();
+    for (const color of colours) {
+      const updates = [gm, display].map(peer => nextMessage(peer.socket, "presence_state"));
+      player.socket.emit("presence_update", { nickname: "Player", color, dice: { share: false, rolls: [] } });
+      for (const [state] of await Promise.all(updates)) {
+        expect(state[player.socket.id!].color).toBe(color);
+        expect(state[display.socket.id!]).toBeUndefined();
       }
     }
-    const update = nextMessage(gm.socket, "party_state");
-    display.socket.emit("player_state", { color: "red" });
-    player.socket.emit("player_state", { nickname: "Still teal" });
-    const [party] = await update;
-    expect(party[player.socket.id!].color).toBe("teal");
-    expect(party[display.socket.id!]).toBeUndefined();
   } finally { await server.dispose(); }
 }, 15000);

@@ -1,4 +1,4 @@
-import { applyChange, visibleTo, changeFor, Item, Scene, mayChange, Person, checkChange, readBatch, topOrder, gmOwner, Change, SceneGrid, checkGrid, defaultSceneGrid, checkSceneName, maxScenes, readLive, dragFrom, dragFor, LiveMessage, maxLiveMessagesPerSecond } from "../../../src/sceneRules";
+import { applyChange, visibleTo, changeFor, Item, Scene, mayChange, Person, checkChange, readBatch, topOrder, gmOwner, Change, SceneGrid, checkGrid, defaultSceneGrid, checkSceneName, maxScenes, readLive, dragFrom, dragFor, LiveMessage, maxLiveMessagesPerSecond, readPresence, PresenceUpdate } from "../../../src/sceneRules";
 import { randomBytes } from "crypto";
 import Accounts from "../accounts/Accounts";
 import { clientAddress } from "../clientRequest";
@@ -39,6 +39,14 @@ export default class GameServer {
   private playerRole(socket: Socket, gameId: string): "gm" | "trusted" | "player" {
     if (socket.data.role === "gm") return "gm";
     return this.gameRepo.games[gameId].trustedPlayerIds.has(socket.data.playerId) ? "trusted" : "player";
+  }
+
+  private updatePresence(socket: Socket, gameId: string, update: PresenceUpdate): void {
+    const game = this.gameRepo.games[gameId];
+    socket.data.color = update.color;
+    game.presenceState[socket.id] = { ...update, sessionId: socket.id,
+      userId: socket.data.playerId, role: this.playerRole(socket, gameId) };
+    this.io.to(gameId).emit("presence_state", game.presenceState);
   }
 
   private person(socket: Socket, gameId: string): Person {
@@ -225,6 +233,9 @@ export default class GameServer {
           // Delete player state from game
           this.gameRepo.deletePlayer(gameId, socket.id);
 
+          delete game.presenceState[socket.id];
+          socket.to(gameId).emit("presence_state", game.presenceState);
+
           // Update party state
           const partyState = this.gameRepo.getPartyState(gameId);
           socket.to(gameId).emit("party_state", partyState);
@@ -281,6 +292,7 @@ export default class GameServer {
             playerColours.find(color => !usedColours.has(color)) ?? playerColours[0];
           await gameState.joinGame(gameId);
           _gameId = gameId;
+          this.updatePresence(socket, gameId, { nickname: "", color: socket.data.color, dice: { share: false, rolls: [] } });
           if (role === "gm") {
             game.cancelSessionCountdown?.();
             game.cancelSessionCountdown = undefined;
@@ -733,9 +745,11 @@ export default class GameServer {
           if (!peer || peer.data.castDisplay || peer.data.playerId !== playerId) continue;
           const role = this.playerRole(peer, gameId);
           if (game.partyState[id]) game.partyState[id].role = role;
+          if (game.presenceState[id]) game.presenceState[id].role = role;
           peer.emit("player_role", role);
         }
         this.io.to(gameId).emit("party_state", game.partyState);
+        this.io.to(gameId).emit("presence_state", game.presenceState);
         if (typeof answer === "function") answer({ ok: true });
       });
 
@@ -815,6 +829,13 @@ export default class GameServer {
           }
         }
         if (typeof answer === "function") answer({ ok: true, token: game.displayToken });
+      });
+
+      socket.on("presence_update", (value: unknown) => {
+        const gameId = gameState.getGameId();
+        if (!gameId || socket.data.castDisplay) return;
+        const update = readPresence(value);
+        if (update) this.updatePresence(socket, gameId, update);
       });
 
       socket.on("player_state", async (playerState: PlayerState) => {

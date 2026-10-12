@@ -27,6 +27,7 @@ export default class GameState {
 
     const partyState = this.gameRepository.getPartyState(gameId);
     this.socket.emit("party_state", partyState);
+    if (castDisplay) this.socket.emit("presence_state", this.gameRepository.games[gameId].presenceState);
 
     if (!castDisplay) this.socket.to(gameId).emit("player_joined", this.socket.id);
   }
