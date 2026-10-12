@@ -1,3 +1,4 @@
+import { memo } from "react";
 import {
   Circle,
   Group,
@@ -26,7 +27,11 @@ import World from "./World";
 
 type SceneImageProps = { item: ImageItem; labelSize: number };
 
-export function SceneImage({ item, labelSize }: SceneImageProps) {
+// Memoised so a live drag redraws only the items it holds
+export const SceneImage = memo(function SceneImage({
+  item,
+  labelSize,
+}: SceneImageProps) {
   const savedQuality = item.metadata.mapQuality;
   const quality =
     item.image.type === "file" &&
@@ -93,7 +98,7 @@ export function SceneImage({ item, labelSize }: SceneImageProps) {
       ) : null}
     </Group>
   );
-}
+});
 
 type SceneImagesProps = {
   placement?: "belowGrid" | "aboveGrid" | "aboveRuler";

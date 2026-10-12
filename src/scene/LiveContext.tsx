@@ -1,4 +1,5 @@
 import React, {
+  useCallback,
   useContext,
   useEffect,
   useMemo,
@@ -12,6 +13,7 @@ import {
   LiveKind,
   LiveMessage,
   LiveState,
+  LiveTransform,
   ReceivedLiveMessage,
   Scene,
 } from "../sceneRules";
@@ -19,6 +21,7 @@ import {
 import {
   afterLive,
   createLiveSender,
+  dragTransforms,
   liveMoving,
   LiveMarks,
   liveStatesAt,
@@ -41,6 +44,10 @@ type LiveStore = {
    * connection. A tool holding a mark of its own lets go of it when this changes.
    */
   cleared: number;
+  /** The items this connection is moving, resizing or rotating itself */
+  held: string[];
+  /** Names the items this connection holds, none once it lets go */
+  hold: (ids: string[]) => void;
   /** The live marks received for the scene being viewed */
   marks: () => LiveMarks;
   /** Calls back when the marks change, returns the way to stop */
@@ -82,6 +89,13 @@ export function LiveProvider({ session, children }: LiveProviderProps) {
   }
 
   const [cleared, setCleared] = useState(0);
+
+  const [held, setHeld] = useState<string[]>([]);
+  const hold = useCallback((ids: string[]) => {
+    setHeld((previous) =>
+      previous.length === 0 && ids.length === 0 ? previous : ids
+    );
+  }, []);
 
   const sender = useMemo(
     () =>
@@ -155,7 +169,7 @@ export function LiveProvider({ session, children }: LiveProviderProps) {
     };
   }, [session, sender]);
 
-  const actions = useMemo<Omit<LiveStore, "cleared">>(
+  const actions = useMemo<Omit<LiveStore, "cleared" | "held">>(
     () => ({
       send(kind, state) {
         const sceneId = sceneIdRef.current;
@@ -165,6 +179,7 @@ export function LiveProvider({ session, children }: LiveProviderProps) {
         flushLater();
       },
       end: sender.end,
+      hold,
       marks: () => marksRef.current,
       subscribe(listener) {
         listenersRef.current.add(listener);
@@ -175,9 +190,12 @@ export function LiveProvider({ session, children }: LiveProviderProps) {
     }),
     // flushLater only reads refs and the sender
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [sender, display]
+    [sender, display, hold]
   );
-  const store = useMemo(() => ({ ...actions, cleared }), [actions, cleared]);
+  const store = useMemo(
+    () => ({ ...actions, cleared, held }),
+    [actions, cleared, held]
+  );
 
   return <LiveContext.Provider value={store}>{children}</LiveContext.Provider>;
 }
@@ -225,6 +243,16 @@ export function useLiveMarks<K extends LiveKind>(
   }, [kind, marks, subscribe]);
 
   return shown;
+}
+
+/**
+ * What the drags received give the items of the scene being viewed, by item
+ * id, smoothed between updates. An item this connection holds is left out.
+ */
+export function useLiveDrags(): Record<string, LiveTransform> {
+  const { held } = useLive();
+  const drags = useLiveMarks("drag");
+  return useMemo(() => dragTransforms(drags, held), [drags, held]);
 }
 
 export default LiveContext;

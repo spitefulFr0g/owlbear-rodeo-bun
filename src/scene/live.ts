@@ -1,7 +1,10 @@
 import {
+  Item,
   LiveKind,
   LiveMessage,
   LiveState,
+  LiveTransform,
+  maxChanges,
   ReceivedLiveMessage,
   Vector2,
 } from "../sceneRules";
@@ -138,6 +141,86 @@ export function withoutConnection(
     (next[kind] as Record<string, LiveMark>) = others;
   }
   return next;
+}
+
+/**
+ * What the drags received give each item, by item id. An item this connection
+ * holds itself is left out, so its own drag is what it sees. Of two
+ * connections dragging one item, the first by connection id is drawn.
+ */
+export function dragTransforms(
+  drags: Record<string, LiveState["drag"]>,
+  held: string[]
+): Record<string, LiveTransform> {
+  const transforms: Record<string, LiveTransform> = {};
+  for (const connectionId of Object.keys(drags).sort()) {
+    for (const transform of drags[connectionId].items) {
+      if (held.includes(transform.id)) continue;
+      if (Object.prototype.hasOwnProperty.call(transforms, transform.id)) {
+        continue;
+      }
+      // An id may be any short string, even one an object already answers to
+      Object.defineProperty(transforms, transform.id, {
+        value: transform,
+        enumerable: true,
+        writable: true,
+        configurable: true,
+      });
+    }
+  }
+  return transforms;
+}
+
+/** An item as drawn while a drag holds it: the drag's values over the store's */
+export function itemInDrag<I extends Item>(
+  item: I,
+  transform: LiveTransform | undefined
+): I {
+  if (!transform) return item;
+  const { position, rotation, scale } = transform;
+  return { ...item, position, rotation, scale };
+}
+
+/**
+ * The scene's items as drawn under the drags received. The store's items are
+ * not changed, and an item no drag holds is the store's own object.
+ */
+export function itemsInDrags(
+  items: Record<string, Item>,
+  transforms: Record<string, LiveTransform>
+): Record<string, Item> {
+  const dragged = Object.keys(transforms).filter((id) =>
+    Object.prototype.hasOwnProperty.call(items, id)
+  );
+  if (dragged.length === 0) return items;
+  const drawn = { ...items };
+  for (const id of dragged) {
+    Object.defineProperty(drawn, id, {
+      value: itemInDrag(items[id], transforms[id]),
+      enumerable: true,
+      writable: true,
+      configurable: true,
+    });
+  }
+  return drawn;
+}
+
+/**
+ * The drag this connection sends for the items it holds: the one picked up
+ * first, the others in the order given. None when it holds more items than a
+ * drag may, as the server would drop it.
+ */
+export function heldDrag(
+  items: LiveTransform[],
+  pickedUp?: string
+): LiveState["drag"] | null {
+  if (items.length === 0 || items.length > maxChanges) return null;
+  return {
+    items: [
+      ...items.filter((item) => item.id === pickedUp),
+      ...items.filter((item) => item.id !== pickedUp),
+    ],
+  };
 }
 
 /** What this connection has out on a scene for one kind */

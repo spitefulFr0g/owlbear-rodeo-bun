@@ -1,7 +1,11 @@
-import { LiveMessage, ReceivedLiveMessage } from "../sceneRules";
+import { Item, LiveMessage, maxChanges, ReceivedLiveMessage } from "../sceneRules";
 import {
   afterLive,
   createLiveSender,
+  dragTransforms,
+  heldDrag,
+  itemInDrag,
+  itemsInDrags,
   liveMoving,
   liveSendInterval,
   liveStatesAt,
@@ -146,4 +150,56 @@ test("an update for another scene first ends the mark on the scene left", () => 
     [{ sceneId: "scene", kind: "pointer", state: null }, true],
     [{ sceneId: "other", kind: "pointer", state: state(2) }, false],
   ]);
+});
+
+const note = (id: string, x: number): Item => ({ id, kind: "text", layer: "note", position: { x, y: 0 }, rotation: 0,
+  scale: { x: 1, y: 1 }, order: 0, owner: "gm", locked: false, hidden: false, metadata: {}, text: "", size: 10,
+  color: "red", square: true });
+
+test("an item in a drag is drawn with the drag's position, rotation and scale over the store's", () => {
+  const item = note("hero", 0);
+  const drawn = itemInDrag(item, { id: "hero", position: { x: 5, y: 6 }, rotation: 90, scale: { x: 2, y: 2 } });
+  expect(drawn).toEqual({ ...item, position: { x: 5, y: 6 }, rotation: 90, scale: { x: 2, y: 2 } });
+  expect(item.position).toEqual({ x: 0, y: 0 });
+  expect(itemInDrag(item, undefined)).toBe(item);
+});
+
+test("drags draw over the items they hold and leave the store and the other items as they were", () => {
+  const items = { hero: note("hero", 0), bystander: note("bystander", 3) };
+  const drawn = itemsInDrags(items, dragTransforms({ a: { items: [transform("hero", 8, 45), transform("deleted", 1)] } }, []));
+  expect(drawn.hero).toEqual({ ...items.hero, position: { x: 8, y: 0 }, rotation: 45 });
+  expect(drawn.bystander).toBe(items.bystander);
+  expect(Object.keys(drawn)).toEqual(["hero", "bystander"]);
+  expect(items.hero.position.x).toBe(0);
+  expect(itemsInDrags(items, dragTransforms({}, []))).toBe(items);
+  expect(itemsInDrags(items, dragTransforms({ a: { items: [transform("deleted", 1)] } }, []))).toBe(items);
+});
+
+test("an item this connection holds keeps its own drag while the others follow the drag received", () => {
+  const transforms = dragTransforms({ a: { items: [transform("mine", 8), transform("theirs", 9)] } }, ["mine"]);
+  expect(transforms).toEqual({ theirs: transform("theirs", 9) });
+});
+
+test("one item dragged by two connections is drawn where the first connection has it", () => {
+  const transforms = dragTransforms({ b: { items: [transform("hero", 2)] }, a: { items: [transform("hero", 1)] } }, []);
+  expect(transforms.hero.position.x).toBe(1);
+});
+
+test("a received drag of an item named like an object property is drawn as any other", () => {
+  const items = { __proto__: null, constructor: note("constructor", 0) } as unknown as Record<string, Item>;
+  const drawn = itemsInDrags(items, dragTransforms({ a: { items: [transform("constructor", 4)] } }, []));
+  expect((drawn.constructor as unknown as Item).position.x).toBe(4);
+});
+
+test("the drag sent puts the item picked up first and keeps the others in order", () => {
+  const held = [transform("mount", 0), transform("hero", 1), transform("hat", 2)];
+  expect(heldDrag(held, "hero")!.items.map((item) => item.id)).toEqual(["hero", "mount", "hat"]);
+  expect(heldDrag(held)!.items).toEqual(held);
+});
+
+test("no drag is sent for nothing held or for more items than a batch may change", () => {
+  const many = Array.from({ length: maxChanges + 1 }, (_, index) => transform(`item-${index}`, index));
+  expect(heldDrag([])).toBeNull();
+  expect(heldDrag(many, "item-3")).toBeNull();
+  expect(heldDrag(many.slice(1))!.items).toHaveLength(maxChanges);
 });
