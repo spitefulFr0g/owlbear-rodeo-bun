@@ -206,7 +206,7 @@ for (const [label, room, token] of [
 for (const [event, payload] of [
   ["scene_changes", { id: "evil", sceneId: "wrong", changes: [{ type: "delete", id: "hero" }] }],
   ["presence_update", { userId: "gm", nickname: "Display", color: "blue", dice: { share: false, rolls: [] } }],
-  ["player_pointer", { x: 1, y: 2 }],
+  ["live", { sceneId: "wrong", kind: "pointer", state: { position: { x: 1, y: 2 }, visible: true } }],
   ["display_view", { sceneId: "wrong", x: 0, y: 0, width: 1, height: 1 }],
   ["display_freeze", true],
 ] as const) {

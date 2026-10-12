@@ -83,16 +83,17 @@ test("waiting viewers receive only their welcome scene's changes and pointers, w
     const settings = waiting.map(peer => nextMessage(peer.socket, "scene_settings"));
     await action(gm.socket, "scene_settings", { sceneId, grid: { ...defaultSceneGrid, shown: false }, fogFill: true });
     for (const [setting] of await Promise.all(settings)) expect(setting.fogFill).toBe(true);
-    const pointers = [gm, trusted, waiting[2]].map(peer => nextMessage(peer.socket, "player_pointer"));
-    player.socket.emit("player_pointer", { position: { x: 1, y: 2 } });
-    for (const [pointer] of await Promise.all(pointers)) expect(pointer.position).toEqual({ x: 1, y: 2 });
+    const pointers = [gm, trusted, waiting[2]].map(peer => nextMessage(peer.socket, "live"));
+    player.socket.emit("live", { sceneId, kind: "pointer", state: { position: { x: 1, y: 2 }, visible: true } });
+    for (const [pointer] of await Promise.all(pointers)) expect(pointer).toEqual({ sceneId, kind: "pointer", connectionId: player.socket.id, state: { position: { x: 1, y: 2 }, visible: true } });
     const leaked: unknown[] = [];
     for (const peer of waiting) peer.socket.onAny((event, value) => {
-      if (["scene_changes", "scene_grid", "scene_settings", "player_pointer", "display_view", "player_view", "scene_list"].includes(event)) leaked.push([event, value]);
+      // The GM leaving the welcome-screen scene ends its live marks there; nothing else live may follow.
+      if (["scene_changes", "scene_grid", "scene_settings", "display_view", "player_view", "scene_list"].includes(event) || (event === "live" && value.state !== null)) leaked.push([event, value]);
     });
     await action(gm.socket, "scene_view", { sceneId: openSceneId });
     await sendBatch(gm.socket, { id: "other", sceneId: openSceneId, changes: [{ type: "add", item: tokenItem }] });
-    gm.socket.emit("player_pointer", { position: { x: 3, y: 4 } });
+    gm.socket.emit("live", { sceneId: openSceneId, kind: "pointer", state: { position: { x: 3, y: 4 }, visible: true } });
     gm.socket.emit("display_view", { sceneId: openSceneId, ...view });
     await action(gm.socket, "scene_settings", { sceneId: openSceneId, fogFill: true });
     // Round trips on each socket drain messages sent before the barriers.

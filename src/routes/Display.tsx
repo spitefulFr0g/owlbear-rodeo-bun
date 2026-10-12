@@ -18,6 +18,7 @@ import { MapLoadingProvider } from "../contexts/MapLoadingContext";
 
 import NetworkedDisplay from "../network/NetworkedDisplay";
 import { SceneProvider } from "../scene/SceneContext";
+import { LiveProvider } from "../scene/LiveContext";
 
 import Session, { SessionStatus } from "../network/Session";
 
@@ -139,7 +140,9 @@ function Display() {
                 }}
               >
                 <SceneProvider session={session} display>
-                  <NetworkedDisplay session={session} />
+                  <LiveProvider session={session}>
+                    <NetworkedDisplay session={session} />
+                  </LiveProvider>
                 </SceneProvider>
               </Flex>
               <OfflineBanner isOpen={sessionStatus === "offline"} />
