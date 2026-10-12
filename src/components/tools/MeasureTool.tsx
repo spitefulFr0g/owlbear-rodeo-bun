@@ -1,65 +1,88 @@
-import { useState, useEffect } from "react";
-import { Label, Line, Tag, Text } from "react-konva";
+import { useState, useEffect, useContext, useRef } from "react";
 
-import { useInteractionEmitter, MapDragEvent, leftMouseButton, useStageScale } from "../../contexts/MapInteractionContext";
+import { useInteractionEmitter, MapDragEvent, leftMouseButton } from "../../contexts/MapInteractionContext";
 import { useMapStage } from "../../contexts/MapStageContext";
+import { PlayerStateContext } from "../../contexts/PlayerContext";
+import colors from "../../helpers/colors";
 import { getRelativePointerPosition } from "../../helpers/konva";
-import { parseGridScale } from "../../helpers/grid";
 import useSceneSnapping from "../../hooks/useSceneSnapping";
-import useWorldPlacement from "../../hooks/useWorldPlacement";
+import { useLive } from "../../scene/LiveContext";
+import { rulerText } from "../../scene/ruler";
 import { useScene } from "../../scene/SceneContext";
-import { gridDistance } from "../../scene/grid";
 import { worldNodeId } from "../../scene/worldPosition";
-import { Vector2 } from "../../sceneRules";
+import { LiveState, Vector2 } from "../../sceneRules";
+import Ruler from "../konva/Ruler";
 import World from "../scene/World";
 
-/** Measures in world units on the scene's grid, above items and below fog */
+/**
+ * Measures in world units on the scene's grid, above items and below fog. The
+ * ruler is sent live to the others viewing the scene while it is held.
+ */
 function MeasureTool({ active }: { active: boolean }) {
   const { scene } = useScene();
+  const player = useContext(PlayerStateContext);
   const emitter = useInteractionEmitter();
   const stage = useMapStage();
-  const stageScale = useStageScale();
-  const placement = useWorldPlacement();
-  const [points, setPoints] = useState<Vector2[] | null>(null);
+  const { send, end, cleared } = useLive();
+  const [ruler, setRuler] = useState<LiveState["ruler"] | null>(null);
+  const startRef = useRef<Vector2 | null>(null);
   const snap = useSceneSnapping(scene?.grid.measurement.type === "euclidean" ? 0 : 1, false);
+
+  // A snapshot or a lost connection lets go of a ruler being held
   useEffect(() => {
-    if (!active) { setPoints(null); return; }
+    startRef.current = null;
+    setRuler(null);
+  }, [cleared]);
+
+  useEffect(() => {
+    return () => end("ruler");
+  }, [end]);
+
+  useEffect(() => {
+    function release() {
+      startRef.current = null;
+      setRuler(null);
+      end("ruler");
+    }
+    if (!active) { release(); return; }
     function position() {
       const world = stage.current?.findOne(`#${worldNodeId}`);
       const point = world && getRelativePointerPosition(world);
       return point && snap(point);
     }
+    function measure(start: Vector2, point: Vector2) {
+      const state = { start: { x: start.x, y: start.y }, end: { x: point.x, y: point.y } };
+      setRuler(state);
+      send("ruler", state);
+    }
     function down(event: MapDragEvent) {
       const point = position();
-      if (leftMouseButton(event) && point) setPoints([point, point]);
+      if (!leftMouseButton(event) || !point) return;
+      startRef.current = point;
+      measure(point, point);
     }
     function move(event: MapDragEvent) {
       const point = position();
-      if (leftMouseButton(event) && point) setPoints((previous) => previous && [previous[0], point]);
+      if (leftMouseButton(event) && point && startRef.current) measure(startRef.current, point);
     }
-    function up() { setPoints(null); }
     emitter?.on("dragStart", down);
     emitter?.on("drag", move);
-    emitter?.on("dragEnd", up);
+    emitter?.on("dragEnd", release);
     return () => {
       emitter?.off("dragStart", down);
       emitter?.off("drag", move);
-      emitter?.off("dragEnd", up);
+      emitter?.off("dragEnd", release);
     };
-  }, [active, emitter, stage, snap]);
-  if (!points || !scene) return null;
-  const scale = parseGridScale(scene.grid.measurement.scale);
-  const length = gridDistance(scene.grid, points[0], points[1]);
-  const zoom = stageScale * placement.scale;
-  const line = points.reduce<number[]>((values, point) => [...values, point.x, point.y], []);
+  }, [active, emitter, stage, snap, send, end]);
+  if (!ruler || !scene) return null;
   return (
     <World listening={false}>
-      <Line points={line} stroke="hsla(230, 25%, 18%, 0.8)" strokeWidth={15} lineCap="round" />
-      <Line points={line} stroke="white" strokeWidth={2.5} lineCap="round" />
-      <Label x={(points[0].x + points[1].x) / 2} y={(points[0].y + points[1].y) / 2} scaleX={1 / zoom} scaleY={1 / zoom}>
-        <Tag fill="hsla(230, 25%, 18%, 0.8)" cornerRadius={4} />
-        <Text text={`${(length * scale.multiplier).toFixed(scale.digits)}${scale.unit}`} fill="white" fontSize={24} padding={4} />
-      </Label>
+      <Ruler
+        start={ruler.start}
+        end={ruler.end}
+        text={rulerText(scene.grid, ruler.start, ruler.end)}
+        color={colors[player?.color || "blue"]}
+      />
     </World>
   );
 }
