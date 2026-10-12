@@ -28,6 +28,8 @@ import NoteTool from "../tools/NoteTool";
 import SceneItemMenu from "../scene/SceneItemMenu";
 import SceneNotice from "../scene/SceneNotice";
 import ScenePointers from "../scene/ScenePointers";
+import SceneMovement from "../scene/SceneMovement";
+import { TokenMovement } from "../../sceneRules";
 import SceneRulers from "../scene/SceneRulers";
 import SceneSelection, { SceneItems } from "../scene/SceneSelection";
 
@@ -51,6 +53,7 @@ function Map({ session }: MapProps) {
     }));
   }
 
+  const [movement, setMovement] = useState<TokenMovement | null>(null);
   const [itemMenu, setItemMenu] = useState<{ x: number; y: number } | null>(
     null
   );
@@ -124,6 +127,7 @@ function Map({ session }: MapProps) {
           }}
         />
         <SceneRulers />
+        <SceneMovement movement={movement} />
         <MeasureTool active={selectedToolId === "measure"} />
         <SceneItems placement="aboveRuler" fogShapes={selecting} />
         <FogTool
@@ -138,6 +142,7 @@ function Map({ session }: MapProps) {
           <NetworkedDisplayView session={session} sceneId={scene.id} />
         )}
         <SceneSelection
+          onMovement={setMovement}
           onMenuOpen={setItemMenu}
           active={selecting}
           layer={
