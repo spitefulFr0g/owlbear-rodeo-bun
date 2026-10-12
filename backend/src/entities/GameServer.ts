@@ -128,7 +128,7 @@ export default class GameServer {
         if (roomId && socket.data.viewedSceneId == null &&
           event === "player_pointer") return;
         if (
-          socket.data.castDisplay && !["get_display_token", "join_display", "room_switches", "room_trust", "room_password", "new_display_link", "session", "scene_create", "scene_view", "scene_rename", "scene_delete", "scene_show", "scene_settings", "scene_bring", "scene_welcome"].includes(event)
+          socket.data.castDisplay && !["get_display_token", "join_display", "room_switches", "room_trust", "room_password", "new_display_link", "session", "scene_create", "scene_view", "scene_rename", "scene_delete", "scene_show", "scene_settings", "scene_bring", "scene_welcome", "scene_duplicate"].includes(event)
         ) {
           return;
         }
@@ -309,6 +309,40 @@ export default class GameServer {
         socket.data.viewedSceneId = sceneId;
         this.gameRepo.save(gameId);
         socket.emit("scene_snapshot", { scene: this.sceneFor(socket, gameId) });
+        this.broadcastSceneList(gameId);
+        if (typeof answer === "function") answer({ ok: true, sceneId });
+      });
+
+      socket.on("scene_duplicate", (value: unknown, answer?: (result: { ok: boolean; error?: string; sceneId?: string }) => void) => {
+        const gameId = gameState.getGameId();
+        if (!gameId || socket.data.castDisplay || socket.data.role !== "gm") {
+          if (typeof answer === "function") answer({ ok: false, error: "not_room_gm" });
+          return;
+        }
+        const payload = value as { sceneId?: unknown } | null;
+        if (!payload || typeof payload !== "object" || Array.isArray(payload) ||
+          Object.keys(payload).some(key => key !== "sceneId") || typeof payload.sceneId !== "string") {
+          if (typeof answer === "function") answer({ ok: false, error: "invalid" });
+          return;
+        }
+        const game = this.gameRepo.games[gameId];
+        if (!Object.hasOwn(game.scenes, payload.sceneId)) {
+          if (typeof answer === "function") answer({ ok: false, error: "not_found" });
+          return;
+        }
+        if (Object.keys(game.scenes).length >= maxScenes) {
+          if (typeof answer === "function") answer({ ok: false, error: "cap" });
+          return;
+        }
+        const original = game.scenes[payload.sceneId];
+        const name = checkSceneName(`${original.name} copy`);
+        if (name === undefined) {
+          if (typeof answer === "function") answer({ ok: false, error: "Cannot duplicate: adding ' copy' would exceed the 100-character scene name limit." });
+          return;
+        }
+        const sceneId = randomBytes(16).toString("hex");
+        game.scenes[sceneId] = { ...structuredClone(original), id: sceneId, name };
+        this.gameRepo.save(gameId);
         this.broadcastSceneList(gameId);
         if (typeof answer === "function") answer({ ok: true, sceneId });
       });
