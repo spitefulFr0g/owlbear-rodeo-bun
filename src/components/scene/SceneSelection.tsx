@@ -12,7 +12,7 @@ import {
   copySelection,
   moveSelection,
 } from "../../scene/selection";
-import { Change, Item, Layer, layers } from "../../sceneRules";
+import { Change, Item, Layer, layers, TokenMovement, tokenMovement } from "../../sceneRules";
 import { useMapStage } from "../../contexts/MapStageContext";
 import { useSetPreventMapInteraction } from "../../contexts/MapInteractionContext";
 import { useKeyboard } from "../../contexts/KeyboardContext";
@@ -32,14 +32,18 @@ export default function SceneSelection({
   boxSelect,
   layer,
   onMenuOpen,
+  onMovement,
 }: {
   active: boolean;
   boxSelect: boolean;
   layer?: Layer;
+  onMovement: (movement: TokenMovement | null) => void;
   onMenuOpen: (position: { x: number; y: number } | null) => void;
 }) {
   const { scene, selection, setSelection, readOnly, act, canSelect } = useScene();
   const { send, end, hold } = useLive();
+  const canSelectRef = useRef(canSelect);
+  canSelectRef.current = canSelect;
   const stageRef = useMapStage();
   const sceneRef = useRef(scene);
   sceneRef.current = scene;
@@ -119,6 +123,10 @@ export default function SceneSelection({
     }
   });
   useEffect(() => {
+    // Scene settings can change while the hand keeps moving; only a new item
+    // store or scene tears down the interaction. Read current rules through refs.
+    const scene = sceneRef.current;
+    const canSelect = (item: Item) => canSelectRef.current(item);
     if (!active || !scene || !root.current || !stageRef.current) return;
     const world = root.current;
     const stage = stageRef.current;
@@ -152,11 +160,12 @@ export default function SceneSelection({
     transformer.boundBoxFunc((old, next) => {
       if (next.width < 1 || next.height < 1) return old;
       const scale = world.getAbsoluteScale().x;
-      const cell = scene.grid.unitsPerCell * scale;
+      const grid = sceneRef.current?.grid || scene.grid;
+      const cell = grid.unitsPerCell * scale;
       let width = next.width;
       const nearest = Math.round(width / cell) * cell;
       if (
-        scene.grid.snap &&
+        grid.snap &&
         sensitivityRef.current > 0 &&
         nearest > 0 &&
         Math.abs(nearest - width) < cell * sensitivityRef.current
@@ -188,6 +197,8 @@ export default function SceneSelection({
         pickedUp
       );
       if (drag) send("drag", drag);
+      const current = sceneRef.current;
+      onMovement(pickedUp && drag && current ? tokenMovement(current, drag.items, pickedUp) || null : null);
     };
     // An abandoned drag shows the items where the store has them
     const restore = (held: Konva.Node[]) =>
@@ -220,6 +231,7 @@ export default function SceneSelection({
           node.scale(item.scale);
         });
       // The batch goes first, so the items land for the others with no step back
+      onMovement(null);
       end("drag");
       hold([]);
       landing = false;
@@ -375,6 +387,7 @@ export default function SceneSelection({
         )
           moving.forEach((node, i) => node.position(originals[i].position));
         // The batch goes first, so the items land for the others with no step back
+        onMovement(null);
         end("drag");
         hold([]);
         landing = false;
@@ -390,6 +403,7 @@ export default function SceneSelection({
       if (!landing) {
         if (start && moving.length) restore(moving);
         if (transformer.isTransforming()) restore(selectedNodes());
+        onMovement(null);
         end("drag");
         hold([]);
       }
@@ -403,10 +417,10 @@ export default function SceneSelection({
     active,
     boxSelect,
     layer,
-    scene,
+    scene?.id,
+    scene?.items,
     readOnly,
     act,
-    canSelect,
     copies,
     send,
     end,
@@ -415,6 +429,7 @@ export default function SceneSelection({
     setSelection,
     stageRef,
     onMenuOpen,
+    onMovement,
   ]);
   if (!scene) return null;
   return (
