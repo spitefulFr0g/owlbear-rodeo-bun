@@ -14,7 +14,7 @@ test("a version 2 room keeps its items and grid with the new scene defaults afte
     const { cookie } = await signIn(server, "Administrator", "test-password");
     const gm = await server.joinRoomAsGM("version-2", cookie);
     const scene = gm.snapshot!.scene!;
-    expect(scene).toMatchObject({ id: "old-scene", fogFill: false, viewOnly: false,
+    expect(scene).toMatchObject({ id: "old-scene", movementMode: true, fogFill: false, viewOnly: false,
       grid: { type: "hexHorizontal", unitsPerCell: 150, measurement: { type: "euclidean", scale: "10m" }, shown: false, snap: false, opacity: 0.8, lineWidth: 3, color: "#333333" },
       items: { note: { text: "Kept through upgrade", position: { x: 123, y: -456 } } } });
     await new Promise(resolve => gm.socket.emit("room_switches", { tokens: false }, resolve));
@@ -32,10 +32,10 @@ test("every prepared scene and its settings survives a room save and restart", a
     const rooms = async () => (await (await fetch(`${server.address}/api/rooms`, { headers: { Cookie: cookie } })).json() as { rooms: { id: string; sizeBytes: number }[] }).rooms;
     const before = (await rooms()).find((room) => room.id === "version-3")!.sizeBytes;
     const gm = await server.joinRoomAsGM("version-3", cookie);
-    expect(gm.snapshot!.scene).toMatchObject({ id: "old-scene", fogFill: true, viewOnly: true, grid: { opacity: 0.3, lineWidth: 4, color: "#123ABC" } });
+    expect(gm.snapshot!.scene).toMatchObject({ id: "old-scene", movementMode: true, fogFill: true, viewOnly: true, grid: { opacity: 0.3, lineWidth: 4, color: "#123ABC" } });
     await new Promise(resolve => gm.socket.emit("room_switches", { tokens: false }, resolve));
     await server.restart();
-    expect((await rooms()).find((room) => room.id === "version-3")!.sizeBytes).toBe(before);
+    expect((await rooms()).find((room) => room.id === "version-3")!.sizeBytes).toBe(before + 40);
     expect((await server.joinRoomAsGM("version-3", cookie)).snapshot!.scene).toEqual(gm.snapshot!.scene);
   } finally { await server.dispose(); }
 });
@@ -46,7 +46,7 @@ test("older room documents open as one empty scene and save it as Scene 1", asyn
     const { cookie } = await signIn(server, "Administrator", "test-password");
     const gm = await server.joinRoomAsGM("version-1", cookie);
     expect(gm.snapshot!.scene!.items).toEqual({});
-    expect(gm.snapshot!.scene).toMatchObject({ fogFill: false, viewOnly: false, grid: { type: "square" } });
+    expect(gm.snapshot!.scene).toMatchObject({ fogFill: false, viewOnly: false, movementMode: true, grid: { type: "square" } });
     await new Promise(resolve => gm.socket.emit("room_switches", { tokens: false }, resolve));
     await server.restart();
     const scene = (await server.joinRoomAsGM("version-1", cookie)).snapshot!.scene!;

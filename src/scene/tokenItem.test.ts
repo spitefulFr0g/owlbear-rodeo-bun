@@ -2,7 +2,7 @@ import { defaultSceneGrid, checkChange, Scene } from "../sceneRules";
 import { Token } from "../types/Token";
 import { tokenItem } from "./tokenItem";
 
-const scene: Scene = { id: "scene", grid: defaultSceneGrid, fogFill: false, viewOnly: false, items: {} };
+const scene: Scene = { id: "scene", grid: defaultSceneGrid, fogFill: false, viewOnly: false, movementMode: true, items: {} };
 
 const wolf: Token = {
   id: "token",
