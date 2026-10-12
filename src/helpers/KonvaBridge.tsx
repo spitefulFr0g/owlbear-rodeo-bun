@@ -50,6 +50,7 @@ import PartyContext from "../contexts/PartyContext";
 import DatabaseContext, { useDatabase } from "../contexts/DatabaseContext";
 import { RoleContext, useRole } from "../contexts/RoomContext";
 import SceneContext from "../scene/SceneContext";
+import LiveContext from "../scene/LiveContext";
 
 type StageRender = (wrapped: React.ReactNode) => React.ReactElement;
 
@@ -96,9 +97,11 @@ function KonvaBridge({
   const player = useContext(PlayerStateContext);
   const party = useContext(PartyContext);
   const scene = useContext(SceneContext);
+  const live = useContext(LiveContext);
 
   return stageRender(
     <SceneContext.Provider value={scene}>
+    <LiveContext.Provider value={live}>
     <PlayerStateContext.Provider value={player}>
     <PartyContext.Provider value={party}>
     <DatabaseContext.Provider value={database}>
@@ -178,6 +181,7 @@ function KonvaBridge({
     </DatabaseContext.Provider>
     </PartyContext.Provider>
     </PlayerStateContext.Provider>
+    </LiveContext.Provider>
     </SceneContext.Provider>
   );
 }
