@@ -30,7 +30,7 @@ test("GM scene lists arrive between join and snapshot, and creating a scene save
     const updated = nextMessage(socket, "scene_list");
     const result = await action(socket, "scene_create", { name: "  Ambush  " });
     expect(result.ok).toBe(true);
-    expect((await snapshot)[0]).toEqual({ scene: { id: result.sceneId, grid: defaultSceneGrid, fogFill: false, viewOnly: false, items: {} } });
+    expect((await snapshot)[0]).toEqual({ scene: { id: result.sceneId, grid: defaultSceneGrid, fogFill: false, viewOnly: false, movementMode: true, items: {} } });
     expect((await updated)[0].scenes).toContainEqual({ id: result.sceneId, name: "Ambush", viewOnly: false });
     const copy = await server.durableCopy();
     try {
@@ -95,7 +95,7 @@ test("GM connections prepare independently while changes, grids and pointers sta
     expect((await viewed)[0].scene.items.hero.owner).toBe("gm");
     const gridRelay = nextMessage(other.socket, "scene_settings");
     expect(await action(gm.socket, "scene_settings", { sceneId, grid: { ...defaultSceneGrid, opacity: 0.25 } })).toEqual({ ok: true });
-    expect((await gridRelay)[0]).toEqual({ sceneId, grid: { ...defaultSceneGrid, opacity: 0.25 }, fogFill: false, viewOnly: false });
+    expect((await gridRelay)[0]).toEqual({ sceneId, grid: { ...defaultSceneGrid, opacity: 0.25 }, fogFill: false, viewOnly: false, movementMode: true });
     const preparationRelay = nextMessage(other.socket, "scene_changes");
     await sendBatch(gm.socket, { id: "edit", sceneId, changes: [{ type: "update", id: "hero", fields: { label: "Prepared" } }] });
     expect((await preparationRelay)[0].sceneId).toBe(sceneId);

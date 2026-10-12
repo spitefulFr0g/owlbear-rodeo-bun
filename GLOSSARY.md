@@ -84,6 +84,9 @@ _Avoid_: Active scene, current scene, live scene
 A scene the GM has marked so that only the GM can change it. Players, trusted or not, can still pan, zoom, point and measure.
 _Avoid_: Locked scene, read-only scene, presentation scene
 
+**Movement mode**:
+A scene setting, on by default, that shows a line and the distance moved while a token is dragged, using the scene’s ruler measurement and scale.
+
 **Map**:
 An image item on the Map layer. It is a picture only; the grid and everything placed on top belong to the scene.
 _Avoid_: Background, battlemap

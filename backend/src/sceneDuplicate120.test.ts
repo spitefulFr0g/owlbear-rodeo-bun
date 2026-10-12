@@ -16,7 +16,7 @@ test("duplicating preserves the complete scene, leaves viewers in place and save
     const other = await server.joinRoomAsGM(room.id, cookie);
     const sceneId = gm.snapshot!.scene!.id;
     const grid = { ...defaultSceneGrid, opacity: 0.25, color: "#123456" };
-    await action(gm.socket, "scene_settings", { sceneId, grid, fogFill: true, viewOnly: true });
+    await action(gm.socket, "scene_settings", { sceneId, grid, fogFill: true, viewOnly: true, movementMode: true });
     await action(gm.socket, "scene_welcome", { sceneId });
     await sendBatch(gm.socket, { id: "add", sceneId, changes: [{ type: "add", item: { ...tokenItem, hidden: true, locked: true } }] });
     expect((await sendBatch(gm.socket, { id: "add-second", sceneId, changes: [
