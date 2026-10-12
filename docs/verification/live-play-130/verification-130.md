@@ -136,3 +136,11 @@ The dispatcher posted the verification summary and story results on #130, linked
 ## Completion
 
 Committed retained upgrade smoke assertion as `3c2c7d75af81e68bc149b7cce1fbfa4323989ea3` on `ticket/122-verify`, with configured author and OpenAI Codex co-author attribution. Pre-commit checks passed (`logs/verify-commit-retry.log`). The dispatcher merged that assertion and published this report and captures in the PR branch, then created issue #132 and commented on #130. Closed the retry's browser tabs and stopped its port-9160 server; inherited port-9150/proxy processes were not stopped.
+
+## Follow-up: story 11 lifecycle repair
+
+A frontend review of the integrated branch reproduced and repaired the story 11 fault in `SceneSelection`. A held move and resize now survive a competing authoritative drop; deletion, permission loss, refused drops and tool changes still cancel or restore the interaction safely. The review also added pure helper coverage for competing edits, deletion and permission loss.
+
+Browser captures and detailed steps are in [`follow-up-frontend/`](follow-up-frontend/). The held move completed at `(950,250)` after the peer committed `(450,500)`. The held resize also remained active through the peer commit and released normally. A follow-up tool-switch check restored the authoritative position and scale and removed the transformer. See the review record at `/home/watermelon/.codex/spec-notes/owlbear-rodeo-bun-live-play/logs/review-frontend.md` for the full procedure and verification limits.
+
+The original story 11 result above records the failure at the earlier verification tip. This follow-up passes the fault's acceptance case and resolves tracked issue [#132](https://github.com/spitefulFr0g/owlbear-rodeo-bun/issues/132). The review passed frontend checks (73 tests), 858 backend/shared tests, production build, backend smoke and pre-commit checks. It did not repeat the full 73-story, five-connection or compiled-upgrade matrix.
