@@ -67,3 +67,20 @@ test("malformed presence keeps the last good state, private dice are removed, an
     for (const [state] of await Promise.all(removed)) expect(state[id]).toBeUndefined();
   } finally { await server.dispose(); }
 });
+
+test("the old party message is not relayed and changes nobody's presence", async () => {
+  const server = await startTestServer();
+  try {
+    const { cookie } = await setupAdministrator(server);
+    const room = await createRoom(server, cookie, "Old messages");
+    const gm = await server.joinRoomAsGM(room.id, cookie);
+    const player = await server.joinRoom(room.id, "", "browser");
+    const received: unknown[][] = [];
+    gm.socket.onAny((...message) => received.push(message));
+    player.socket.emit("player_state", update);
+    const state = nextMessage(gm.socket, "presence_state");
+    player.socket.emit("presence_update", { ...update, nickname: "Barrier" });
+    expect((await state)[0][player.socket.id!].nickname).toBe("Barrier");
+    expect(received.map(([event]) => event)).toEqual(["presence_state"]);
+  } finally { await server.dispose(); }
+});

@@ -13,7 +13,6 @@ import { DisplayView } from "../types/DisplayView";
 import GameRepository from "./GameRepository";
 import GameState from "./GameState";
 import JoinTokens from "./JoinTokens";
-import { PlayerState } from "../types/PlayerState";
 import { playerColours, isPlayerColour } from "../types/PlayerColour";
 
 export default class GameServer {
@@ -230,15 +229,8 @@ export default class GameServer {
             });
           }
           socket.to(gameId).emit("player_left", socket.id);
-          // Delete player state from game
-          this.gameRepo.deletePlayer(gameId, socket.id);
-
           delete game.presenceState[socket.id];
           socket.to(gameId).emit("presence_state", game.presenceState);
-
-          // Update party state
-          const partyState = this.gameRepo.getPartyState(gameId);
-          socket.to(gameId).emit("party_state", partyState);
         } catch (error) {
           console.error("DISCONNECT_ERROR", error);
         }
@@ -744,11 +736,9 @@ export default class GameServer {
           const peer = this.io.sockets.sockets.get(id);
           if (!peer || peer.data.castDisplay || peer.data.playerId !== playerId) continue;
           const role = this.playerRole(peer, gameId);
-          if (game.partyState[id]) game.partyState[id].role = role;
           if (game.presenceState[id]) game.presenceState[id].role = role;
           peer.emit("player_role", role);
         }
-        this.io.to(gameId).emit("party_state", game.partyState);
         this.io.to(gameId).emit("presence_state", game.presenceState);
         if (typeof answer === "function") answer({ ok: true });
       });
@@ -836,29 +826,6 @@ export default class GameServer {
         if (!gameId || socket.data.castDisplay) return;
         const update = readPresence(value);
         if (update) this.updatePresence(socket, gameId, update);
-      });
-
-      socket.on("player_state", async (playerState: PlayerState) => {
-        try {
-          let gameId: string;
-          if (_gameId) {
-            gameId = _gameId;
-          } else {
-            const result = gameState.getGameId();
-            if (result) {
-              gameId = result;
-              _gameId = result;
-            } else {
-              return;
-            }
-          }
-
-          if (isPlayerColour(playerState?.color)) socket.data.color = playerState.color;
-          this.gameRepo.setPlayerState(gameId, { ...playerState, color: socket.data.color, userId: socket.data.playerId, role: this.playerRole(socket, gameId) }, socket.id);
-          await gameState.broadcastPlayerState(gameId, socket, "party_state");
-        } catch (error) {
-          console.error("PLAYER_STATE_ERROR", error);
-        }
       });
 
       let liveWindow = this.clock.now();

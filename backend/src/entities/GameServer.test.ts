@@ -139,7 +139,7 @@ async function joinDisplay(socket: Socket, gameId: string, token: string | null)
 function record(socket: Socket) {
   const events: any[][] = [];
   // The paired UI migration removes the temporary legacy party transport.
-  socket.onAny((...args) => { if (args[0] !== "party_state") events.push(args); });
+  socket.onAny((...args) => { events.push(args); });
   return events;
 }
 

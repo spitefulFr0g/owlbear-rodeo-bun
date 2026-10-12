@@ -1,8 +1,7 @@
-import { gmOwner } from "../sceneRules";
-import { PartyState } from "../types/PartyState";
+import { gmOwner, PresenceState } from "../sceneRules";
 
 /** Owner identities are browser ids, even for signed-in players. */
-export function itemOwners(party: PartyState, currentOwners: string[]) {
+export function itemOwners(party: PresenceState, currentOwners: string[]) {
   const owners = [{ id: gmOwner, name: "The GM" }];
   for (const player of Object.values(party)) {
     if (!player.userId || player.role === "gm" ||

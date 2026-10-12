@@ -1,19 +1,20 @@
-import React, { useEffect, useContext } from "react";
+import React, { useEffect, useContext, useState, useRef } from "react";
 
 import { useDatabase } from "./DatabaseContext";
-import { useUserId } from "./UserIdContext";
 
-import useNetworkedState, {
-  SetNetworkedState,
-} from "../hooks/useNetworkedState";
+import useDebounce from "../hooks/useDebounce";
 import Session, { SessionStatus } from "../network/Session";
+import { presenceUpdate } from "../helpers/presenceUpdate";
+import { PresenceUpdate } from "../sceneRules";
 import { PlayerState } from "../types/PlayerState";
+
+type SetPlayerState = React.Dispatch<React.SetStateAction<PlayerState>>;
 
 export const PlayerStateContext = React.createContext<PlayerState | undefined>(
   undefined
 );
 export const PlayerUpdaterContext = React.createContext<
-  SetNetworkedState<PlayerState> | undefined
+  SetPlayerState | undefined
 >(undefined);
 
 type PlayerProviderProps = {
@@ -22,22 +23,54 @@ type PlayerProviderProps = {
 };
 
 export function PlayerProvider({ session, children }: PlayerProviderProps) {
-  const userId = useUserId();
   const { database, databaseStatus } = useDatabase();
 
-  const [playerState, setPlayerState] = useNetworkedState<PlayerState>(
-    {
-      nickname: "",
-      color: session.color,
-      timer: undefined,
-      dice: { share: false, rolls: [] },
-      sessionId: undefined,
-      userId,
-    },
-    session,
-    "player_state",
-    500
-  );
+  const [playerState, setPlayerState] = useState<PlayerState>({
+    nickname: "",
+    color: session.color,
+    timer: undefined,
+    dice: { share: false, rolls: [] },
+  });
+  const playerStateRef = useRef(playerState);
+  playerStateRef.current = playerState;
+
+  // The presence last sent on this connection, so a change that sends
+  // nothing new, like a roll with sharing off, is not sent again
+  const sentRef = useRef<string>();
+  const sendRef = useRef((update: PresenceUpdate | undefined) => {
+    const presence = update && JSON.stringify(update);
+    if (!presence || presence === sentRef.current) return;
+    sentRef.current = presence;
+    session.socket?.emit("presence_update", update);
+  });
+
+  // The connection this browser's presence was last started on
+  const joinedIdRef = useRef<string>();
+
+  const update = presenceUpdate(playerState);
+  const presence = useDebounce(update && JSON.stringify(update), 500);
+  useEffect(() => {
+    if (joinedIdRef.current && presence) sendRef.current(JSON.parse(presence));
+  }, [presence]);
+
+  // The server starts each connection with an unnamed presence, so the first
+  // join and every rejoin send this browser's own straight away
+  useEffect(() => {
+    function handleStatus(status: SessionStatus) {
+      // Also sent when someone else joins
+      if (status !== "joined" || !session.id || joinedIdRef.current === session.id) return;
+      joinedIdRef.current = session.id;
+      sentRef.current = undefined;
+      const color = session.color;
+      setPlayerState((prevState) => prevState.color === color ? prevState : { ...prevState, color });
+      sendRef.current(presenceUpdate({ ...playerStateRef.current, color }));
+    }
+
+    session.on("status", handleStatus);
+    return () => {
+      session.off("status", handleStatus);
+    };
+  }, [session]);
 
   useEffect(() => {
     if (!database || databaseStatus === "loading") {
@@ -54,7 +87,7 @@ export function PlayerProvider({ session, children }: PlayerProviderProps) {
     }
 
     loadNickname();
-  }, [database, databaseStatus, setPlayerState]);
+  }, [database, databaseStatus]);
 
   useEffect(() => {
     if (
@@ -71,55 +104,6 @@ export function PlayerProvider({ session, children }: PlayerProviderProps) {
   useEffect(() => {
     if (playerState.color) session.color = playerState.color;
   }, [playerState.color, session]);
-
-  useEffect(() => {
-    if (userId) {
-      setPlayerState((prevState) => {
-        if (prevState) {
-          return {
-            ...prevState,
-            userId,
-          };
-        }
-        return prevState;
-      });
-    }
-  }, [userId, setPlayerState]);
-
-  useEffect(() => {
-    function updateSessionId() {
-      setPlayerState((prevState) => {
-        if (prevState) {
-          return {
-            ...prevState,
-            sessionId: session.id,
-            color: session.color,
-          };
-        }
-        return prevState;
-      });
-    }
-    function handleSocketConnect() {
-      // Set the player state to trigger a sync
-      updateSessionId();
-    }
-
-    function handleSocketStatus(status: SessionStatus) {
-      if (status === "joined") {
-        updateSessionId();
-      }
-    }
-
-    session.on("status", handleSocketStatus);
-    session.socket?.on("connect", handleSocketConnect);
-    session.socket?.io.on("reconnect", handleSocketConnect);
-
-    return () => {
-      session.off("status", handleSocketStatus);
-      session.socket?.off("connect", handleSocketConnect);
-      session.socket?.io.off("reconnect", handleSocketConnect);
-    };
-  });
 
   return (
     <PlayerStateContext.Provider value={playerState}>

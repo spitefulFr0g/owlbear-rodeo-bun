@@ -80,13 +80,10 @@ function Party({ gameId, roomSettings, onTrustChange }: PartyProps) {
   }
 
   function handleDiceRollsChange(newDiceRolls: DiceRoll[]) {
-    setPlayerState(
-      (prevState) => ({
-        ...prevState,
-        dice: { share: shareDice, rolls: newDiceRolls },
-      }),
-      shareDice
-    );
+    setPlayerState((prevState) => ({
+      ...prevState,
+      dice: { share: shareDice, rolls: newDiceRolls },
+    }));
   }
 
   function handleShareDiceChange(newShareDice: boolean) {

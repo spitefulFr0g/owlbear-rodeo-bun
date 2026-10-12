@@ -2,8 +2,6 @@ import { PresenceState, Scene, defaultSceneGrid } from "../../../src/sceneRules"
 import { RoomSwitches } from "../types/RoomSwitches";
 import { randomBytes } from "crypto";
 import { DisplayView } from "../types/DisplayView";
-import { PlayerState } from "../types/PlayerState";
-import { PartyState } from "../types/PartyState";
 
 export type StoredScene = Scene & { name: string };
 
@@ -31,19 +29,12 @@ export default class Game {
   displayToken: string;
   gameId: string;
   presenceState: PresenceState = {};
-  partyState: PartyState;
   passwordHash: string;
 
   constructor(gameId: string, hash: string, displayToken = randomBytes(32).toString("base64url")) {
     this.displayToken = displayToken;
     this.gameId = gameId;
-    this.partyState = {};
     this.passwordHash = hash;
-  }
-
-  getPartyState(): PartyState {
-    const result = this.partyState;
-    return result;
   }
 
   getGamePasswordHash(): string {
@@ -53,13 +44,5 @@ export default class Game {
 
   setGamePasswordHash(hash: string): void {
     this.passwordHash = hash;
-  }
-
-  setPlayerState(playerState: PlayerState, playerId: string): void {
-    this.partyState[playerId] = playerState;
-  }
-
-  deletePlayer(playerId: string): void {
-    delete this.partyState[playerId];
   }
 }
