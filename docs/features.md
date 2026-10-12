@@ -115,7 +115,7 @@ Decided for this release, in [Plan v0.3.0: the item model](https://github.com/sp
 | Step | What is built |
 | --- | --- |
 | 8. Scene library | Create, name, open, edit, duplicate, delete and switch scenes, from a Scenes dialog. The one-step importer with map alignment and the fog fill setting. The Scene Controls menu for the grid, with grid opacity, line width and colour. Show to players, and a one-off "bring players here". Fog Fill. Assigning a scene as the welcome screen. The view-only scene. |
-| 7. Live play | Drags and rulers seen live by everyone viewing the same scene. Movement mode. Presence carries name, colour, role and the scene being viewed, and dice rolls and the timer move onto it. |
+| 7. Live play | Drags and rulers seen live by everyone viewing the same scene. Movement mode. The pointer joins drags and rulers as checked live messages. Presence carries name, colour, role and the scene being viewed, plus shared dice rolls and the timer. |
 
 Two specs, one release. Both ship as v0.4.0.
 
@@ -132,6 +132,14 @@ Decided for this release, in [Plan v0.4.0: scenes and live play](https://github.
 - **Duplicating a scene:** an entry on a scene in the Scenes dialog makes a copy in the same room.
 - **No prototype:** step 8 is server routing and dialogs over a canvas that exists.
 - **Toolchain:** the move from Create React App to Vite is not part of this release. It is decided again before step 9.
+- **Live play decisions:** [Live play (#122)](https://github.com/spitefulFr0g/owlbear-rodeo-bun/issues/122) records the step 7 answers.
+- **Live messages:** pointer, ruler and drag share one scene routing rule. The server checks their shape and size, sets the sender's connection id and applies a fixed rate limit. Updates are throttled to about twenty a second per kind; ends are never dropped by the transport. They are never stored, included in a snapshot or put in undo, and get no answer. Disconnecting or leaving a scene ends that connection's live marks.
+- **Live drags:** cover moving, resizing and rotating existing items, including attached items. The server keeps only items the sender may change and sends each receiver only items they may see. Hidden drags are withheld by the same owner and role rule as hidden items. A received drag selects, locks and blocks nothing; a person's own drag takes precedence on their screen. The saved change is sent before the drag ends, so the preview lands on the committed state.
+- **Movement mode:** a scene setting, set only by the GM in Scene Controls, on for new and existing scenes and copied by a duplicate. Moving a token shows a straight line and distance using the scene's ruler rules, to the person dragging and everyone sent the drag. A group shows one distance. Resizing, rotating and moving a non-token show none. Turning it off leaves drags live. It joins scene document version 3 without another database layout change.
+- **Presence and the party list:** the server checks name, colour, shared dice rolls and timer, and sets connection id, browser id, role and viewed scene itself. Players see only a mark that a GM is viewing another scene, never its id or name; the GM's other devices see the scene name. Outside a session players see no mark. Dice rolls and timers still cross scenes and are never saved; rolls with sharing off are not sent. The dice tray, timer and trusted marks work as before.
+- **Scene privacy and cast display:** live messages stay on the scene being viewed. A GM preparing another scene sends nothing live to players or cast displays and receives nothing live from the open scene. A cast display receives the live marks of the scene the players see, including movement distances, even while frozen, and sends none. On the welcome-screen scene pointers and rulers work for everyone waiting and the GM's drags are seen; the default welcome screen sends and receives nothing live.
+- **Live play limits:** strokes, fog shapes and items not yet added are seen only when finished. Arriving mid-drag shows it from the next update. Concurrent drags do not lock an item; the last release to reach the server wins. Movement mode has no waypoints or distance left after the drop. Fog Fill still covers items sent to players, so their drags are sent too. Reconnecting sends nothing live and queues no edits.
+- **Upgrade and rollback:** the first start upgrades the database and keeps a pre-upgrade copy beside it. Going back to v0.3.0 requires stopping the server and restoring that copy; v0.3.0 refuses upgraded data. The release notes carry this warning.
 - **Rough edges in v0.3.0:** the ones found in the hand check are fixed as v0.3.1 and are not part of either spec. See [Interface rough edges found in the v0.3.0 hand check](https://github.com/spitefulFr0g/owlbear-rodeo-bun/issues/106).
 
 ### v0.5.0: libraries and tools
@@ -163,9 +171,6 @@ Decisions that are known to be needed and are not made yet, with the step that n
 
 | Question | Needed by |
 | --- | --- |
-| Whether movement mode is always on or a setting. | Step 7 |
-| Whether a live drag of a hidden item is withheld the way the item is. | Step 7 |
-| What the party list shows for a GM who is viewing another scene. | Step 7 |
 | Whether the interface moves from Create React App to Vite. | Step 9 |
 | Whether extensions written for `@owlbear-rodeo/sdk` should load unchanged. | The extension platform |
 
@@ -306,10 +311,10 @@ Decision: [Screen real-time sync (section E)](https://github.com/spitefulFr0g/ow
 | Feature | Verdict | Step | Note |
 | --- | --- | --- | --- |
 | Item-level sync with conflict handling | In | 6 | The server orders changes and the last write to a field wins. No CRDT. |
-| Other people's in-progress actions seen live | In: drags, rulers. Later: drawing strokes, selections | 7 | Sent like the pointer: throttled, never stored, never in undo. |
+| Other people's in-progress actions seen live | In: drags, rulers. Later: drawing strokes, selections | 7 | Pointer, ruler and drag are checked live messages routed by scene, throttled, never stored and never in undo. Drags use the same permission and visibility rules as items; move, resize and rotate are live. |
 | Offline edits queued and replayed on reconnect | Later | | The canvas is read-only while reconnecting. |
 | Connection status | Have | | |
-| Party list with name, colour, role, selection, metadata | In: name, colour, role, scene being viewed. Later: selection, metadata | 7 | |
+| Party list with name, colour, role, selection, metadata | In: name, colour, role, scene being viewed. Later: selection, metadata | 7 | Checked presence. Players see only a GM’s “viewing another scene” mark; GM devices see the scene name. Dice rolls and timers cross scenes. |
 | Room-wide and local-only message broadcast | Later | | Only extensions need it. |
 
 ### F. Asset manager and dock
@@ -375,9 +380,9 @@ Decision: [Screen grid, fog, drawing, text and presentation features (sections H
 | Alignment rulers and precision rails | Later | | |
 | Shift to adjust one axis | Later | | |
 | Prompt to update maps already placed | Out | | The grid belongs to the scene, so there is nothing to update on a map. |
-| Ruler seen by everyone while dragging | In | 7 | |
+| Ruler seen by everyone while dragging | In | 7 | Seen only by people viewing the same scene, including a frozen cast display, in its owner’s colour and with the scene’s distance rules. |
 | Permanent rulers | Later | | |
-| Movement mode | In | 7 | Dragging a token shows the distance moved, to everyone. |
+| Movement mode | In | 7 | GM-set scene setting in Scene Controls, on by default. Moving tokens shows one straight line and distance per group to everyone sent the drag, using the ruler’s rules. No distance for resize or rotation; switching it off leaves drags live. |
 
 ### I. Fog
 
@@ -486,8 +491,8 @@ Decision: [Decide which built-in features stay (section Q)](https://github.com/s
 
 | Feature | Verdict | Step | Note |
 | --- | --- | --- | --- |
-| Built-in 3D dice with shared rolls | Have | 7 | Rolls move onto presence in step 7. They are never saved. |
-| Countdown timer | Have | 7 | Moves onto presence in step 7. |
+| Built-in 3D dice with shared rolls | Have | 7 | Checked presence carries shared rolls across scenes in step 7; sharing off sends none. They are never saved. |
+| Countdown timer | Have | 7 | Checked presence carries it across scenes in step 7; it is never saved and still counts in its owner’s browser. |
 | Audio sharing | Out | 1 | Removed in step 1, with all peer-to-peer code. |
 | Room passwords | Have | | Optional, set by the GM. |
 | Grid-size detection on map import | Have | | |
