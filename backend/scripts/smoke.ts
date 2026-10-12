@@ -7,7 +7,7 @@
  *   bun scripts/smoke.ts                                  the server from source
  *   bun scripts/smoke.ts <executable>                     a compiled executable
  *   bun scripts/smoke.ts <executable> --from <released>   an upgrade: the released
- *       executable (v0.3.0) makes the data, <executable> opens it
+ *       executable (v0.4.0) makes the data, <executable> opens it
  */
 import { mkdtemp, rm, readFile } from "fs/promises";
 import { tmpdir } from "os";
@@ -104,8 +104,7 @@ try {
   if (answer.refused.length || answer.applied.length !== 1) throw new Error("The smoke note was not placed");
   const grid = { type: "hexHorizontal", unitsPerCell: 150, measurement: { type: "euclidean", scale: "10m" }, shown: false, snap: false };
   const styledGrid = { ...grid, opacity: 0.8, lineWidth: 3, color: "#333333" };
-  const gridAnswer = await new Promise<any>(resolve => first.socket.emit(released ? "scene_grid" : "scene_settings", { sceneId: savedSceneId,
-    grid: released ? grid : styledGrid }, resolve));
+  const gridAnswer = await new Promise<any>(resolve => first.socket.emit("scene_settings", { sceneId: savedSceneId, grid: styledGrid }, resolve));
   if (!gridAnswer.ok) throw new Error("The smoke grid was not changed");
   const upload = await fetch(`${server.address}/assets/smoke-image`, {
     method: "PUT",
