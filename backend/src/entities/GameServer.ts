@@ -114,6 +114,9 @@ export default class GameServer {
     const game = this.gameRepo.games[gameId];
     const scene = game?.scenes[message.sceneId];
     if (!scene || socket.data.castDisplay || socket.data.viewedSceneId !== scene.id) return;
+    // The committed-change path also requires a player's joined browser id.
+    // Keep reliable ends available even when this connection cannot edit.
+    if (message.kind === "drag" && message.state && socket.data.role !== "gm" && !socket.data.playerId) return;
     const dragItems = message.kind === "drag" && message.state ? dragFrom(this.person(socket, gameId), {
       switches: game.switches, viewOnly: scene.viewOnly,
       welcomeScreen: !game.session && game.welcomeSceneId === scene.id,

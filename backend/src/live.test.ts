@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { Socket } from "socket.io-client";
-import { maxLiveMessagesPerSecond, maxChanges, ReceivedLiveMessage } from "../../src/sceneRules";
+import { maxLiveMessagesPerSecond, maxChanges, LiveMessage, ReceivedLiveMessage } from "../../src/sceneRules";
 import { createRoom, nextMessage, setupAdministrator, startTestServer, sendBatch } from "./testing/serverHelpers";
 import { tokenItem } from "./testing/sceneFixtures";
 const action = (socket: Socket, event: string, value: unknown) => new Promise<{ ok: boolean; sceneId: string }>(resolve => socket.emit(event, value, resolve));
@@ -198,5 +198,43 @@ test("welcome scenes relay GM drags and reliable player ends but refuse player u
     const end = { sceneId, kind: "drag", state: null };
     const ended = nextMessage(gm.socket, "live"); player.socket.emit("live", end); await ended;
     expect(received).toEqual([{ ...end, connectionId: player.socket.id }]);
+  } finally { await server.dispose(); }
+});
+
+test("players without a browser id cannot preview changes the server would refuse, but can point and measure", async () => {
+  const server = await startTestServer();
+  try {
+    const { cookie } = await setupAdministrator(server), room = await createRoom(server, cookie, "Missing browser id");
+    const gm = await server.joinRoomAsGM(room.id, cookie), sceneId = gm.snapshot?.scene?.id;
+    if (!sceneId) throw new Error("The GM must receive a scene on join");
+    await action(gm.socket, "session", true);
+    await sendBatch(gm.socket, { id: "seed", sceneId, changes: [{ type: "add", item: tokenItem }] });
+    const player = await server.joinRoom(room.id);
+    const connectionId = player.socket.id;
+    if (!connectionId) throw new Error("The player must be connected after joining");
+    const position = { x: 42, y: 67 };
+    const answer = await sendBatch(player.socket, { id: "drop", sceneId, changes: [
+      { type: "update", id: tokenItem.id, fields: { position } },
+    ] });
+    expect(answer.applied).toEqual([]);
+    expect(answer.refused.map(item => item.id)).toEqual([tokenItem.id]);
+    const received: ReceivedLiveMessage[] = [];
+    gm.socket.on("live", message => received.push(message));
+    player.socket.emit("live", { sceneId, kind: "drag", state: { items: [
+      { id: tokenItem.id, position, rotation: 0, scale: { x: 1, y: 1 } },
+    ] } });
+    player.socket.emit("live", { sceneId, kind: "drag", state: null });
+    const ruler: LiveMessage = { sceneId, kind: "ruler", state: { start: position, end: { x: 100, y: 100 } } };
+    player.socket.emit("live", ruler);
+    const sentinel = nextMessage(gm.socket, "live");
+    player.socket.emit("live", pointer(sceneId));
+    await sentinel;
+    await barrier(player.socket);
+    await barrier(gm.socket);
+    expect(received).toEqual([
+      { sceneId, kind: "drag", state: null, connectionId },
+      { ...ruler, connectionId },
+      { ...pointer(sceneId), kind: "pointer", connectionId },
+    ]);
   } finally { await server.dispose(); }
 });
