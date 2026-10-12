@@ -21,7 +21,7 @@ test("the GM changes the scene grid for every viewer and keeps it across a resta
     const payload = { sceneId: gm.snapshot!.scene!.id, grid };
     const relays = [gm, player, display, otherGM].map(peer => nextMessage(peer.socket, "scene_settings"));
     expect(await change(gm.socket, payload)).toEqual({ ok: true });
-    for (const relay of relays) expect((await relay)[0]).toEqual({ ...payload, fogFill: false, viewOnly: false });
+    for (const relay of relays) expect((await relay)[0]).toEqual({ ...payload, fogFill: false, viewOnly: false, movementMode: true });
     await server.restart();
     expect((await server.joinRoomAsGM(room.id, cookie)).snapshot!.scene!.grid).toEqual(grid);
   } finally { await server.dispose(); }

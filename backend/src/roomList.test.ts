@@ -13,7 +13,7 @@ test("an account creates named rooms with server links and lists them by name", 
     const response = await request(server, "POST", undefined, cookie, { name: "  Zebra  " });
     expect(response.status).toBe(201);
     const { room } = await response.json() as any;
-    expect(room).toEqual({ id: expect.stringMatching(/^[A-Za-z0-9]{16}$/), name: "Zebra", hasPassword: false, sizeBytes: 385 });
+    expect(room).toEqual({ id: expect.stringMatching(/^[A-Za-z0-9]{16}$/), name: "Zebra", hasPassword: false, sizeBytes: 405 });
     const second = await request(server, "POST", undefined, cookie, { name: "Alpha", password: "secret" });
     const { room: alpha } = await second.json() as any;
     expect(alpha.id).not.toBe(room.id);

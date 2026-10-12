@@ -2,7 +2,7 @@ import { applyChange, defaultSceneGrid, invertChange, Scene, TextItem } from "./
 const item: TextItem = { id: "note", kind: "text", layer: "note", position: { x: 0, y: 0 },
   scale: { x: 1, y: 1 }, rotation: 0, order: 1, owner: "gm", locked: false,
   hidden: false, metadata: { old: true }, text: "before", color: "red", size: 150, square: true };
-const scene: Scene = { id: "scene", grid: defaultSceneGrid, fogFill: false, viewOnly: false, items: { note: item } };
+const scene: Scene = { id: "scene", grid: defaultSceneGrid, fogFill: false, viewOnly: false, movementMode: true, items: { note: item } };
 test("undoing an add deletes it and undoing a delete restores the same id", () => {
   expect(invertChange({ ...scene, items: {} }, { type: "add", item })).toEqual({ type: "delete", id: item.id });
   expect(invertChange(scene, { type: "delete", id: item.id })).toEqual({ type: "add", item });

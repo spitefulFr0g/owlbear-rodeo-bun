@@ -51,7 +51,7 @@ export default class GameServer {
     const scene = this.gameRepo.games[gameId].scenes[socket.data.viewedSceneId];
     if (!scene) return null;
     const person = this.person(socket, gameId);
-    return { id: scene.id, grid: scene.grid, fogFill: scene.fogFill, viewOnly: scene.viewOnly, items: Object.fromEntries(Object.entries(scene.items).filter(([, item]) => visibleTo(person, item))) };
+    return { id: scene.id, grid: scene.grid, fogFill: scene.fogFill, viewOnly: scene.viewOnly, movementMode: scene.movementMode, items: Object.fromEntries(Object.entries(scene.items).filter(([, item]) => visibleTo(person, item))) };
   }
 
   private sceneList(gameId: string) {
@@ -329,7 +329,7 @@ export default class GameServer {
         }
         const sceneId = randomBytes(16).toString("hex");
         let scene = { id: sceneId, name: checkSceneName(payload.name)!, grid: payload.grid ?? { ...defaultSceneGrid },
-          fogFill: payload.fogFill ?? false, viewOnly: false, items: {} };
+          fogFill: payload.fogFill ?? false, viewOnly: false, movementMode: true, items: {} };
         if ((Object.hasOwn(payload, "grid") && !checkGrid(payload.grid)) ||
             (Object.hasOwn(payload, "fogFill") && typeof payload.fogFill !== "boolean") ||
             (Object.hasOwn(payload, "map") && (!payload.map || payload.map.kind !== "image" ||
@@ -450,14 +450,15 @@ export default class GameServer {
           if (typeof answer === "function") answer({ ok: false, error: "not_room_gm" });
           return;
         }
-        const payload = value as { sceneId?: unknown; grid?: SceneGrid; fogFill?: boolean; viewOnly?: boolean } | null;
+        const payload = value as { sceneId?: unknown; grid?: SceneGrid; fogFill?: boolean; viewOnly?: boolean; movementMode?: boolean } | null;
         if (!payload || typeof payload !== "object" || Array.isArray(payload) ||
-          Object.keys(payload).some(key => !["sceneId", "grid", "fogFill", "viewOnly"].includes(key)) ||
+          Object.keys(payload).some(key => !["sceneId", "grid", "fogFill", "viewOnly", "movementMode"].includes(key)) ||
           typeof payload.sceneId !== "string" ||
-          !["grid", "fogFill", "viewOnly"].some(key => Object.hasOwn(payload, key)) ||
+          !["grid", "fogFill", "viewOnly", "movementMode"].some(key => Object.hasOwn(payload, key)) ||
           (Object.hasOwn(payload, "grid") && !checkGrid(payload.grid)) ||
           (Object.hasOwn(payload, "fogFill") && typeof payload.fogFill !== "boolean") ||
-          (Object.hasOwn(payload, "viewOnly") && typeof payload.viewOnly !== "boolean")) {
+          (Object.hasOwn(payload, "viewOnly") && typeof payload.viewOnly !== "boolean") ||
+          (Object.hasOwn(payload, "movementMode") && typeof payload.movementMode !== "boolean")) {
           if (typeof answer === "function") answer({ ok: false, error: "invalid" });
           return;
         }
@@ -471,8 +472,9 @@ export default class GameServer {
         if (payload.grid !== undefined) scene.grid = payload.grid;
         if (payload.fogFill !== undefined) scene.fogFill = payload.fogFill;
         if (payload.viewOnly !== undefined) scene.viewOnly = payload.viewOnly;
+        if (payload.movementMode !== undefined) scene.movementMode = payload.movementMode;
         this.gameRepo.save(gameId);
-        const settings = { sceneId: scene.id, grid: scene.grid, fogFill: scene.fogFill, viewOnly: scene.viewOnly };
+        const settings = { sceneId: scene.id, grid: scene.grid, fogFill: scene.fogFill, viewOnly: scene.viewOnly, movementMode: scene.movementMode };
         for (const id of this.io.sockets.adapter.rooms.get(gameId) || []) {
           const peer = this.io.sockets.sockets.get(id);
           if (peer?.data.viewedSceneId === scene.id) {

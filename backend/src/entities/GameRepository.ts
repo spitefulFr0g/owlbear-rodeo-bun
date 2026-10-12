@@ -37,8 +37,8 @@ export default class GameRepository {
         game.welcomeSceneId = record.documentVersion === 3 ? document.welcomeSceneId : null;
         game.scenes = Object.fromEntries(Object.entries(document.scenes).map(([id, value]) => {
           const scene = value as StoredScene;
-          return [id, record.documentVersion === 3 ? scene : {
-            ...scene, name: "Scene 1", fogFill: false, viewOnly: false,
+          return [id, record.documentVersion === 3 ? { ...scene, movementMode: scene.movementMode ?? true } : {
+            ...scene, name: "Scene 1", fogFill: false, viewOnly: false, movementMode: true,
             grid: { ...defaultSceneGrid, ...scene.grid },
           }];
         }));
