@@ -51,10 +51,7 @@ function NetworkedDisplay({ session }: { session: Session }) {
       : defaultDisplayView(scene);
 
   return (
-    <DisplayMap
-      view={view}
-      session={session}
-    />
+    <DisplayMap view={view} />
   );
 }
 

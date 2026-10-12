@@ -5,16 +5,13 @@ import MapInteraction from "../map/MapInteraction";
 import SceneGrid from "../scene/SceneGrid";
 
 import { SceneItems } from "../scene/SceneSelection";
-import NetworkedMapPointer from "../../network/NetworkedMapPointer";
-
-import Session from "../../network/Session";
+import ScenePointers from "../scene/ScenePointers";
 
 import { MapRect } from "../../helpers/displayView";
 
 type DisplayMapProps = {
   // The part of the map to show
   view: MapRect;
-  session: Session;
   /** Waiting players may pan, zoom and point, with no interface */
   interactive?: boolean;
 };
@@ -22,7 +19,7 @@ type DisplayMapProps = {
 function ignore() {}
 
 /** The map as a player sees it with nothing to press, for a cast display */
-function DisplayMap({ view, session, interactive = false }: DisplayMapProps) {
+function DisplayMap({ view, interactive = false }: DisplayMapProps) {
 
   const initialRect = useRef(view).current;
   return (
@@ -38,7 +35,7 @@ function DisplayMap({ view, session, interactive = false }: DisplayMapProps) {
         <SceneGrid />
         <SceneItems placement="aboveGrid" />
         <SceneItems placement="aboveRuler" />
-        <NetworkedMapPointer active={interactive} session={session} />
+        <ScenePointers active={interactive} />
       </MapInteraction>
     </Box>
   );

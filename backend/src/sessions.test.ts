@@ -2,6 +2,7 @@ import { expect, test } from "bun:test";
 import { createRoom, nextMessage, setupAdministrator, startTestServer } from "./testing/serverHelpers";
 import type { Socket } from "socket.io-client";
 
+const pointer = (sceneId: string, x: number) => ({ sceneId, kind: "pointer", state: { position: { x, y: 2 }, visible: true } });
 const session = (socket: Socket, running: unknown) => new Promise<any>(resolve => socket.emit("session", running, resolve));
 
 test("only the GM controls a room session, which survives refresh but ends on restart", async () => {
@@ -36,7 +37,8 @@ test("waiting players and cast displays receive party data and no pointers or di
     const gm = await server.joinRoomAsGM(room.id, cookie);
     gm.socket.emit("player_state", { name: "Keeper" });
     const preparingGM = await server.joinRoomAsGM(room.id, cookie);
-    const gmPointers = nextMessage(preparingGM.socket, "player_pointer");
+    const gmPointers = nextMessage(preparingGM.socket, "live");
+    const sceneId = gm.snapshot!.scene!.id;
     const token = await new Promise<string>(resolve => gm.socket.emit("get_display_token", resolve));
     const player = await server.joinRoom(room.id, "", "player");
     const trusted = await server.joinRoom(room.id, "", "trusted");
@@ -45,27 +47,27 @@ test("waiting players and cast displays receive party data and no pointers or di
     const peers = [player.socket, trusted.socket, display.socket];
     const received: string[][] = peers.map(() => []);
     peers.forEach((peer, i) => {
-      for (const event of ["scene_snapshot", "scene_changes", "player_pointer", "display_view"])
+      for (const event of ["scene_snapshot", "scene_changes", "live", "display_view"])
         peer.on(event, () => received[i].push(event));
     });
     expect(player.state.partyState[gm.socket.id!].name).toBe("Keeper");
-    gm.socket.emit("player_pointer", { x: 1, y: 2 });
-    gm.socket.emit("display_view", { sceneId: gm.snapshot!.scene!.id, x: 0, y: 0, width: 10, height: 10 });
+    gm.socket.emit("live", pointer(sceneId, 1));
+    gm.socket.emit("display_view", { sceneId, x: 0, y: 0, width: 10, height: 10 });
     await gmPointers;
     for (const peer of peers) {
-      peer.emit("player_pointer", { x: 3, y: 4 });
+      peer.emit("live", pointer(sceneId, 3));
       await session(peer, false);
     }
     expect(received).toEqual([[], [], []]);
     const snapshots = peers.map(peer => nextMessage(peer, "scene_snapshot"));
     await session(gm.socket, true);
     for (const snapshot of await Promise.all(snapshots)) expect(snapshot[0]).toEqual(gm.snapshot);
-    const forwarded = nextMessage(gm.socket, "player_pointer");
-    player.socket.emit("player_pointer", { x: 3, y: 4 });
-    expect((await forwarded)[0]).toEqual({ x: 3, y: 4 });
+    const forwarded = nextMessage(gm.socket, "live");
+    player.socket.emit("live", pointer(sceneId, 3));
+    expect((await forwarded)[0]).toEqual({ ...pointer(sceneId, 3), connectionId: player.socket.id });
     await session(gm.socket, false);
     received.forEach(events => events.splice(0));
-    player.socket.emit("player_pointer", { x: 5, y: 6 });
+    player.socket.emit("live", pointer(sceneId, 5));
     await session(player.socket, false);
     expect(received).toEqual([[], [], []]);
   } finally { await server.dispose(); }

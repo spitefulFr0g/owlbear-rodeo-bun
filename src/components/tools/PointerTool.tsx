@@ -17,6 +17,10 @@ import Pointer from "../konva/Pointer";
 
 import colors, { Color } from "../../helpers/colors";
 
+/** The pointer as drawn for everyone, in world units */
+export const pointerSize = 30;
+export const pointerTrailDuration = 200;
+
 type MapPointerProps = {
   active: boolean;
   position: Vector2;
@@ -86,16 +90,14 @@ function PointerTool({
     };
   });
 
-  const size = 30;
-
   return (
     <World listening={false}>
       {visible && (
         <Pointer
           position={position}
           color={colors[color]}
-          size={size}
-          duration={200}
+          size={pointerSize}
+          duration={pointerTrailDuration}
         />
       )}
     </World>
