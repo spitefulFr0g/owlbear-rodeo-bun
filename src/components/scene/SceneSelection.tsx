@@ -125,7 +125,7 @@ export default function SceneSelection({
       event.preventDefault();
     }
   });
-  useEffect(() => {
+  useLayoutEffect(() => {
     // Item updates must not replace the handlers that own a held interaction.
     // Every event reads the latest scene; pickup geometry stays fixed until release.
     const initialScene = sceneRef.current;
@@ -478,11 +478,9 @@ export default function SceneSelection({
   if (!scene) return null;
   return (
     <>
-      {active && (
-        <World>
-          <Group ref={root} />
-        </World>
-      )}
+      <World>
+        <Group ref={root} />
+      </World>
     </>
   );
 }
