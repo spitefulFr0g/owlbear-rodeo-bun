@@ -1,15 +1,12 @@
 import { PlayerColour } from "../helpers/playerColour";
 import { Timer } from "./Timer";
 import { DiceState } from "./Dice";
-import { Role } from "./Room";
 
+/** This browser's own name, colour, dice and timer; what it sends is its presence */
 export type PlayerState = {
   nickname: string;
+  /** Assigned by the server on join */
   color?: PlayerColour;
   timer?: Timer;
   dice: DiceState;
-  sessionId?: string;
-  userId?: string;
-  /** Set by the server for the others in the party, never taken from a browser */
-  role?: Role;
 };

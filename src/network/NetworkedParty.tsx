@@ -33,24 +33,23 @@ function NetworkedParty({ gameId, session }: NetworkedPartyProps) {
   // Keep a reference to players who have just joined to show the joined notification
   const joinedPlayersRef = useRef<string[]>([]);
   useEffect(() => {
-    if (joinedPlayersRef.current.length > 0) {
-      for (let id of joinedPlayersRef.current) {
-        if (partyState[id]) {
-          addToast(`${partyState[id].nickname} joined the party`);
-        }
-      }
-      joinedPlayersRef.current = [];
-    }
+    // A presence starts unnamed, so wait for the name its browser sends
+    joinedPlayersRef.current = joinedPlayersRef.current.filter((id) => {
+      if (!partyState[id]?.nickname) return true;
+      addToast(`${partyState[id].nickname} joined the party`);
+      return false;
+    });
   }, [partyState, addToast]);
 
   useEffect(() => {
     function handlePlayerJoined(sessionId: string) {
       // Add player to join notification list
-      // Can't just show the notification here as the partyState data isn't populated at this point
+      // Can't just show the notification here as the presence isn't named at this point
       joinedPlayersRef.current.push(sessionId);
     }
 
     function handlePlayerLeft(sessionId: string) {
+      joinedPlayersRef.current = joinedPlayersRef.current.filter((id) => id !== sessionId);
       if (partyState[sessionId]) {
         addToast(`${partyState[sessionId].nickname} left the party`);
       }
