@@ -1,15 +1,14 @@
 import { Flex, Text, Box } from "theme-ui";
-import raw from "raw.macro";
 
 import Footer from "../components/Footer";
 import Markdown from "../components/Markdown";
 
 import assets from "../docs/assets";
 
-const database = raw("../docs/faq/database.md");
-const maps = raw("../docs/faq/maps.md");
-const general = raw("../docs/faq/general.md");
-const connection = raw("../docs/faq/connection.md");
+import database from "../docs/faq/database.md?raw";
+import maps from "../docs/faq/maps.md?raw";
+import general from "../docs/faq/general.md?raw";
+import connection from "../docs/faq/connection.md?raw";
 
 function FAQ() {
   return (

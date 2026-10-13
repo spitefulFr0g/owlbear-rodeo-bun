@@ -54,7 +54,7 @@ function Game() {
   }, [sessionStatus, refresh]);
 
   const [maintenance, setMaintenance] = useState(
-    process.env.REACT_APP_MAINTENANCE === "true"
+    import.meta.env.VITE_MAINTENANCE === "true"
   );
 
   useEffect(() => {

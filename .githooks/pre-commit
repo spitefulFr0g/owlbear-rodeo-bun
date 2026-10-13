@@ -14,7 +14,7 @@ check() {
   fi
 }
 
-if ! git diff --cached --quiet -- backend src package.json yarn.lock tsconfig.json scripts .githooks .github/workflows; then
+if ! git diff --cached --quiet -- backend src public index.html vite.config.mjs .env .env.production package.json yarn.lock tsconfig.json scripts .githooks .github/workflows; then
   cd "$root" || exit 1
   check node scripts/frontend.cjs setup
 fi
@@ -26,7 +26,7 @@ if ! git diff --cached --quiet -- backend src/sceneRules src/scene package.json 
   check bun run lint
 fi
 
-if ! git diff --cached --quiet -- src tsconfig.json package.json yarn.lock scripts .githooks .github/workflows/frontend.yml; then
+if ! git diff --cached --quiet -- src public index.html vite.config.mjs .env .env.production tsconfig.json package.json yarn.lock scripts .githooks .github/workflows/frontend.yml; then
   cd "$root" || exit 1
   check node scripts/frontend.cjs check
 fi

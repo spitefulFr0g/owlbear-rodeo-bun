@@ -28,7 +28,7 @@ try {
   assert.throws(() => setup(worktree), /dependencies are missing/);
   const modules = path.join(main, "node_modules");
   fs.mkdirSync(path.join(modules, ".bin"), { recursive: true });
-  write(modules, ".bin/tsc", "compiler fixture");
+  write(modules, ".bin/vite", "bundler fixture");
   // A scripts-only package change still shares the same dependencies.
   write(worktree, "package.json", JSON.stringify({ ...pkg, scripts: { check: "changed" } }));
   setup(worktree);
@@ -50,7 +50,7 @@ try {
   assert.throws(() => setup(worktree), /somewhere other than the main checkout/);
   fs.unlinkSync(link);
   fs.mkdirSync(path.join(link, ".bin"), { recursive: true });
-  write(link, ".bin/tsc", "local compiler fixture");
+  write(link, ".bin/vite", "local bundler fixture");
   assert.strictEqual(setup(worktree), link);
   assert.strictEqual(borrowedModules(worktree), undefined);
   console.log("Frontend dependency sharing checks passed");

@@ -15,6 +15,8 @@ on:
       - ".github/workflows/release.yml"
       - "backend/scripts/**"
       - "scripts/**"
+      - "vite.config.mjs"
+      - "index.html"
   workflow_dispatch:
 
 jobs:
@@ -32,21 +34,20 @@ jobs:
               exit 1
             fi
           done
+      - run: corepack enable
       - uses: actions/setup-node@v4
         with:
-          node-version: 16.20.0
+          node-version: 24
           cache: yarn
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.4.2
       - run: bun install --frozen-lockfile
         working-directory: backend
+      - run: yarn install --frozen-lockfile --non-interactive
       - name: Build the frontend
         working-directory: backend
-        run: bun run build:frontend --local
-        env:
-          # Create React App fails the build on a lint warning when CI is set.
-          CI: "false"
+        run: bun run build:frontend
       - run: yarn check:frontend
       - run: bun test
         working-directory: backend

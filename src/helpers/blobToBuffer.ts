@@ -12,7 +12,7 @@ async function blobToBuffer(blob: Blob): Promise<Uint8Array> {
 
       function onLoadEnd() {
         reader.removeEventListener("loadend", onLoadEnd, false);
-        resolve(Buffer.from(reader.result as ArrayBuffer));
+        resolve(new Uint8Array(reader.result as ArrayBuffer));
       }
 
       reader.addEventListener("loadend", onLoadEnd, false);
