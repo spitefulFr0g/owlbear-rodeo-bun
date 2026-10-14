@@ -1,7 +1,7 @@
 import { tokenItem } from "./testing/sceneFixtures";
 import { expect, test } from "bun:test";
 import { parseConfig } from "./config";
-import { sendBatch, createRoom, nextMessage, signIn, setupAdministrator, startTestServer } from "./testing/serverHelpers";
+import { uploadLibrary, libraryCommand, sendBatch, createRoom, nextMessage, signIn, setupAdministrator, startTestServer } from "./testing/serverHelpers";
 
 function setup(address: string, username: string, password = "long-password") {
   return fetch(`${address}/api/setup`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ username, password }) });
@@ -62,14 +62,14 @@ test("reopened setup preserves accounts, signed-in browsers and scenes while cle
     await sendBatch(owner.socket, { id: "kept", sceneId: owner.snapshot!.scene!.id, changes: [{ type: "add", item: map }] });
     await received;
     const image = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 1, 2, 3, 4]);
-    expect((await fetch(`${server.address}/assets/kept-image`, { method: "PUT", body: image,
-      headers: { Authorization: `Bearer ${owner.token}`, "Content-Type": "image/png", "X-Asset-Width": "4", "X-Asset-Height": "2", "X-Asset-Owner": "gm" } })).status).toBe(201);
+    const asset = await uploadLibrary(server, owner.token, image);
+    await libraryCommand(owner.socket, { action: "delete", id: asset.id });
     await server.restart({ reopenSetup: true });
     expect(await (await fetch(`${server.address}/api/status`, { headers: { Cookie: original.cookie } })).json()).toEqual({ setup: "open", account: original.account });
     expect((await signIn(server, "administrator", "test-password")).account).toEqual(original.account);
     const joined = await server.joinRoomAsGM(room.id, original.cookie);
     expect(joined.snapshot!.scene!.items.hero).toEqual(map);
-    const download = await fetch(`${server.address}/assets/kept-image`, { headers: { Authorization: `Bearer ${joined.token}` } });
+    const download = await fetch(`${server.address}/assets/${asset.files.original.id}`, { headers: { Authorization: `Bearer ${joined.token}` } });
     expect(download.status).toBe(404);
     await download.text();
     await setupAdministrator(server, "Recovered");
@@ -78,7 +78,7 @@ test("reopened setup preserves accounts, signed-in browsers and scenes while cle
     expect((await signIn(server, "Recovered", "test-password")).account.administrator).toBe(true);
     const kept = await server.joinRoomAsGM(room.id, original.cookie);
     expect(kept.snapshot!.scene!.items.hero).toEqual(map);
-    expect((await fetch(`${server.address}/assets/kept-image`, { headers: { Authorization: `Bearer ${kept.token}` } })).status).toBe(404);
+    expect((await fetch(`${server.address}/assets/${asset.files.original.id}`, { headers: { Authorization: `Bearer ${kept.token}` } })).status).toBe(404);
   } finally { await server.dispose(); }
 });
 

@@ -1,3 +1,4 @@
+import LibraryService from "./entities/LibraryService";
 import { roomDeletion } from "./rooms/deleteRoom";
 import AdministratorController from "./controllers/AdministratorController";
 import AttemptLimiter from "./AttemptLimiter";
@@ -107,7 +108,7 @@ export async function startServer(options: ServerOptions): Promise<RunningServer
 
   const controllers: Array<Controller> = [
     new HealthcheckController(),
-    new AssetController(assetStore, joinTokens, MAX_ASSET_BYTES, database),
+    new AssetController(assetStore, joinTokens),
   ];
 
   server.loadMiddleware(globalMiddleware);
@@ -123,10 +124,13 @@ export async function startServer(options: ServerOptions): Promise<RunningServer
   app.use("/api", new SetupController(accounts).setRoutes());
   app.use("/api", new SignInController(accounts, attempts).setRoutes());
   const game = new GameServer(io, joinTokens, database, options.clock, attempts, options.behindProxy, accounts);
+  const library = new LibraryService(database, assetStore, joinTokens, game.gameRepo, io, accounts, options.clock, MAX_ASSET_BYTES);
+  game.library = library;
+  app.use("/api", library.routes());
   app.use("/api", new RoomController(accounts, database, game.gameRepo, (id) => io.to(id).emit("room_state", game.gameRepo.roomState(id)), roomDeletion(assetStore, game.gameRepo, io), async () => await assetStore.diskSizeBytes() + database.diskSizeBytes()).setRoutes());
   app.use("/api", new InviteController(accounts).setRoutes());
   app.use("/api", new PasswordController(accounts).setRoutes());
-  app.use("/api", new AdministratorController(accounts, game.gameRepo).setRoutes());
+  app.use("/api", new AdministratorController(accounts, game.gameRepo, () => library.broadcast()).setRoutes());
   server.loadControllers(controllers);
   server.loadMiddleware([frontendHandler(frontendAssets)]);
 
@@ -166,7 +170,8 @@ export async function startServer(options: ServerOptions): Promise<RunningServer
         game.stop();
         io.close((error?: Error) => error ? reject(error) : resolve());
         httpServer.closeIdleConnections();
-      }).finally(() => {
+      }).finally(async () => {
+        await library.stop();
         try { game.flush(); }
         finally { database.close(); releaseDirectory(); }
       });

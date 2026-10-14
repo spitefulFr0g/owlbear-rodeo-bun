@@ -119,3 +119,5 @@ export function librarySections(options: LibraryViewOptions): LibrarySection[] {
   }
   return sections;
 }
+
+export * from "./wire";

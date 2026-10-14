@@ -92,6 +92,7 @@ let originalDatabase: Buffer | undefined;
 // Set when the released executable wrote an older layout than the one under test.
 let upgraded = false;
 let savedSceneId: string;
+let storedImageId = "smoke-image";
 const image = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 1, 2, 3, 4]);
 let server = released ? await start([released], false) : await start(command);
 try {
@@ -110,12 +111,20 @@ try {
   const styledGrid = { ...grid, opacity: 0.8, lineWidth: 3, color: "#333333" };
   const gridAnswer = await new Promise<any>(resolve => first.socket.emit("scene_settings", { sceneId: savedSceneId, grid: styledGrid }, resolve));
   if (!gridAnswer.ok) throw new Error("The smoke grid was not changed");
+  if (released) {
   const upload = await fetch(`${server.address}/assets/smoke-image`, {
     method: "PUT",
     body: image,
     headers: { Authorization: `Bearer ${first.token}`, "Content-Type": "image/png", "X-Asset-Width": "4", "X-Asset-Height": "2", "X-Asset-Owner": "gm" },
   });
   if (upload.status !== 201) throw new Error(`The image upload answered ${upload.status}: ${await upload.text()}`);
+  } else {
+    const { uploadLibrary, libraryCommand } = await import("../src/testing/serverHelpers");
+    const asset = await uploadLibrary(server, first.token, image);
+    storedImageId = asset.files.original.id;
+    const deleted = await libraryCommand(first.socket, { action: "delete", id: asset.id });
+    if (!deleted.ok) throw new Error("The smoke image could not be removed from the library");
+  }
   if (released) {
     const placedImage = new Promise<any>(resolve => first.socket.once("scene_answer", resolve));
     first.socket.emit("scene_changes", { id: "smoke-image-place", sceneId: savedSceneId, changes: [{ type: "add", item: {
@@ -166,7 +175,7 @@ try {
     throw new Error("A release on the same layout left a pre-upgrade copy");
   }
   if (second.ownerOnly !== false) throw new Error("The restarted or upgraded room did not default Owner Only to off");
-  const kept = await fetch(`${server.address}/assets/smoke-image`, { headers: { Authorization: `Bearer ${second.token}` } });
+  const kept = await fetch(`${server.address}/assets/${storedImageId}`, { headers: { Authorization: `Bearer ${second.token}` } });
   if (released ? kept.status !== 200 || !Buffer.from(await kept.arrayBuffer()).equals(Buffer.from(image)) : kept.status !== 404) {
     throw new Error(`The image was not there after the restart: ${kept.status}`);
   }

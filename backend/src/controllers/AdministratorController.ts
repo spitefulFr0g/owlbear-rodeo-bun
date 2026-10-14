@@ -14,7 +14,7 @@ const administratorBody: RequestHandler = (req, res, next) => {
 };
 
 export default class AdministratorController {
-  constructor(private readonly accounts: Accounts, private readonly rooms: GameRepository) {}
+  constructor(private readonly accounts: Accounts, private readonly rooms: GameRepository, private readonly changed: () => void = () => undefined) {}
 
   setRoutes(): Router {
     const router = Router();
@@ -39,6 +39,7 @@ export default class AdministratorController {
       for (const room of Object.values(this.rooms.games)) {
         if (room.gmAccountId === req.params.id) room.gmAccountId = caller.id;
       }
+      this.changed();
       res.sendStatus(204);
     });
     return router;

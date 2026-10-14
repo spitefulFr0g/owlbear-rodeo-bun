@@ -2,7 +2,7 @@ import { expect, test } from "bun:test";
 import { createHash } from "crypto";
 import { mkdir, readdir, stat, writeFile } from "fs/promises";
 import { join } from "path";
-import { createRoom, inviteAccount, nextMessage, setupAdministrator, startTestServer } from "./testing/serverHelpers";
+import { uploadLibrary, createRoom, inviteAccount, nextMessage, setupAdministrator, startTestServer } from "./testing/serverHelpers";
 
 const SLOW = 20000;
 const imageHeaders = (token: string) => ({ Authorization: `Bearer ${token}`, "Content-Type": "image/png",
@@ -34,12 +34,11 @@ test("administrators see every room and actual database and image bytes includin
     const second = await createRoom(server, administrator.cookie, "Beta");
     const uploader = await server.joinRoomAsGM(first.id, other.cookie);
     const reader = await server.joinRoomAsGM(second.id, administrator.cookie);
+    const ids: Record<string, string> = {};
     for (const id of ["shared", "same-bytes"]) {
-      const response = await fetch(`${server.address}/assets/${id}`, { method: "PUT", headers: imageHeaders(uploader.token), body: "12345678" });
-      expect(response.status).toBe(201);
-      await response.text();
+        ids[id] = (await uploadLibrary(server, uploader.token, "12345678")).files.original.id;
     }
-    expect((await fetch(`${server.address}/assets/shared`, { method: "HEAD", headers: imageHeaders(reader.token) })).status).toBe(200);
+    expect((await fetch(`${server.address}/assets/${ids.shared}`, { method: "HEAD", headers: imageHeaders(reader.token) })).status).toBe(200);
     const list = async () => {
       const response = await fetch(`${server.address}/api/admin/rooms`, { headers: { Cookie: administrator.cookie } });
       expect(response.status).toBe(200);
@@ -48,15 +47,15 @@ test("administrators see every room and actual database and image bytes includin
     const check = async (bytes: number) => {
       const result = await list();
       expect(result.rooms).toEqual([
-        { ...first, sizeBytes: 405, gm: { id: other.account.id, username: "Other" } },
-        { ...second, sizeBytes: 405, gm: { id: administrator.account.id, username: "Administrator" } },
+        { ...first, sizeBytes: 413, quota: 2000000000, playerQuota: 100000000, gm: { id: other.account.id, username: "Other" } },
+        { ...second, sizeBytes: 405, quota: 2000000000, playerQuota: 100000000, gm: { id: administrator.account.id, username: "Administrator" } },
       ]);
       expect(result.totalBytes).toBe((await stat(join(directory, "owlbear.db"))).size + bytes);
       expect(await fileBytes(join(directory, "assets", "blobs"))).toBe(bytes);
     };
     await check(8);
     await server.restart();
-    await check(0);
+    await check(8);
     expect((await fetch(`${server.address}/api/admin/rooms`)).status).toBe(401);
     const forbidden = await fetch(`${server.address}/api/admin/rooms`, { headers: { Cookie: other.cookie } });
     expect(forbidden.status).toBe(403);
@@ -73,21 +72,20 @@ test("an administrator deletes another GM's room with notifications, disconnecti
     const survivor = await createRoom(server, other.cookie, "Survivor");
     const writer = await server.joinRoomAsGM(room.id, other.cookie);
     const reader = await server.joinRoomAsGM(survivor.id, other.cookie);
+    const ids: Record<string, string> = {};
     for (const id of ["exclusive", "shared"]) {
-      const uploaded = await fetch(`${server.address}/assets/${id}`, { method: "PUT", headers: imageHeaders(writer.token), body: id });
-      expect(uploaded.status).toBe(201);
-      await uploaded.text();
+        ids[id] = (await uploadLibrary(server, writer.token, id)).files.original.id;
     }
-    expect((await fetch(`${server.address}/assets/shared`, { method: "HEAD", headers: imageHeaders(reader.token) })).status).toBe(200);
+    expect((await fetch(`${server.address}/assets/${ids.shared}`, { method: "HEAD", headers: imageHeaders(reader.token) })).status).toBe(200);
     const events: string[] = [];
     writer.socket.on("room_deleted", (...args) => { expect(args).toEqual([]); events.push("room_deleted"); });
     const disconnected = nextMessage(writer.socket, "disconnect").then(() => events.push("disconnect"));
     expect((await fetch(`${server.address}/api/rooms/${room.id}`, { method: "DELETE", headers: { Cookie: administrator.cookie } })).status).toBe(204);
     await disconnected;
     expect(events).toEqual(["room_deleted", "disconnect"]);
-    expect((await fetch(`${server.address}/assets/exclusive`, { headers: imageHeaders(reader.token) })).status).toBe(404);
-    expect((await fetch(`${server.address}/assets/shared`, { headers: imageHeaders(reader.token) })).status).toBe(404);
-    expect((await fetch(`${server.address}/assets/shared`, { headers: imageHeaders(writer.token) })).status).toBe(401);
+    expect((await fetch(`${server.address}/assets/${ids.exclusive}`, { headers: imageHeaders(reader.token) })).status).toBe(404);
+    expect((await fetch(`${server.address}/assets/${ids.shared}`, { headers: imageHeaders(reader.token) })).status).toBe(404);
+    expect((await fetch(`${server.address}/assets/${ids.shared}`, { headers: imageHeaders(writer.token) })).status).toBe(401);
     await server.restart();
     const list = await fetch(`${server.address}/api/admin/rooms`, { headers: { Cookie: administrator.cookie } });
     expect((await list.json() as any).rooms.map((room: any) => room.id)).toEqual([survivor.id]);

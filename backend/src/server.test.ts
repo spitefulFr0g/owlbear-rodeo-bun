@@ -3,7 +3,7 @@ import { createHash } from "crypto";
 import { mkdir, mkdtemp, rm, writeFile, stat } from "fs/promises";
 import { join } from "path";
 import { expect, test } from "bun:test";
-import { createRoom, setupAdministrator, startTestServer } from "./testing/serverHelpers";
+import { uploadLibrary, libraryCommand, createRoom, setupAdministrator, startTestServer } from "./testing/serverHelpers";
 
 const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 1, 2, 3, 4]);
 
@@ -13,16 +13,11 @@ test("an unplaced legacy upload is cleared at restart", async () => {
     const { cookie } = await setupAdministrator(server);
     const room = await createRoom(server, cookie, "Room");
     const { token } = await server.joinRoomAsGM(room.id, cookie);
-    const uploaded = await fetch(`${server.address}/assets/image`, {
-      method: "PUT", body: png,
-      headers: { Authorization: `Bearer ${token}`, "Content-Type": "image/png",
-        "X-Asset-Width": "4", "X-Asset-Height": "2", "X-Asset-Owner": "gm" },
-    });
-    expect(uploaded.status).toBe(201);
-    await uploaded.text();
+    const asset = await uploadLibrary(server, token, png);
+    await libraryCommand((await server.joinRoomAsGM(room.id, cookie)).socket, { action: "delete", id: asset.id });
     await server.restart();
     const rejoined = await server.joinRoom(room.id);
-    const downloaded = await fetch(`${server.address}/assets/image`, {
+    const downloaded = await fetch(`${server.address}/assets/${asset.files.original.id}`, {
       headers: { Authorization: `Bearer ${rejoined.token}` },
     });
     expect(downloaded.status).toBe(404);
@@ -42,19 +37,13 @@ test("two servers keep room passwords, join tokens and images separate", async (
     const a = await first.joinRoom(firstRoom.id, "first-password");
     const b = await second.joinRoom(secondRoom.id, "second-password");
     const uploader = await first.joinRoomAsGM(firstRoom.id, firstAccount.cookie);
-    const response = await fetch(`${first.address}/assets/separate`, {
-      method: "PUT", body: png,
-      headers: { Authorization: `Bearer ${uploader.token}`, "Content-Type": "image/png",
-        "X-Asset-Width": "4", "X-Asset-Height": "2", "X-Asset-Owner": "gm" },
-    });
-    expect(response.status).toBe(201);
-    await response.text();
-    const foreign = await fetch(`${second.address}/assets/separate`, {
+    const asset = await uploadLibrary(first, uploader.token, png);
+    const foreign = await fetch(`${second.address}/assets/${asset.files.original.id}`, {
       headers: { Authorization: `Bearer ${a.token}` },
     });
     expect(foreign.status).toBe(401);
     await foreign.text();
-    const absent = await fetch(`${second.address}/assets/separate`, {
+    const absent = await fetch(`${second.address}/assets/${asset.files.original.id}`, {
       headers: { Authorization: `Bearer ${b.token}` },
     });
     expect(absent.status).toBe(404);

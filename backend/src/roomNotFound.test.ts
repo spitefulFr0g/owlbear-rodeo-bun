@@ -18,7 +18,7 @@ test("a missing room refuses only the joiner and stays missing on later joins an
       if (attempt === 1) await server.restart();
     }
     const response = await fetch(`${server.address}/api/rooms`, { headers: { Cookie: cookie } });
-    expect(await response.json()).toEqual({ rooms: [] });
+    expect(await response.json()).toEqual({ accountLibrary: { sizeBytes: 0, quota: 2000000000 }, rooms: [] });
   } finally { await server.dispose(); }
 });
 
