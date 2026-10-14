@@ -6,7 +6,7 @@ import { CubeTexture } from "@babylonjs/core/Materials/Textures/cubeTexture";
 import { Scene } from "@babylonjs/core";
 import { Box } from "theme-ui";
 
-// @ts-ignore
+// @ts-expect-error
 import environment from "../../dice/environment.dds";
 
 import DiceInteraction from "./DiceInteraction";

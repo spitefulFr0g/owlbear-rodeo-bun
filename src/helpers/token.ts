@@ -19,7 +19,6 @@ export async function createTokenFromFile(
   let defaultSize = 1;
   if (file.name) {
     name = file.name.toLowerCase();
-    // @ts-ignore Check match all exists
     if (name.matchAll) {
       // Match against a regex to find the grid size in the file name
       // e.g. Cave 22x23 will return [["22x22", "22", "x", "23"]]

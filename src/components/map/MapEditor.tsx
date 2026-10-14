@@ -145,7 +145,6 @@ function MapEditor({ map, onSettingsChange }: MapEditorProps) {
             <KonvaBridge
               stageRender={(children: React.ReactNode) => (
                 <Stage
-                  // @ts-ignore https://github.com/konvajs/react-konva/issues/342
                   width={stageWidth}
                   height={stageHeight}
                   scale={{ x: stageScale, y: stageScale }}

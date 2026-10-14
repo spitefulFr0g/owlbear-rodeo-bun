@@ -11,7 +11,8 @@
     "build:frontend": "bun scripts/build-frontend.ts",
     "build": "bun scripts/build.ts",
     "lint": "eslint \"src/**/*.ts\"",
-    "smoke": "bun scripts/embed-frontend.ts && bun scripts/smoke.ts"
+    "smoke": "bun scripts/embed-frontend.ts && bun scripts/smoke.ts",
+    "browse": "bun scripts/embed-frontend.ts && bun scripts/browse.ts"
   },
   "dependencies": {
     "cors": "^2.8.5",

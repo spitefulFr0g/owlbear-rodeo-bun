@@ -370,7 +370,7 @@ function Transformer({
         const tag = new Konva.Tag();
         tag.fill("hsla(230, 25%, 15%, 0.8)");
         tag.cornerRadius(4);
-        // @ts-ignore
+        // @ts-expect-error
         tag.pointerDirection("down");
         tag.pointerHeight(4);
         tag.pointerWidth(4);

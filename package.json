@@ -77,7 +77,15 @@
     "setup:worktree": "node scripts/frontend.cjs setup"
   },
   "eslintConfig": {
-    "extends": "react-app"
+    "extends": "react-app",
+    "overrides": [
+      {
+        "files": ["**/*.ts?(x)"],
+        "rules": {
+          "@typescript-eslint/ban-ts-comment": ["error", { "ts-expect-error": false, "ts-ignore": true, "ts-nocheck": true }]
+        }
+      }
+    ]
   },
   "devDependencies": {
     "@types/color": "^3.0.3",
