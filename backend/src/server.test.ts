@@ -7,7 +7,7 @@ import { createRoom, setupAdministrator, startTestServer } from "./testing/serve
 
 const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 1, 2, 3, 4]);
 
-test("an image uploaded with a room connection survives a server restart", async () => {
+test("an unplaced legacy upload is cleared at restart", async () => {
   const server = await startTestServer();
   try {
     const { cookie } = await setupAdministrator(server);
@@ -25,8 +25,8 @@ test("an image uploaded with a room connection survives a server restart", async
     const downloaded = await fetch(`${server.address}/assets/image`, {
       headers: { Authorization: `Bearer ${rejoined.token}` },
     });
-    expect(downloaded.status).toBe(200);
-    expect(new Uint8Array(await downloaded.arrayBuffer())).toEqual(png);
+    expect(downloaded.status).toBe(404);
+    await downloaded.text();
   } finally { await server.dispose(); }
 });
 
@@ -97,7 +97,7 @@ async function legacyAsset(dir: string, id: string, body = png) {
   return path;
 }
 
-test("every v0.1.0 image remains downloadable and old records are never read again", async () => {
+test("unused v0.1.0 images are cleared and old records are never read again", async () => {
   let dir = "";
   const server = await startTestServer(async (dataDir) => {
     dir = dataDir;
@@ -111,9 +111,9 @@ test("every v0.1.0 image remains downloadable and old records are never read aga
       const { token } = await server.joinRoom(room.id);
       for (const [id, body] of [["old-a", png], ["old-b", new Uint8Array([5, 6, 7])]] as const) {
         const response = await fetch(`${server.address}/assets/${id}`, { headers: { Authorization: `Bearer ${token}` } });
-        expect(response.status).toBe(200);
-        expect(response.headers.get("X-Asset-Owner")).toBe("old-gm");
-        expect(new Uint8Array(await response.arrayBuffer())).toEqual(body);
+        expect(response.status).toBe(404);
+        expect(response.headers.get("X-Asset-Owner")).toBeNull();
+        await response.text();
       }
     };
     await check();
@@ -148,8 +148,8 @@ test("a failed legacy read-in is retried in full on the next start", async () =>
       const { token } = await server.joinRoom(room.id);
       for (const [id, body] of [["aa-first", new Uint8Array([9, 8])], ["zz-last", png]] as const) {
         const response = await fetch(`${server.address}/assets/${id}`, { headers: { Authorization: `Bearer ${token}` } });
-        expect(response.status).toBe(200);
-        expect(new Uint8Array(await response.arrayBuffer())).toEqual(body);
+        expect(response.status).toBe(404);
+        await response.text();
       }
     } finally { await server.dispose(); }
   } finally { await rm(dir, { recursive: true, force: true }); }

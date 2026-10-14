@@ -81,7 +81,7 @@ test("the old display link joins after restart without restoring presence, dice,
   } finally { await server.dispose(); }
 });
 
-test("saved image references remain downloadable and incremental edits survive restart", async () => {
+test("a refused image replacement does not change the saved item and unused bytes are cleared", async () => {
   const server = await startRoomServer();
   try {
     const { owner, observer } = await change(server);
@@ -101,13 +101,13 @@ test("saved image references remain downloadable and incremental edits survive r
     await server.restart();
     const joined = await server.joinRoomAsGM(server.roomId, server.cookie);
     const item = joined.snapshot!.scene!.items.hero;
-    expect(item).toEqual({ ...tokenItem, image: { type: "file", file: "image" }, label: "The door is open" });
+    expect(item).toEqual(tokenItem);
     for (const token of [joined.token, (await server.joinRoom(server.roomId)).token]) {
       const response = await fetch(`${server.address}/assets/image`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      expect(response.status).toBe(200);
-      expect(new Uint8Array(await response.arrayBuffer())).toEqual(image);
+      expect(response.status).toBe(404);
+      await response.text();
     }
   } finally { await server.dispose(); }
 });

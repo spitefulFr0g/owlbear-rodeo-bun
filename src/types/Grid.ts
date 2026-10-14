@@ -1,10 +1,11 @@
-import Vector2 from "../helpers/Vector2";
+// Persisted grid coordinates are plain values, shared with the server.
+type GridPoint = { x: number; y: number };
 
 export type GridInset = {
   /** Top left position of the inset */
-  topLeft: Vector2;
+  topLeft: GridPoint;
   /** Bottom right position of the inset */
-  bottomRight: Vector2;
+  bottomRight: GridPoint;
 };
 
 export type GridMeasurementType =
@@ -24,7 +25,7 @@ export type Grid = {
   /** The inset of the grid from the map */
   inset: GridInset;
   /** The number of columns and rows of the grid as `x` and `y` */
-  size: Vector2;
+  size: GridPoint;
   type: GridType;
   measurement: GridMeasurement;
 };

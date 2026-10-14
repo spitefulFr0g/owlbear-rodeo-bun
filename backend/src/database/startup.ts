@@ -3,7 +3,9 @@ import { copyFileSync, existsSync, renameSync, rmSync, statSync, writeFileSync }
 
 export interface UpgradeStep { version: number; sql: string }
 // Future released layouts add steps in increasing version order.
-export const upgradeSteps: readonly UpgradeStep[] = [];
+export const upgradeSteps: readonly UpgradeStep[] = [{ version: 4, sql: `
+  DROP TABLE IF EXISTS room_assets;
+` }];
 
 export function inspectDatabase(path: string, supportedVersion: number): number {
   let database: Database | undefined;

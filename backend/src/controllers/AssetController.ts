@@ -86,7 +86,6 @@ export default class AssetController extends Controller {
         return;
       }
       // Reads still work with uploads off, but cannot make a foreign image placeable.
-      if (res.locals.canRecordAsset) this.database?.recordRoomAsset(res.locals.roomId, assetId);
       const { record } = asset;
       res.status(200).set({
         "Content-Type": record.mime,
@@ -148,11 +147,9 @@ export default class AssetController extends Controller {
         // Keep the connection open when the store gives up on the body
         req.iterator({ destroyOnReturn: false })
       );
-      this.database?.recordRoomAsset(res.locals.roomId, assetId);
       res.status(201).json({ id: record.id, hash: record.hash });
     } catch (error) {
       if (error instanceof AssetExistsError) {
-        this.database?.recordRoomAsset(res.locals.roomId, req.params.assetId);
         refuse(409);
       } else if (error instanceof AssetTooLargeError) {
         refuse(413);

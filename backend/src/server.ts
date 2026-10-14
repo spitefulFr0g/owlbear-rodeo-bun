@@ -60,6 +60,7 @@ export async function startServer(options: ServerOptions): Promise<RunningServer
   const assetStore = new FsAssetStore(join(dataDir, "assets"), MAX_ASSET_BYTES, options.clock, database);
   try {
     await assetStore.init();
+    await assetStore.startupCleanup();
   } catch (error: any) {
     database.close();
     throw new Error(`Unable to use the data directory ${dataDir}: ${error.message}\nChoose another with --data-dir.`);

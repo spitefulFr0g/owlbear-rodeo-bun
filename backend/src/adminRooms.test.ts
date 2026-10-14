@@ -45,18 +45,18 @@ test("administrators see every room and actual database and image bytes includin
       expect(response.status).toBe(200);
       return await response.json() as any;
     };
-    const check = async () => {
+    const check = async (bytes: number) => {
       const result = await list();
       expect(result.rooms).toEqual([
-        { ...first, sizeBytes: 421, gm: { id: other.account.id, username: "Other" } },
-        { ...second, sizeBytes: 413, gm: { id: administrator.account.id, username: "Administrator" } },
+        { ...first, sizeBytes: 405, gm: { id: other.account.id, username: "Other" } },
+        { ...second, sizeBytes: 405, gm: { id: administrator.account.id, username: "Administrator" } },
       ]);
-      expect(result.totalBytes).toBe((await stat(join(directory, "owlbear.db"))).size + 20);
-      expect(await fileBytes(join(directory, "assets", "blobs"))).toBe(20);
+      expect(result.totalBytes).toBe((await stat(join(directory, "owlbear.db"))).size + bytes);
+      expect(await fileBytes(join(directory, "assets", "blobs"))).toBe(bytes);
     };
-    await check();
+    await check(8);
     await server.restart();
-    await check();
+    await check(0);
     expect((await fetch(`${server.address}/api/admin/rooms`)).status).toBe(401);
     const forbidden = await fetch(`${server.address}/api/admin/rooms`, { headers: { Cookie: other.cookie } });
     expect(forbidden.status).toBe(403);
@@ -86,7 +86,7 @@ test("an administrator deletes another GM's room with notifications, disconnecti
     await disconnected;
     expect(events).toEqual(["room_deleted", "disconnect"]);
     expect((await fetch(`${server.address}/assets/exclusive`, { headers: imageHeaders(reader.token) })).status).toBe(404);
-    expect((await fetch(`${server.address}/assets/shared`, { headers: imageHeaders(reader.token) })).status).toBe(200);
+    expect((await fetch(`${server.address}/assets/shared`, { headers: imageHeaders(reader.token) })).status).toBe(404);
     expect((await fetch(`${server.address}/assets/shared`, { headers: imageHeaders(writer.token) })).status).toBe(401);
     await server.restart();
     const list = await fetch(`${server.address}/api/admin/rooms`, { headers: { Cookie: administrator.cookie } });

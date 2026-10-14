@@ -231,6 +231,7 @@ export default class Accounts {
       if (id === callerId) return { error: "cannot_remove_self" } as const;
       if (account.administrator && this.list().filter(account => account.administrator).length === 1) return { error: "last_administrator" } as const;
       this.database.connection.query("UPDATE rooms SET gmAccountId = ? WHERE gmAccountId = ?").run(callerId, id);
+      this.database.library.transferAccount(id, callerId);
       this.endSignIns(id);
       this.database.connection.query("DELETE FROM accounts WHERE id = ?").run(id);
       return { removed: true } as const;

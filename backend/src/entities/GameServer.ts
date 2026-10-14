@@ -1,4 +1,5 @@
-import { applyChange, visibleTo, changeFor, Item, Scene, mayChange, Person, checkChange, readBatch, topOrder, gmOwner, Change, SceneGrid, checkGrid, defaultSceneGrid, checkSceneName, maxScenes, readLive, dragFrom, dragFor, LiveMessage, maxLiveMessagesPerSecond, readPresence, PresenceUpdate, presenceSceneFor } from "../../../src/sceneRules";
+import { mayPlaceImage } from "../../../src/sceneRules/library";
+import { ImageSource, applyChange, visibleTo, changeFor, Item, Scene, mayChange, Person, checkChange, readBatch, topOrder, gmOwner, Change, SceneGrid, checkGrid, defaultSceneGrid, checkSceneName, maxScenes, readLive, dragFrom, dragFor, LiveMessage, maxLiveMessagesPerSecond, readPresence, PresenceUpdate, presenceSceneFor } from "../../../src/sceneRules";
 import { randomBytes } from "crypto";
 import Accounts from "../accounts/Accounts";
 import { clientAddress } from "../clientRequest";
@@ -65,6 +66,15 @@ export default class GameServer {
   private person(socket: Socket, gameId: string): Person {
     return { role: socket.data.castDisplay ? "display" : this.playerRole(socket, gameId),
       id: socket.data.castDisplay ? "" : socket.data.role === "gm" ? gmOwner : socket.data.playerId };
+  }
+
+  private mayPlace(gameId: string, person: Person, image: ImageSource): boolean {
+    const accountId = this.gameRepo.games[gameId].gmAccountId ?? undefined;
+    return mayPlaceImage(image, { person, roomId: gameId, accountId,
+      assets: this.database ? [...this.database.library.assets({ kind: "room", id: gameId }),
+        ...this.database.library.assets({ kind: "account", id: accountId ?? "" })] : [],
+      placedFileIds: this.database?.placedFileIds(gameId) ?? new Set(),
+    });
   }
 
   private sceneFor(socket: Socket, gameId: string): Scene | null {
@@ -358,6 +368,10 @@ export default class GameServer {
             (Object.hasOwn(payload, "fogFill") && typeof payload.fogFill !== "boolean") ||
             (Object.hasOwn(payload, "map") && (!payload.map || payload.map.kind !== "image" ||
               payload.map.layer !== "map" || checkChange(scene, { type: "add", item: payload.map })))) {
+          if (typeof answer === "function") answer({ ok: false, error: "invalid" });
+          return;
+        }
+        if (payload.map && payload.map.kind === "image" && !this.mayPlace(gameId, this.person(socket, gameId), payload.map.image)) {
           if (typeof answer === "function") answer({ ok: false, error: "invalid" });
           return;
         }
@@ -659,11 +673,12 @@ export default class GameServer {
           const id = change.type === "add" ? change.item.id : change.id;
           const before = Object.hasOwn(scene.items, id) ? scene.items[id] : undefined;
           const refusedItem = before && visibleTo(person, before) ? before : null;
-          if (checkChange(scene, change) ||
+          const targetImage = change.type === "add" && change.item.kind === "image" ? change.item.image :
+            change.type === "update" ? change.fields.image : undefined;
+          const placementAllowed = !targetImage || this.mayPlace(gameId, person, targetImage);
+          if (!placementAllowed || checkChange(scene, change) ||
               !mayChange(person, { switches: game.switches, viewOnly: scene.viewOnly, welcomeScreen: !game.session && game.welcomeSceneId === scene.id, knownImage: image =>
-                image.type === "default" || [image.file, image.thumbnail, ...Object.values(image.resolutions ?? {})]
-                  .filter((id): id is string => id !== undefined)
-                  .every(id => this.database?.roomHasAsset(gameId, id) ?? false) },
+                this.mayPlace(gameId, person, image) },
                 change.type === "add" ? undefined : before, change) ||
               (socket.data.role !== "gm" && !socket.data.playerId)) {
             refused.push({ id, item: refusedItem });
@@ -689,6 +704,7 @@ export default class GameServer {
           }
           scene = { ...result.scene, name: scene.name };
           game.scenes[scene.id] = scene;
+          this.database?.recordPlacedFiles(gameId, scene.items[id]);
           applied.push(actual);
           transitions.push({ before, after: Object.hasOwn(scene.items, id) ? scene.items[id] : undefined, change: actual });
         }

@@ -90,7 +90,7 @@ const imageHeaders = (token: string) => ({ Authorization: `Bearer ${token}`, "Co
   "X-Asset-Width": "1", "X-Asset-Height": "1", "X-Asset-Owner": "gm" });
 
 for (const method of ["HEAD", "GET", "PUT"] as const) {
-  test(`deleting a room removes its exclusive images but preserves images another room used through ${method}`, async () => {
+  test(`deleting a room cleans unplaced images despite another room accessing them through ${method}`, async () => {
     const server = await startTestServer();
     try {
       const { cookie } = await setupAdministrator(server);
@@ -112,13 +112,13 @@ for (const method of ["HEAD", "GET", "PUT"] as const) {
         expect(response.status).toBe(404);
       }
       const shared = await fetch(`${server.address}/assets/shared`, { headers: imageHeaders(reader.token) });
-      expect(shared.status).toBe(200);
-      expect(await shared.text()).toBe("shared bytes");
+      expect(shared.status).toBe(404);
+      await shared.text();
       await server.restart();
       const joined = await server.joinRoom(second.id);
       const saved = await fetch(`${server.address}/assets/shared`, { headers: imageHeaders(joined.token) });
-      expect(saved.status).toBe(200);
-      expect(await saved.text()).toBe("shared bytes");
+      expect(saved.status).toBe(404);
+      await saved.text();
       expect((await remove(server, second.id, cookie)).status).toBe(204);
       const third = await createRoom(server, cookie, "Third");
       const last = await server.joinRoom(third.id);
@@ -151,7 +151,7 @@ test("a room deleted during a password check refuses the pending join", async ()
   } finally { releaseCheck(); check.mockRestore(); await server.dispose(); }
 });
 
-test("deleting a room frees its image files and keeps images no room has used", async () => {
+test("deleting a room clears unused image files", async () => {
   let directory = "";
   const legacyHash = createHash("sha256").update("legacy bytes").digest("hex");
   const exclusiveHash = createHash("sha256").update("exclusive bytes").digest("hex");
@@ -179,8 +179,8 @@ test("deleting a room frees its image files and keeps images no room has used", 
     const second = await createRoom(server, cookie, "Second");
     const reader = await server.joinRoom(second.id);
     const untouched = await fetch(`${server.address}/assets/legacy`, { headers: imageHeaders(reader.token) });
-    expect(untouched.status).toBe(200);
-    expect(await untouched.text()).toBe("legacy bytes");
+    expect(untouched.status).toBe(404);
+    await untouched.text();
   } finally { await server.dispose(); }
 });
 
@@ -215,8 +215,8 @@ test("file cleanup failure leaves the room and exclusive image records deleted w
       const joined = await recovered.joinRoom(second.id);
       expect((await fetch(`${recovered.address}/assets/exclusive`, { headers: imageHeaders(joined.token) })).status).toBe(404);
       const shared = await fetch(`${recovered.address}/assets/shared`, { headers: imageHeaders(joined.token) });
-      expect(shared.status).toBe(200);
-      expect(await shared.text()).toBe("shared");
+      expect(shared.status).toBe(404);
+      await shared.text();
     } finally { await recovered.dispose(); }
   } finally { await server.dispose(); }
 });
