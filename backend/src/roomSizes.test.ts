@@ -24,7 +24,7 @@ const imageHeaders = (token: string) => ({ Authorization: `Bearer ${token}`, "Co
   "X-Asset-Width": "1", "X-Asset-Height": "1", "X-Asset-Owner": "player" });
 
 for (const method of ["PUT", "HEAD", "GET"] as const) {
-  test(`${method} records a shared image once for each room and keeps usage after restart`, async () => {
+  test(`${method} does not add unplaced files to either room size`, async () => {
     const server = await startTestServer();
     try {
       const { cookie } = await setupAdministrator(server);
@@ -36,16 +36,16 @@ for (const method of ["PUT", "HEAD", "GET"] as const) {
       expect(upload.status).toBe(201);
       await upload.text();
       const sizes = async () => (await (await fetch(`${server.address}/api/rooms`, { headers: { Cookie: cookie } })).json() as any).rooms.map((room: any) => room.sizeBytes);
-      expect(await sizes()).toEqual([413, 405]);
+      expect(await sizes()).toEqual([405, 405]);
       for (let repeat = 0; repeat < 2; repeat++) {
         const response = await fetch(`${server.address}/assets/image`, { method, headers: imageHeaders(reader.token), ...(method === "PUT" ? { body: "ignored" } : {}) });
         expect(response.status).toBe(method === "PUT" ? 409 : 200);
         if (method === "GET") expect(await response.text()).toBe("12345678");
         else await response.text();
       }
-      expect(await sizes()).toEqual([413, 413]);
+      expect(await sizes()).toEqual([405, 405]);
       await server.restart();
-      expect(await sizes()).toEqual([413, 413]);
+      expect(await sizes()).toEqual([405, 405]);
     } finally { await server.dispose(); }
   });
 }
@@ -81,8 +81,8 @@ test("cast display downloads do not record legacy images as used by the room", a
     const unauthenticated = await fetch(`${server.address}/assets/legacy`);
     expect(unauthenticated.status).toBe(401);
     const response = await fetch(`${server.address}/assets/legacy`, { headers: { Authorization: `Bearer ${token}` } });
-    expect(response.status).toBe(200);
-    expect(await response.text()).toBe(bytes);
+    expect(response.status).toBe(404);
+    await response.text();
     await server.restart();
     const list = await fetch(`${server.address}/api/rooms`, { headers: { Cookie: cookie } });
     expect((await list.json() as any).rooms[0].sizeBytes).toBe(405); // The display fetch does not add image usage.

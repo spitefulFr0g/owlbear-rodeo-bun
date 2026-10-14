@@ -49,7 +49,7 @@ test("reopened setup validates names and passwords without consuming its one use
   } finally { await server.dispose(); }
 });
 
-test("reopened setup preserves accounts, signed-in browsers, rooms and images while joins keep working", async () => {
+test("reopened setup preserves accounts, signed-in browsers and scenes while clearing unused images", async () => {
   const server = await startTestServer();
   try {
     const original = await setupAdministrator(server);
@@ -57,7 +57,7 @@ test("reopened setup preserves accounts, signed-in browsers, rooms and images wh
     const owner = await server.joinRoomAsGM(room.id, original.cookie);
     await new Promise(resolve => owner.socket.emit("session", true, resolve));
     const observer = await server.joinRoom(room.id, "room-password");
-    const map = { ...tokenItem, layer: "map" as const, locked: true, image: { type: "file" as const, file: "kept-image" } };
+    const map = { ...tokenItem, layer: "map" as const, locked: true };
     const received = nextMessage(observer.socket, "scene_changes");
     await sendBatch(owner.socket, { id: "kept", sceneId: owner.snapshot!.scene!.id, changes: [{ type: "add", item: map }] });
     await received;
@@ -70,15 +70,15 @@ test("reopened setup preserves accounts, signed-in browsers, rooms and images wh
     const joined = await server.joinRoomAsGM(room.id, original.cookie);
     expect(joined.snapshot!.scene!.items.hero).toEqual(map);
     const download = await fetch(`${server.address}/assets/kept-image`, { headers: { Authorization: `Bearer ${joined.token}` } });
-    expect(download.status).toBe(200);
-    expect(new Uint8Array(await download.arrayBuffer())).toEqual(image);
+    expect(download.status).toBe(404);
+    await download.text();
     await setupAdministrator(server, "Recovered");
     await server.restart();
     expect((await signIn(server, "Administrator", "test-password")).account).toEqual(original.account);
     expect((await signIn(server, "Recovered", "test-password")).account.administrator).toBe(true);
     const kept = await server.joinRoomAsGM(room.id, original.cookie);
     expect(kept.snapshot!.scene!.items.hero).toEqual(map);
-    expect(new Uint8Array(await (await fetch(`${server.address}/assets/kept-image`, { headers: { Authorization: `Bearer ${kept.token}` } })).arrayBuffer())).toEqual(image);
+    expect((await fetch(`${server.address}/assets/kept-image`, { headers: { Authorization: `Bearer ${kept.token}` } })).status).toBe(404);
   } finally { await server.dispose(); }
 });
 

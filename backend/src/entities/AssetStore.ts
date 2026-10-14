@@ -104,6 +104,13 @@ export class FsAssetStore implements AssetStore {
     await mkdir(this.tmpDir, { recursive: true });
   }
 
+  async startupCleanup(): Promise<void> {
+    this.database.rebuildPlacedFiles();
+    this.database.library.dropIncomplete();
+    this.database.collectUnusedFiles();
+    await this.removeUnreferencedBlobs();
+  }
+
   async put(
     id: string,
     info: AssetInfo,
@@ -200,7 +207,15 @@ export class FsAssetStore implements AssetStore {
       for (const hash of new Set(removed.map(asset => asset.hash))) {
         if (!this.database.hasHash(hash)) await rm(this.blobPath(hash), { force: true });
       }
+      await this.removeUnreferencedBlobs();
     });
+  }
+
+  private async removeUnreferencedBlobs(): Promise<void> {
+    for (const file of await readdir(this.blobsDir, { recursive: true })) {
+      const path = join(this.blobsDir, file);
+      if ((await stat(path)).isFile() && !this.database.hasHash(file.split(/[\\/]/).pop()!)) await rm(path, { force: true });
+    }
   }
 
   async diskSizeBytes(): Promise<number> {
@@ -210,7 +225,7 @@ export class FsAssetStore implements AssetStore {
       const sizes = await Promise.all((await readdir(path)).map(name => measure(join(path, name))));
       return sizes.reduce((total, size) => total + size, 0);
     };
-    return this.exclusive(() => measure(this.blobsDir));
+    return this.exclusive(async () => await measure(this.blobsDir) + await measure(this.tmpDir));
   }
 
   private importLegacyRecords(): void {

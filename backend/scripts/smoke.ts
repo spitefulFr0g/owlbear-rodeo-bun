@@ -116,6 +116,17 @@ try {
     headers: { Authorization: `Bearer ${first.token}`, "Content-Type": "image/png", "X-Asset-Width": "4", "X-Asset-Height": "2", "X-Asset-Owner": "gm" },
   });
   if (upload.status !== 201) throw new Error(`The image upload answered ${upload.status}: ${await upload.text()}`);
+  if (released) {
+    const placedImage = new Promise<any>(resolve => first.socket.once("scene_answer", resolve));
+    first.socket.emit("scene_changes", { id: "smoke-image-place", sceneId: savedSceneId, changes: [{ type: "add", item: {
+      id: "smoke-placed-image", kind: "image", layer: "character", position: { x: 0, y: 0 }, rotation: 0,
+      scale: { x: 1, y: 1 }, order: 0, owner: "gm", locked: false, hidden: false, metadata: {},
+      image: { type: "file", file: "smoke-image" }, width: 4, height: 2, label: "Smoke",
+      outline: { type: "circle", x: 2, y: 1, radius: 1 },
+    } }] });
+    const imageAnswer = await placedImage;
+    if (imageAnswer.refused.length || imageAnswer.applied.length !== 1) throw new Error("The released server did not place the smoke image");
+  }
   // Long enough for a timer that fires at once to show itself on stderr.
   await Bun.sleep(3000);
   first.socket.disconnect();
@@ -124,7 +135,7 @@ try {
   if (released) {
     originalDatabase = await readFile(join(dataDir, "owlbear.db"));
     const database = new Database(join(dataDir, "owlbear.db"), { readonly: true });
-    try { upgraded = database.query<{ user_version: number }, []>("PRAGMA user_version").get()!.user_version < 3; }
+    try { upgraded = database.query<{ user_version: number }, []>("PRAGMA user_version").get()!.user_version < 4; }
     finally { database.close(); }
   }
   server = await start(command);
@@ -137,7 +148,7 @@ try {
   await new Promise(resolve => second.socket.emit("get_display_token", resolve));
   const scene = second.snapshot?.scene;
   if (!scene || scene.id !== savedSceneId || JSON.stringify(scene.items["smoke-note"]) !== JSON.stringify(note) ||
-      Object.keys(scene.items).length !== 1 || Object.entries(styledGrid).some(([key, value]) => JSON.stringify(scene.grid[key as keyof typeof scene.grid]) !== JSON.stringify(value)) ||
+      Object.keys(scene.items).length !== (released ? 2 : 1) || Object.entries(styledGrid).some(([key, value]) => JSON.stringify(scene.grid[key as keyof typeof scene.grid]) !== JSON.stringify(value)) ||
       scene.fogFill !== false || scene.viewOnly !== false || scene.movementMode !== true || "name" in scene) {
     throw new Error("The restarted or upgraded room did not keep its scene, note, grid and new defaults");
   }
@@ -147,15 +158,26 @@ try {
     const database = new Database(join(dataDir, "owlbear.db"), { readonly: true });
     try {
       const version = database.query<{ user_version: number }, []>("PRAGMA user_version").get()!.user_version;
-      if (version !== 3) throw new Error(`The upgraded layout version was ${version}, expected 3`);
+      if (database.query<{ count: number }, []>("SELECT COUNT(*) AS count FROM library_assets").get()!.count ||
+          database.query<{ count: number }, []>("SELECT COUNT(*) AS count FROM library_folders").get()!.count) throw new Error("The upgrade created library entries");
+      if (version !== 4) throw new Error(`The upgraded layout version was ${version}, expected 4`);
     } finally { database.close(); }
   } else if (released && await access(join(dataDir, "owlbear.db.before-upgrade")).then(() => true, () => false)) {
     throw new Error("A release on the same layout left a pre-upgrade copy");
   }
   if (second.ownerOnly !== false) throw new Error("The restarted or upgraded room did not default Owner Only to off");
   const kept = await fetch(`${server.address}/assets/smoke-image`, { headers: { Authorization: `Bearer ${second.token}` } });
-  if (kept.status !== 200 || !Buffer.from(await kept.arrayBuffer()).equals(Buffer.from(image))) {
+  if (released ? kept.status !== 200 || !Buffer.from(await kept.arrayBuffer()).equals(Buffer.from(image)) : kept.status !== 404) {
     throw new Error(`The image was not there after the restart: ${kept.status}`);
+  }
+  if (released) {
+    const item = scene.items["smoke-placed-image"];
+    for (const change of [{ type: "delete", id: item.id }, { type: "add", item }]) {
+      const answered = new Promise<any>(resolve => second.socket.once("scene_answer", resolve));
+      second.socket.emit("scene_changes", { id: `smoke-undo-${change.type}`, sceneId: savedSceneId, changes: [change] });
+      const result = await answered;
+      if (result.refused.length || result.applied.length !== 1) throw new Error("A placed image could not be deleted and undone during the sitting");
+    }
   }
   const settingsAnswer = await new Promise<any>(resolve => second.socket.emit("room_switches", { tokens: false }, resolve));
   if (!settingsAnswer.ok) throw new Error("Could not save the upgraded room");
@@ -174,7 +196,7 @@ try {
     const timeout = setTimeout(() => old.kill(), 10000);
     try {
       const error = await new Response(old.stderr).text();
-      if (await old.exited === 0 || !error.includes("newer layout version 3")) throw new Error(`The released executable did not refuse upgraded data: ${error}`);
+      if (await old.exited === 0 || !error.includes("newer layout version 4")) throw new Error(`The released executable did not refuse upgraded data: ${error}`);
     } finally { clearTimeout(timeout); old.kill(); }
   }
 } finally {

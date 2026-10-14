@@ -92,7 +92,7 @@ test("removing an account ends every HTTP sign-in and passes loaded and unloaded
     expect(newGM.snapshot!.scene!.items.hero).toEqual(tokenItem);
     expect(await new Promise<string>(resolve => newGM.socket.emit("get_display_token", resolve))).toBe(displayToken);
     const image = await fetch(`${server.address}/assets/image`, { headers: { Authorization: `Bearer ${rejoined.token}` } });
-    expect(new Uint8Array(await image.arrayBuffer())).toEqual(png);
+    expect(image.status).toBe(404);
     expect((await (await request(server.address, "admin/accounts", "GET", admin.cookie)).json() as any).accounts).toEqual([admin.account]);
   } finally { await server.dispose(); }
 });
