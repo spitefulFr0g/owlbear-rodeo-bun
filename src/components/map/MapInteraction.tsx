@@ -218,7 +218,6 @@ function MapInteraction({
             <KonvaBridge
               stageRender={(children) => (
                 <Stage
-                  // @ts-ignore
                   width={stageWidth}
                   height={stageHeight}
                   scale={{ x: stageScale, y: stageScale }}

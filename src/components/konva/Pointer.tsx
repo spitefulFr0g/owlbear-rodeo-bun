@@ -139,7 +139,7 @@ function Pointer({ position, size, duration, segments, color }: PointerProps) {
     );
     gradient.addColorStop(0, color);
     gradient.addColorStop(1, transparentColorRef.current);
-    // @ts-ignore
+    // @ts-expect-error
     context.fillStyle = gradient;
     context.fill();
   }

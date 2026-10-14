@@ -14,19 +14,24 @@ check() {
   fi
 }
 
-if ! git diff --cached --quiet -- backend src public index.html vite.config.mjs .env .env.production package.json yarn.lock tsconfig.json scripts .githooks .github/workflows; then
+# The frontend is everything outside backend/ and the docs, so a new file at
+# the root is checked without being listed here.
+frontend=$(git diff --cached --name-only | grep -v -e '^backend/' -e '^docs/' -e '\.md$')
+backend=$(git diff --cached --name-only -- backend src/sceneRules src/scene package.json yarn.lock)
+
+if [ -n "$frontend" ] || [ -n "$backend" ]; then
   cd "$root" || exit 1
   check node scripts/frontend.cjs setup
 fi
 
-if ! git diff --cached --quiet -- backend src/sceneRules src/scene package.json yarn.lock; then
+if [ -n "$backend" ]; then
   cd "$root/backend" || exit 1
   check bun run typecheck
   check bun run test
   check bun run lint
 fi
 
-if ! git diff --cached --quiet -- src public index.html vite.config.mjs .env .env.production tsconfig.json package.json yarn.lock scripts .githooks .github/workflows/frontend.yml; then
+if [ -n "$frontend" ]; then
   cd "$root" || exit 1
   check node scripts/frontend.cjs check
 fi

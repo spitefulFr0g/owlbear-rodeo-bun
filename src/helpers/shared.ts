@@ -113,15 +113,13 @@ export function shuffle<Type>(array: Type[]) {
  */
 export async function clipboardSupported(): Promise<boolean> {
   // Reason: we're already handling the case where clipboard-read is not supported
-  // @ts-ignore
+  // @ts-expect-error
   if (navigator.clipboard?.readText && navigator.clipboard?.writeText) {
     if (navigator.permissions) {
-      // @ts-ignore
       let query = await navigator.permissions.query({ name: "clipboard-read" });
       if (query.state === "prompt") {
         try {
           await navigator.clipboard.readText();
-          // @ts-ignore
           query = await navigator.permissions.query({ name: "clipboard-read" });
           // Wait 300ms before returning when permission has been accepted to prevent immediate calls
           // to the clipboard api to fail with a document not focused error

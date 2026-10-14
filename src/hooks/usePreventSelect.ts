@@ -1,7 +1,7 @@
 function usePreventSelect() {
   function clearSelection() {
     window?.getSelection()?.removeAllRanges();
-    // @ts-ignore
+    // @ts-expect-error
     document?.selection?.empty();
   }
   function preventSelect() {

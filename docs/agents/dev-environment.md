@@ -75,9 +75,11 @@ delete it after.
 
 ## Seeing it in a browser
 
-Start the backend on a spare port with its own data directory:
-`bun src/index.ts --port 9100 --data-dir <temp dir>`. A fresh data directory
-opens on the setup form.
+`bun run browse` in `backend/` starts the server on port 9100 (`--port` for
+another) with a temporary data directory, an administrator and a room already
+made, and prints the sign-in, the room link and the server's pid. The server
+outlives the command; stop it with the `kill <pid>` it prints, since
+`pkill -f` matches the shell running it and ends that too.
 
 For changes to held drags, resizes, tool switching or authoritative-update
 reconciliation, run the [held interaction verification command](verification.md).
