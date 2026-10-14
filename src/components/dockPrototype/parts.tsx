@@ -1,5 +1,5 @@
 // PROTOTYPE: small pieces every variant may use (#136). No layout lives here.
-import { Box, Image } from "theme-ui";
+import { Box, Button, Flex, Image, Text } from "theme-ui";
 
 import SelectMapIcon from "../../icons/SelectMapIcon";
 import TokenPropIcon from "../../icons/TokenPropIcon";
@@ -9,7 +9,7 @@ import TokenAttachmentIcon from "../../icons/TokenAttachmentIcon";
 import GroupIcon from "../../icons/GroupIcon";
 
 import { Asset, AssetType, assetTypes, typeLabels } from "./data";
-import { Proto, Tab } from "./model";
+import { formatBytes, Proto, Tab } from "./model";
 
 export function TabIcon({ tab }: { tab: Tab }) {
   switch (tab) {
@@ -133,4 +133,75 @@ export function FolderGlyph({ open = false }: { open?: boolean }) {
       )}
     </svg>
   );
+}
+
+/** Where an asset lives, as a GM or player would say it */
+export function whereLabel(asset: Asset) {
+  if (asset.library === "server") return "Server set";
+  if (asset.library === "account") return "My library";
+  return asset.uploader ? `This room, from ${asset.uploader}` : "This room";
+}
+
+/** The picked asset with its edits and actions, for an inspector or drawer */
+export function AssetDetails({ proto, size = 160 }: { proto: Proto; size?: number }) {
+  const asset = proto.selected;
+  if (!asset) {
+    return (
+      <Flex sx={{ flexGrow: 1, alignItems: "center", justifyContent: "center", color: "gray", p: 3 }}>
+        Pick an asset
+      </Flex>
+    );
+  }
+  const editable = proto.mayEdit(asset);
+  const move = moveLabel(proto, asset);
+  return (
+    <Flex sx={{ flexDirection: "column", alignItems: "center", p: 3, gap: 2, overflowY: "auto" }}>
+      <Thumb asset={asset} size={size} />
+      <Text variant="heading" sx={{ fontSize: 3, textAlign: "center" }}>
+        {asset.name}
+      </Text>
+      <Text variant="caption">
+        {whereLabel(asset)} · {formatBytes(asset.bytes)}
+      </Text>
+      {editable ? (
+        <Box sx={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: 2, alignItems: "center", width: "100%" }}>
+          <Text sx={{ fontSize: 1 }}>Name</Text>
+          <Button variant="secondary" sx={{ fontSize: 0 }} onClick={() => proto.actions.rename(asset)}>
+            Rename…
+          </Button>
+          <Text sx={{ fontSize: 1 }}>Type</Text>
+          <TypeSelect proto={proto} asset={asset} />
+          <Text sx={{ fontSize: 1 }}>Folder</Text>
+          <FolderSelect proto={proto} asset={asset} />
+        </Box>
+      ) : (
+        <Text variant="caption">{asset.library === "server" ? "The server set is read-only" : "Only its uploader or the GM can change it"}</Text>
+      )}
+      <Flex sx={{ gap: 2, mt: 1, flexWrap: "wrap", justifyContent: "center" }}>
+        {move && (
+          <Button variant="secondary" sx={{ fontSize: 0 }} onClick={() => proto.actions.move(asset)}>
+            {move}
+          </Button>
+        )}
+        {editable && (
+          <Button sx={{ bg: "error", fontSize: 0 }} onClick={() => proto.actions.remove(asset)}>
+            Delete
+          </Button>
+        )}
+      </Flex>
+    </Flex>
+  );
+}
+
+export function StarGlyph({ on }: { on: boolean }) {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill={on ? "#ffd54a" : "none"} stroke={on ? "#ffd54a" : "currentcolor"} strokeWidth="2">
+      <path d="M12 2l3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9-1z" />
+    </svg>
+  );
+}
+
+/** Asset types a role may see; players have no maps */
+export function typesFor(proto: Proto) {
+  return proto.role === "gm" ? assetTypes : assetTypes.filter((x) => x !== "map");
 }

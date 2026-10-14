@@ -217,6 +217,10 @@ export function usePrototype(role: Role) {
   }
 
   const actions = {
+    /** Records a summary, for actions a variant applies to several assets */
+    say(text: string) {
+      setLastAction(text);
+    },
     place(asset: Asset) {
       setLastAction(
         asset.type === "map"
