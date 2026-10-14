@@ -1,4 +1,5 @@
 const fs = require("fs");
+const os = require("os");
 const path = require("path");
 const { execFileSync } = require("child_process");
 
@@ -35,7 +36,7 @@ function setup(repo = root) {
   const borrowed = borrowedModules(repo);
   const modules = path.join(repo, "node_modules");
   if (borrowed && !fs.existsSync(modules)) fs.symlinkSync(borrowed, modules, "dir");
-  if (!fs.existsSync(path.join(modules, ".bin", "tsc"))) {
+  if (!fs.existsSync(path.join(modules, ".bin", "vite"))) {
     throw new Error("frontend dependencies are missing; run yarn install --frozen-lockfile in the main checkout or this worktree");
   }
   return modules;
@@ -49,14 +50,22 @@ function run(command) {
   const commands = {
     typecheck: ["typescript/bin/tsc", "--noEmit"],
     lint: ["eslint/bin/eslint.js", "--ext", ".js,.jsx,.ts,.tsx", "src", "--max-warnings=0"],
-    test: ["react-scripts/bin/react-scripts.js", "test", "--watchAll=false", "--runInBand", "src/helpers"],
+    test: ["vitest/vitest.mjs", "run"],
+    build: ["vite/bin/vite.js", "build"],
   };
-  for (const name of command === "check" ? ["typecheck", "lint", "test"] : [command]) {
-    if (!commands[name]) throw new Error(`unknown frontend check: ${name}`);
-    const [script, ...args] = commands[name];
-    execFileSync(process.execPath, [path.join(modules, script), ...args], {
-      cwd: root, stdio: "inherit", env: { ...process.env, CI: "true" },
-    });
+  // The backend embeds build/ by file name, so a check builds somewhere else.
+  const scratch = command === "check" ? fs.mkdtempSync(path.join(os.tmpdir(), "frontend-check-")) : undefined;
+  try {
+    for (const name of scratch ? ["typecheck", "lint", "test", "build"] : [command]) {
+      if (!commands[name]) throw new Error(`unknown frontend check: ${name}`);
+      const [script, ...args] = commands[name];
+      if (scratch && name === "build") args.push("--outDir", scratch, "--emptyOutDir", "--logLevel", "warn");
+      execFileSync(process.execPath, [path.join(modules, script), ...args], {
+        cwd: root, stdio: "inherit", env: { ...process.env, CI: "true" },
+      });
+    }
+  } finally {
+    if (scratch) fs.rmSync(scratch, { recursive: true, force: true });
   }
 }
 

@@ -1,34 +1,33 @@
 import { Flex, Text } from "theme-ui";
-import raw from "raw.macro";
 import { useLocation } from "react-router-dom";
 
 import Footer from "../components/Footer";
 import Markdown from "../components/Markdown";
 import Accordion from "../components/Accordion";
 
-const v110 = raw("../docs/releaseNotes/v1.1.0.md");
-const v120 = raw("../docs/releaseNotes/v1.2.0.md");
-const v121 = raw("../docs/releaseNotes/v1.2.1.md");
-const v130 = raw("../docs/releaseNotes/v1.3.0.md");
-const v131 = raw("../docs/releaseNotes/v1.3.1.md");
-const v132 = raw("../docs/releaseNotes/v1.3.2.md");
-const v133 = raw("../docs/releaseNotes/v1.3.3.md");
-const v140 = raw("../docs/releaseNotes/v1.4.0.md");
-const v141 = raw("../docs/releaseNotes/v1.4.1.md");
-const v142 = raw("../docs/releaseNotes/v1.4.2.md");
-const v150 = raw("../docs/releaseNotes/v1.5.0.md");
-const v151 = raw("../docs/releaseNotes/v1.5.1.md");
-const v152 = raw("../docs/releaseNotes/v1.5.2.md");
-const v160 = raw("../docs/releaseNotes/v1.6.0.md");
-const v161 = raw("../docs/releaseNotes/v1.6.1.md");
-const v162 = raw("../docs/releaseNotes/v1.6.2.md");
-const v170 = raw("../docs/releaseNotes/v1.7.0.md");
-const v180 = raw("../docs/releaseNotes/v1.8.0.md");
-const v181 = raw("../docs/releaseNotes/v1.8.1.md");
-const v190 = raw("../docs/releaseNotes/v1.9.0.md");
-const v1100 = raw("../docs/releaseNotes/v1.10.0.md");
-const v1101 = raw("../docs/releaseNotes/v1.10.1.md");
-const v1102 = raw("../docs/releaseNotes/v1.10.2.md");
+import v110 from "../docs/releaseNotes/v1.1.0.md?raw";
+import v120 from "../docs/releaseNotes/v1.2.0.md?raw";
+import v121 from "../docs/releaseNotes/v1.2.1.md?raw";
+import v130 from "../docs/releaseNotes/v1.3.0.md?raw";
+import v131 from "../docs/releaseNotes/v1.3.1.md?raw";
+import v132 from "../docs/releaseNotes/v1.3.2.md?raw";
+import v133 from "../docs/releaseNotes/v1.3.3.md?raw";
+import v140 from "../docs/releaseNotes/v1.4.0.md?raw";
+import v141 from "../docs/releaseNotes/v1.4.1.md?raw";
+import v142 from "../docs/releaseNotes/v1.4.2.md?raw";
+import v150 from "../docs/releaseNotes/v1.5.0.md?raw";
+import v151 from "../docs/releaseNotes/v1.5.1.md?raw";
+import v152 from "../docs/releaseNotes/v1.5.2.md?raw";
+import v160 from "../docs/releaseNotes/v1.6.0.md?raw";
+import v161 from "../docs/releaseNotes/v1.6.1.md?raw";
+import v162 from "../docs/releaseNotes/v1.6.2.md?raw";
+import v170 from "../docs/releaseNotes/v1.7.0.md?raw";
+import v180 from "../docs/releaseNotes/v1.8.0.md?raw";
+import v181 from "../docs/releaseNotes/v1.8.1.md?raw";
+import v190 from "../docs/releaseNotes/v1.9.0.md?raw";
+import v1100 from "../docs/releaseNotes/v1.10.0.md?raw";
+import v1101 from "../docs/releaseNotes/v1.10.1.md?raw";
+import v1102 from "../docs/releaseNotes/v1.10.2.md?raw";
 
 function ReleaseNotes() {
   const location = useLocation();

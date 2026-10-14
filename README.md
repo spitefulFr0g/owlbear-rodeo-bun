@@ -65,15 +65,15 @@ Audio sharing only works over HTTPS or on `localhost`, so it is unavailable to p
 
 #### Building the executable
 
-You need [Bun](https://bun.sh) and Docker. Docker is only used to build the frontend with Node 16. In `/backend`, run:
+You need [Bun](https://bun.sh), plus NodeJS v24 or newer and Yarn to build the frontend. Run `yarn install` in the root folder, then in `/backend` run:
 
 ```
 bun install
-bun run build:frontend   # builds the website into /build (a few minutes, ~5GB RAM)
+bun run build:frontend   # builds the website into /build
 bun run build            # writes dist/owlbear-rodeo-linux-x64 and dist/owlbear-rodeo-windows-x64.exe
 ```
 
-Pass a target to build just one, such as `bun run build linux-x64`. Use `bun run build:frontend --local` to build with a local Node 16 and Yarn instead of Docker.
+Pass a target to build just one, such as `bun run build linux-x64`.
 
 ### Production (or for non-developers)
 
@@ -88,23 +88,9 @@ Once deployed Render will provide a URL for you to share with your players.
 
 ### Locally
 
-#### **Docker**
+Run the backend and the frontend side by side.
 
-Note: the Docker setup has not been updated for this fork's Bun backend yet.
-
-To use the project with docker you can run the following from the root directory of the project:
-
-```
-docker-compose up
-```
-
-Note: You will need to increase your max memory allowed in Docker to 5GB in order to build Owlbear Rodeo.
-
-#### **Manual**
-
-If you don't want to use Docker you can run both the backend and frontend manually.
-
-The backend needs [Bun](https://bun.sh). The frontend needs `NodeJS v16` and `Yarn`.
+The backend needs [Bun](https://bun.sh). The frontend needs `NodeJS v24` or newer and `Yarn`.
 
 To run the backend in `/backend` run:
 
@@ -118,6 +104,7 @@ bun run dev
 To run the frontend in the root folder run:
 
 ```
+yarn install
 yarn start
 ```
 

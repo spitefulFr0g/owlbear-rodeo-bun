@@ -7,9 +7,11 @@
  *   bun scripts/smoke.ts                                  the server from source
  *   bun scripts/smoke.ts <executable>                     a compiled executable
  *   bun scripts/smoke.ts <executable> --from <released>   an upgrade: the released
- *       executable (v0.4.0) makes the data, <executable> opens it
+ *       executable makes the data, <executable> opens it. When the release
+ *       wrote an older layout, the upgrade must also keep a pre-upgrade copy and
+ *       the release must refuse the upgraded data
  */
-import { mkdtemp, rm, readFile } from "fs/promises";
+import { mkdtemp, rm, readFile, access } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
 import { Database } from "bun:sqlite";
@@ -87,6 +89,8 @@ const note = { id: "smoke-note", kind: "text", layer: "note", position: { x: 123
   scale: { x: 1, y: 1 }, order: 0, owner: "gm", locked: false, hidden: false, metadata: {},
   text: "Kept across the upgrade", color: "yellow", size: 150, square: true };
 let originalDatabase: Buffer | undefined;
+// Set when the released executable wrote an older layout than the one under test.
+let upgraded = false;
 let savedSceneId: string;
 const image = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 1, 2, 3, 4]);
 let server = released ? await start([released], false) : await start(command);
@@ -117,7 +121,12 @@ try {
   first.socket.disconnect();
 
   await server.stop();
-  if (released) originalDatabase = await readFile(join(dataDir, "owlbear.db"));
+  if (released) {
+    originalDatabase = await readFile(join(dataDir, "owlbear.db"));
+    const database = new Database(join(dataDir, "owlbear.db"), { readonly: true });
+    try { upgraded = database.query<{ user_version: number }, []>("PRAGMA user_version").get()!.user_version < 3; }
+    finally { database.close(); }
+  }
   server = await start(command);
   const list = await fetch(`${server.address}/api/rooms`, { headers: { Cookie: cookie } });
   if (list.status !== 200) throw new Error(`The sign-in did not last through the restart: ${list.status}`);
@@ -132,7 +141,7 @@ try {
       scene.fogFill !== false || scene.viewOnly !== false || scene.movementMode !== true || "name" in scene) {
     throw new Error("The restarted or upgraded room did not keep its scene, note, grid and new defaults");
   }
-  if (released) {
+  if (upgraded) {
     const backup = await readFile(join(dataDir, "owlbear.db.before-upgrade"));
     if (!backup.equals(originalDatabase!)) throw new Error("The pre-upgrade copy did not preserve the released database");
     const database = new Database(join(dataDir, "owlbear.db"), { readonly: true });
@@ -140,6 +149,8 @@ try {
       const version = database.query<{ user_version: number }, []>("PRAGMA user_version").get()!.user_version;
       if (version !== 3) throw new Error(`The upgraded layout version was ${version}, expected 3`);
     } finally { database.close(); }
+  } else if (released && await access(join(dataDir, "owlbear.db.before-upgrade")).then(() => true, () => false)) {
+    throw new Error("A release on the same layout left a pre-upgrade copy");
   }
   if (second.ownerOnly !== false) throw new Error("The restarted or upgraded room did not default Owner Only to off");
   const kept = await fetch(`${server.address}/assets/smoke-image`, { headers: { Authorization: `Bearer ${second.token}` } });
@@ -158,7 +169,7 @@ try {
     if (record.documentVersion !== 3 || document.openSceneId !== savedSceneId || document.welcomeSceneId !== null ||
         document.scenes[savedSceneId].name !== "Scene 1") throw new Error("The room was not saved as document version 3 with its scene name and no welcome screen");
   } finally { database.close(); }
-  if (released) {
+  if (released && upgraded) {
     const old = Bun.spawn([released, "--port", "0", "--data-dir", dataDir], { stdout: "ignore", stderr: "pipe" });
     const timeout = setTimeout(() => old.kill(), 10000);
     try {

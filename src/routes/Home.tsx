@@ -94,7 +94,7 @@ function Home() {
         Getting Started <HelpIcon />
       </Button>
       <Text variant="caption" as="p" sx={{ textAlign: "center" }}>
-        Legacy v{process.env.REACT_APP_VERSION}
+        Legacy v{import.meta.env.VITE_VERSION}
       </Text>
       <ChangePasswordModal
         isOpen={isChangePasswordModalOpen}

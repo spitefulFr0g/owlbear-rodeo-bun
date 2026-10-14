@@ -70,8 +70,12 @@ function DiceInteraction({
       const scene = new Scene(engine);
       scene.clearColor = new Color4(0, 0, 0, 0);
       // Enable physics
-      Ammo().then(() => {
-        scene.enablePhysics(new Vector3(0, -98, 0), new AmmoJSPlugin(false));
+      // ammo.js stores itself on `this`, which a module does not have
+      Ammo.call({}).then((ammo: unknown) => {
+        scene.enablePhysics(
+          new Vector3(0, -98, 0),
+          new AmmoJSPlugin(false, ammo)
+        );
       });
 
       let camera = new TargetCamera("camera", new Vector3(0, 33.5, 0), scene);

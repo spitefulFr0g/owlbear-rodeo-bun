@@ -47,8 +47,8 @@ export class ApiError extends Error {
 }
 
 // The server hosts the frontend, so talk to the same origin unless a
-// separate broker is configured (e.g. the CRA dev server)
-const serverUrl = process.env.REACT_APP_BROKER_URL || window.location.origin;
+// separate broker is configured (e.g. the Vite dev server)
+const serverUrl = import.meta.env.VITE_BROKER_URL || window.location.origin;
 
 async function request<T>(
   method: string,

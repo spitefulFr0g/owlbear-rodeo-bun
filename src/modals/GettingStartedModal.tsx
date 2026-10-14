@@ -1,5 +1,4 @@
 import { Box, Label, Text } from "theme-ui";
-import raw from "raw.macro";
 
 import Modal from "../components/Modal";
 import Markdown from "../components/Markdown";
@@ -7,7 +6,7 @@ import Link from "../components/Link";
 
 import { RequestCloseEventHandler } from "../types/Events";
 
-const gettingStarted = raw("../docs/howTo/gettingStarted.md");
+import gettingStarted from "../docs/howTo/gettingStarted.md?raw";
 
 type GettingStartedModalProps = {
   isOpen: boolean;

@@ -1,5 +1,4 @@
 import { Flex, Text } from "theme-ui";
-import raw from "raw.macro";
 import { useLocation } from "react-router-dom";
 
 import Footer from "../components/Footer";
@@ -8,19 +7,19 @@ import Accordion from "../components/Accordion";
 
 import assets from "../docs/assets";
 
-const overview = raw("../docs/howTo/overview.md");
-const startingAndJoining = raw("../docs/howTo/startingAndJoining.md");
-const sharingMaps = raw("../docs/howTo/sharingMaps.md");
-const usingTokens = raw("../docs/howTo/usingTokens.md");
-const usingDrawing = raw("../docs/howTo/usingDrawing.md");
-const usingDice = raw("../docs/howTo/usingDice.md");
-const usingFog = raw("../docs/howTo/usingFog.md");
-const usingMeasure = raw("../docs/howTo/usingMeasure.md");
-const usingPointer = raw("../docs/howTo/usingPointer.md");
-const usingTimer = raw("../docs/howTo/usingTimer.md");
-const usingNotes = raw("../docs/howTo/usingNotes.md");
-const shortcuts = raw("../docs/howTo/shortcuts.md");
-const settings = raw("../docs/howTo/settings.md");
+import overview from "../docs/howTo/overview.md?raw";
+import startingAndJoining from "../docs/howTo/startingAndJoining.md?raw";
+import sharingMaps from "../docs/howTo/sharingMaps.md?raw";
+import usingTokens from "../docs/howTo/usingTokens.md?raw";
+import usingDrawing from "../docs/howTo/usingDrawing.md?raw";
+import usingDice from "../docs/howTo/usingDice.md?raw";
+import usingFog from "../docs/howTo/usingFog.md?raw";
+import usingMeasure from "../docs/howTo/usingMeasure.md?raw";
+import usingPointer from "../docs/howTo/usingPointer.md?raw";
+import usingTimer from "../docs/howTo/usingTimer.md?raw";
+import usingNotes from "../docs/howTo/usingNotes.md?raw";
+import shortcuts from "../docs/howTo/shortcuts.md?raw";
+import settings from "../docs/howTo/settings.md?raw";
 
 function HowTo() {
   const location = useLocation();

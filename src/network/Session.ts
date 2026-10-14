@@ -61,14 +61,14 @@ class Session extends EventEmitter {
    */
   async connect() {
     try {
-      if (process.env.REACT_APP_MAINTENANCE === "true") {
+      if (import.meta.env.VITE_MAINTENANCE === "true") {
         this.emit("status", "offline");
         return;
       }
       // The server hosts the frontend, so connect back to the same origin
-      // unless a separate broker is configured (e.g. the CRA dev server)
+      // unless a separate broker is configured (e.g. the Vite dev server)
       const brokerUrl =
-        process.env.REACT_APP_BROKER_URL || window.location.origin;
+        import.meta.env.VITE_BROKER_URL || window.location.origin;
       this.brokerUrl = brokerUrl;
       this.socket = io(brokerUrl, {
         withCredentials: true,
@@ -125,7 +125,7 @@ class Session extends EventEmitter {
       "join_game",
       gameId,
       password,
-      process.env.REACT_APP_VERSION,
+      import.meta.env.VITE_VERSION,
       { playerId, color: rememberedColour() }
     );
     this.emit("status", "joining");

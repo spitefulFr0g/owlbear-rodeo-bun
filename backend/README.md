@@ -4,4 +4,4 @@ Node.js backend for Owlbear Rodeo
 
 ## Requirements:
 
-- Docker
+- [Bun](https://bun.sh)
