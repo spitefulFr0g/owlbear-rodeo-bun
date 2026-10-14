@@ -17,6 +17,7 @@ export type LibraryAsset = {
   type: AssetType;
   folderId: string | null;
   uploader: string | null;
+  uploaderName?: string;
   created: number;
   files: LibraryFiles;
   width: number;

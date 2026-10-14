@@ -34,6 +34,8 @@ export default class JoinTokens {
     return role === "gm" || role === "player";
   }
 
+  connection(token: string) { return this.gameByToken.get(token); }
+
   revoke(socketId: string): void {
     const token = this.tokenBySocket.get(socketId);
     if (token) {

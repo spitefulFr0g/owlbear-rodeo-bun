@@ -4,7 +4,7 @@ import { createHash } from "crypto";
 import { mkdir, rm, stat, writeFile } from "fs/promises";
 import { join } from "path";
 import Auth from "./entities/Auth";
-import { sendBatch, createRoom, inviteAccount, nextMessage, setupAdministrator, startTestServer } from "./testing/serverHelpers";
+import { uploadLibrary, sendBatch, createRoom, inviteAccount, nextMessage, setupAdministrator, startTestServer } from "./testing/serverHelpers";
 
 type Server = Awaited<ReturnType<typeof startTestServer>>;
 const remove = (server: Server, id: string, cookie?: string, origin?: string) => fetch(`${server.address}/api/rooms/${id}`, {
@@ -98,31 +98,30 @@ for (const method of ["HEAD", "GET", "PUT"] as const) {
       const second = await createRoom(server, cookie, "Second");
       const uploader = await server.joinRoomAsGM(first.id, cookie);
       const reader = await server.joinRoomAsGM(second.id, cookie);
+      const ids: Record<string, string> = {};
       for (const [id, body] of [["exclusive", "exclusive bytes"], ["shared", "shared bytes"], ["same-hash", "shared bytes"]]) {
-        const upload = await fetch(`${server.address}/assets/${id}`, { method: "PUT", headers: imageHeaders(uploader.token), body });
-        expect(upload.status).toBe(201);
-        await upload.text();
+        ids[id] = (await uploadLibrary(server, uploader.token, body)).files.original.id;
       }
-      const used = await fetch(`${server.address}/assets/shared`, { method, headers: imageHeaders(reader.token), ...(method === "PUT" ? { body: "ignored" } : {}) });
-      expect(used.status).toBe(method === "PUT" ? 409 : 200);
+      const used = await fetch(`${server.address}/assets/${ids.shared}`, { method, headers: imageHeaders(reader.token), ...(method === "PUT" ? { body: "ignored" } : {}) });
+      expect(used.status).toBe(method === "PUT" ? 403 : 200);
       await used.text();
       expect((await remove(server, first.id, cookie)).status).toBe(204);
       for (const id of ["exclusive", "same-hash"]) {
-        const response = await fetch(`${server.address}/assets/${id}`, { headers: imageHeaders(reader.token) });
+        const response = await fetch(`${server.address}/assets/${ids[id]}`, { headers: imageHeaders(reader.token) });
         expect(response.status).toBe(404);
       }
-      const shared = await fetch(`${server.address}/assets/shared`, { headers: imageHeaders(reader.token) });
+      const shared = await fetch(`${server.address}/assets/${ids.shared}`, { headers: imageHeaders(reader.token) });
       expect(shared.status).toBe(404);
       await shared.text();
       await server.restart();
       const joined = await server.joinRoom(second.id);
-      const saved = await fetch(`${server.address}/assets/shared`, { headers: imageHeaders(joined.token) });
+      const saved = await fetch(`${server.address}/assets/${ids.shared}`, { headers: imageHeaders(joined.token) });
       expect(saved.status).toBe(404);
       await saved.text();
       expect((await remove(server, second.id, cookie)).status).toBe(204);
       const third = await createRoom(server, cookie, "Third");
       const last = await server.joinRoom(third.id);
-      expect((await fetch(`${server.address}/assets/shared`, { headers: imageHeaders(last.token) })).status).toBe(404);
+      expect((await fetch(`${server.address}/assets/${ids.shared}`, { headers: imageHeaders(last.token) })).status).toBe(404);
     } finally { await server.dispose(); }
   });
 }
@@ -169,9 +168,7 @@ test("deleting a room clears unused image files", async () => {
     const { cookie } = await setupAdministrator(server);
     const room = await createRoom(server, cookie, "Room");
     const writer = await server.joinRoomAsGM(room.id, cookie);
-    const upload = await fetch(`${server.address}/assets/exclusive`, { method: "PUT", headers: imageHeaders(writer.token), body: "exclusive bytes" });
-    expect(upload.status).toBe(201);
-    await upload.text();
+    await uploadLibrary(server, writer.token, "exclusive bytes");
     expect((await remove(server, room.id, cookie)).status).toBe(204);
     // Disk space is observable at the filesystem boundary, without reading SQLite.
     expect(await stat(join(directory, "assets", "blobs", exclusiveHash.slice(0, 2), exclusiveHash)).catch(error => error.code)).toBe("ENOENT");
@@ -193,12 +190,11 @@ test("file cleanup failure leaves the room and exclusive image records deleted w
     const second = await createRoom(server, cookie, "Second");
     const writer = await server.joinRoomAsGM(first.id, cookie);
     const reader = await server.joinRoomAsGM(second.id, cookie);
+    const ids: Record<string, string> = {};
     for (const id of ["exclusive", "shared"]) {
-      const uploaded = await fetch(`${server.address}/assets/${id}`, { method: "PUT", headers: imageHeaders(writer.token), body: id });
-      expect(uploaded.status).toBe(201);
-      await uploaded.text();
+        ids[id] = (await uploadLibrary(server, writer.token, id)).files.original.id;
     }
-    const used = await fetch(`${server.address}/assets/shared`, { method: "HEAD", headers: imageHeaders(reader.token) });
+    const used = await fetch(`${server.address}/assets/${ids.shared}`, { method: "HEAD", headers: imageHeaders(reader.token) });
     expect(used.status).toBe(200);
     const hash = createHash("sha256").update("exclusive").digest("hex");
     const path = join(directory, "assets", "blobs", hash.slice(0, 2), hash);
@@ -213,8 +209,8 @@ test("file cleanup failure leaves the room and exclusive image records deleted w
       const rooms = await fetch(`${recovered.address}/api/rooms`, { headers: { Cookie: cookie } });
       expect((await rooms.json() as any).rooms.map((room: any) => room.id)).toEqual([second.id]);
       const joined = await recovered.joinRoom(second.id);
-      expect((await fetch(`${recovered.address}/assets/exclusive`, { headers: imageHeaders(joined.token) })).status).toBe(404);
-      const shared = await fetch(`${recovered.address}/assets/shared`, { headers: imageHeaders(joined.token) });
+      expect((await fetch(`${recovered.address}/assets/${ids.exclusive}`, { headers: imageHeaders(joined.token) })).status).toBe(404);
+      const shared = await fetch(`${recovered.address}/assets/${ids.shared}`, { headers: imageHeaders(joined.token) });
       expect(shared.status).toBe(404);
       await shared.text();
     } finally { await recovered.dispose(); }

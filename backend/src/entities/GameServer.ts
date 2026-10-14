@@ -1,3 +1,4 @@
+import LibraryService from "./LibraryService";
 import { mayPlaceImage } from "../../../src/sceneRules/library";
 import { ImageSource, applyChange, visibleTo, changeFor, Item, Scene, mayChange, Person, checkChange, readBatch, topOrder, gmOwner, Change, SceneGrid, checkGrid, defaultSceneGrid, checkSceneName, maxScenes, readLive, dragFrom, dragFor, LiveMessage, maxLiveMessagesPerSecond, readPresence, PresenceUpdate, presenceSceneFor } from "../../../src/sceneRules";
 import { randomBytes } from "crypto";
@@ -17,6 +18,7 @@ import JoinTokens from "./JoinTokens";
 import { playerColours, isPlayerColour } from "../types/PlayerColour";
 
 export default class GameServer {
+  library?: LibraryService;
   private readonly io: IOServer;
   private stopping = false;
   readonly gameRepo;
@@ -187,6 +189,7 @@ export default class GameServer {
     for (const gameId of this.gameRepo.loadRoomsInSession()) this.startSessionCountdown(gameId);
     this.io.on("connect", async (socket: Socket) => {
       const gameState = new GameState(this.io, socket, this.gameRepo);
+      this.library?.attach(socket, () => gameState.getGameId());
       let _gameId: string;
       let joining = false;
       const account = this.accounts?.resolveAccount(socket.request);
@@ -203,7 +206,7 @@ export default class GameServer {
       // refused here too, before any handler can change or forward state.
       socket.use(([event], next) => {
         if (
-          socket.data.castDisplay && !["get_display_token", "join_display", "room_switches", "room_trust", "room_password", "new_display_link", "session", "scene_create", "scene_view", "scene_rename", "scene_delete", "scene_show", "scene_settings", "scene_bring", "scene_welcome", "scene_duplicate"].includes(event)
+          socket.data.castDisplay && !["library_command", "get_display_token", "join_display", "room_switches", "room_trust", "room_password", "new_display_link", "session", "scene_create", "scene_view", "scene_rename", "scene_delete", "scene_show", "scene_settings", "scene_bring", "scene_welcome", "scene_duplicate"].includes(event)
         ) {
           return;
         }
@@ -243,6 +246,7 @@ export default class GameServer {
       });
 
       socket.on("disconnecting", async () => {
+        this.library?.disconnected(socket);
         this.joinTokens.revoke(socket.id);
         if (socket.data.castDisplay) return;
         try {
@@ -330,6 +334,7 @@ export default class GameServer {
           }
           // Only the player who joined gets the token for the asset routes
           const token = this.joinTokens.issue(socket.id, gameId, role);
+          this.library?.joined(socket, gameId);
           socket.emit("joined_game", socket.id, token, { role: this.playerRole(socket, gameId), color: socket.data.color, room: this.gameRepo.roomState(gameId) });
           this.viewScene(socket, gameId, role === "gm" || game.session ? game.openSceneId : game.welcomeSceneId);
           if (role === "gm") socket.emit("scene_list", this.sceneList(gameId));

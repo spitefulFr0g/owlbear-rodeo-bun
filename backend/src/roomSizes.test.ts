@@ -3,7 +3,7 @@ import { expect, test } from "bun:test";
 import { mkdir, writeFile } from "fs/promises";
 import { join } from "path";
 import { createHash } from "crypto";
-import { sendBatch, nextMessage, createRoom, setupAdministrator, startTestServer } from "./testing/serverHelpers";
+import { uploadLibrary, sendBatch, nextMessage, createRoom, setupAdministrator, startTestServer } from "./testing/serverHelpers";
 
 test("room creation, listing and renaming answer the saved document size", async () => {
   const server = await startTestServer();
@@ -24,7 +24,7 @@ const imageHeaders = (token: string) => ({ Authorization: `Bearer ${token}`, "Co
   "X-Asset-Width": "1", "X-Asset-Height": "1", "X-Asset-Owner": "player" });
 
 for (const method of ["PUT", "HEAD", "GET"] as const) {
-  test(`${method} does not add unplaced files to either room size`, async () => {
+  test(`${method} does not grant placement or add the file to the reading room size`, async () => {
     const server = await startTestServer();
     try {
       const { cookie } = await setupAdministrator(server);
@@ -32,20 +32,18 @@ for (const method of ["PUT", "HEAD", "GET"] as const) {
       const second = await createRoom(server, cookie, "Second");
       const uploader = await server.joinRoomAsGM(first.id, cookie);
       const reader = await server.joinRoomAsGM(second.id, cookie);
-      const upload = await fetch(`${server.address}/assets/image`, { method: "PUT", headers: imageHeaders(uploader.token), body: "12345678" });
-      expect(upload.status).toBe(201);
-      await upload.text();
+      const asset = await uploadLibrary(server, uploader.token, "12345678");
       const sizes = async () => (await (await fetch(`${server.address}/api/rooms`, { headers: { Cookie: cookie } })).json() as any).rooms.map((room: any) => room.sizeBytes);
-      expect(await sizes()).toEqual([405, 405]);
+      expect(await sizes()).toEqual([413, 405]);
       for (let repeat = 0; repeat < 2; repeat++) {
-        const response = await fetch(`${server.address}/assets/image`, { method, headers: imageHeaders(reader.token), ...(method === "PUT" ? { body: "ignored" } : {}) });
-        expect(response.status).toBe(method === "PUT" ? 409 : 200);
+        const response = await fetch(`${server.address}/assets/${asset.files.original.id}`, { method, headers: imageHeaders(reader.token), ...(method === "PUT" ? { body: "ignored" } : {}) });
+        expect(response.status).toBe(method === "PUT" ? 403 : 200);
         if (method === "GET") expect(await response.text()).toBe("12345678");
         else await response.text();
       }
-      expect(await sizes()).toEqual([405, 405]);
+      expect(await sizes()).toEqual([413, 405]);
       await server.restart();
-      expect(await sizes()).toEqual([405, 405]);
+      expect(await sizes()).toEqual([413, 405]);
     } finally { await server.dispose(); }
   });
 }

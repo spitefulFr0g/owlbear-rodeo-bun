@@ -18,7 +18,7 @@ test("an account creates named rooms with server links and lists them by name", 
     const { room: alpha } = await second.json() as any;
     expect(alpha.id).not.toBe(room.id);
     expect(alpha.hasPassword).toBe(true);
-    expect(await (await request(server, "GET", undefined, cookie)).json()).toEqual({ rooms: [alpha, room] });
+    expect(await (await request(server, "GET", undefined, cookie)).json()).toEqual({ accountLibrary: { sizeBytes: 0, quota: 2000000000 }, rooms: [alpha, room] });
   } finally { await server.dispose(); }
 });
 
@@ -36,7 +36,7 @@ test("room routes require a sign-in and reject invalid names without creating ro
       expect(response.status).toBe(400);
       expect(await response.json()).toMatchObject({ error: "room_name_invalid" });
     }
-    expect(await (await request(server, "GET", undefined, cookie)).json()).toEqual({ rooms: [] });
+    expect(await (await request(server, "GET", undefined, cookie)).json()).toEqual({ accountLibrary: { sizeBytes: 0, quota: 2000000000 }, rooms: [] });
     expect((await request(server, "POST", undefined, cookie, { name: "a".repeat(64) })).status).toBe(201);
   } finally { await server.dispose(); }
 });
@@ -69,7 +69,7 @@ test("joining carries the name and renaming reaches players and cast displays wi
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ room: { ...room, name: "After", sizeBytes } });
     for (const notification of notifications) expect(await notification).toEqual([{ name: "After", session: true, hasPassword: false, switches: { tokens: true, drawing: true, notes: true, fog: false, uploads: false, ownerOnly: false } }]);
-    expect(await (await request(server, "GET", undefined, cookie)).json()).toEqual({ rooms: [{ ...room, name: "After", sizeBytes }] });
+    expect(await (await request(server, "GET", undefined, cookie)).json()).toEqual({ accountLibrary: { sizeBytes: 0, quota: 2000000000 }, rooms: [{ ...room, name: "After", sizeBytes }] });
     await server.joinRoom(room.id);
   } finally { await server.dispose(); }
 });
@@ -92,7 +92,7 @@ test("password rooms refuse missing and wrong passwords while empty passwords ne
     await server.joinRoom(openRoom.id);
     // A browser sends the password it last used for another room
     await server.joinRoom(openRoom.id, "room-password");
-    expect(await (await request(server, "GET", undefined, cookie)).json()).toEqual({ rooms: [openRoom, protectedRoom] });
+    expect(await (await request(server, "GET", undefined, cookie)).json()).toEqual({ accountLibrary: { sizeBytes: 0, quota: 2000000000 }, rooms: [openRoom, protectedRoom] });
   } finally { await server.dispose(); }
 });
 
@@ -109,11 +109,11 @@ test("renamed rooms keep their GM, name, document and link across restart and im
     expect((await request(server, "PATCH", `/api/rooms/${room.id}`, cookie, { name: "After" })).status).toBe(200);
     const copy = await server.durableCopy();
     try {
-      expect(await (await request(copy, "GET", undefined, cookie)).json()).toEqual({ rooms: [{ ...room, name: "After", sizeBytes: Buffer.byteLength(JSON.stringify({ openSceneId: peer.snapshot!.scene!.id, welcomeSceneId: null, scenes: { [peer.snapshot!.scene!.id]: { ...peer.snapshot!.scene, name: "Scene 1" } } })) }] });
+      expect(await (await request(copy, "GET", undefined, cookie)).json()).toEqual({ accountLibrary: { sizeBytes: 0, quota: 2000000000 }, rooms: [{ ...room, name: "After", sizeBytes: Buffer.byteLength(JSON.stringify({ openSceneId: peer.snapshot!.scene!.id, welcomeSceneId: null, scenes: { [peer.snapshot!.scene!.id]: { ...peer.snapshot!.scene, name: "Scene 1" } } })) }] });
       expect((await copy.joinRoomAsGM(room.id, cookie)).snapshot!.scene!.items.hero).toEqual(tokenItem);
     } finally { await copy.dispose(); }
     await server.restart();
-    expect(await (await request(server, "GET", undefined, cookie)).json()).toEqual({ rooms: [{ ...room, name: "After", sizeBytes: Buffer.byteLength(JSON.stringify({ openSceneId: peer.snapshot!.scene!.id, welcomeSceneId: null, scenes: { [peer.snapshot!.scene!.id]: { ...peer.snapshot!.scene, name: "Scene 1" } } })) }] });
+    expect(await (await request(server, "GET", undefined, cookie)).json()).toEqual({ accountLibrary: { sizeBytes: 0, quota: 2000000000 }, rooms: [{ ...room, name: "After", sizeBytes: Buffer.byteLength(JSON.stringify({ openSceneId: peer.snapshot!.scene!.id, welcomeSceneId: null, scenes: { [peer.snapshot!.scene!.id]: { ...peer.snapshot!.scene, name: "Scene 1" } } })) }] });
     expect((await request(server, "PATCH", `/api/rooms/${room.id}`, cookie, { name: "Again" })).status).toBe(200);
     expect((await server.joinRoomAsGM(room.id, cookie)).snapshot!.scene!.items.hero).toEqual(tokenItem);
   } finally { await server.dispose(); }
@@ -127,7 +127,7 @@ test("unknown rooms cannot be joined or renamed and invalid renames change nothi
     const refused = nextMessage(socket, "room_not_found");
     socket.emit("join_game", "legacy-room", "");
     expect(await refused).toEqual([]);
-    expect(await (await request(server, "GET", undefined, cookie)).json()).toEqual({ rooms: [] });
+    expect(await (await request(server, "GET", undefined, cookie)).json()).toEqual({ accountLibrary: { sizeBytes: 0, quota: 2000000000 }, rooms: [] });
     const forbidden = await request(server, "PATCH", "/api/rooms/legacy-room", cookie, { name: "Stolen" });
     expect(forbidden.status).toBe(404);
     expect(await forbidden.json()).toMatchObject({ error: "room_not_found" });
@@ -140,7 +140,7 @@ test("unknown rooms cannot be joined or renamed and invalid renames change nothi
       expect(response.status).toBe(400);
       expect(await response.json()).toMatchObject({ error: "room_name_invalid" });
     }
-    expect(await (await request(server, "GET", undefined, cookie)).json()).toEqual({ rooms: [room] });
+    expect(await (await request(server, "GET", undefined, cookie)).json()).toEqual({ accountLibrary: { sizeBytes: 0, quota: 2000000000 }, rooms: [room] });
     await server.restart();
     const rejoined = server.connect();
     const info = nextMessage(rejoined, "room_not_found");
@@ -166,6 +166,6 @@ test("room changes reject foreign origins and malformed names leave the list unc
       expect(malformed.status).toBe(400);
       expect(await malformed.json()).toMatchObject({ error: "room_name_invalid" });
     }
-    expect(await (await request(server, "GET", undefined, cookie)).json()).toEqual({ rooms: [room] });
+    expect(await (await request(server, "GET", undefined, cookie)).json()).toEqual({ accountLibrary: { sizeBytes: 0, quota: 2000000000 }, rooms: [room] });
   } finally { await server.dispose(); }
 });
