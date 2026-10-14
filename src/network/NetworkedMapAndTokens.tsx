@@ -9,12 +9,16 @@ import Map from "../components/map/Map";
 import TokenBar from "../components/token/TokenBar";
 import GlobalImageDrop from "../components/image/GlobalImageDrop";
 import { Map as MapType } from "../types/Map";
+import { useSearchParam } from "../components/PrototypeSwitcher";
+import DockPrototype from "../components/dockPrototype/DockPrototype";
 
 function NetworkedMapAndTokens({ session }: { session: Session }) {
   const { scene } = useScene();
   const role = useRole();
   const room = useRoom();
   const sceneMap = useSceneMap();
+  // PROTOTYPE: ?variant= swaps the token bar for the dock prototype (#136)
+  const prototypeVariant = useSearchParam("variant");
   // An image dropped as a map goes on the scene being viewed
   async function handleMapChange(map: MapType) {
     try {
@@ -30,8 +34,14 @@ function NetworkedMapAndTokens({ session }: { session: Session }) {
   }
   return (
     <GlobalImageDrop onMapChange={handleMapChange}>
-      <Map session={session} />
-      <TokenBar />
+      {import.meta.env.VITE_PROTOTYPE === "true" && prototypeVariant ? (
+        <DockPrototype canvas={<Map session={session} />} />
+      ) : (
+        <>
+          <Map session={session} />
+          <TokenBar />
+        </>
+      )}
     </GlobalImageDrop>
   );
 }

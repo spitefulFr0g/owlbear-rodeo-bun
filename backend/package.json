@@ -12,7 +12,8 @@
     "build": "bun scripts/build.ts",
     "lint": "eslint \"src/**/*.ts\"",
     "smoke": "bun scripts/embed-frontend.ts && bun scripts/smoke.ts",
-    "browse": "bun scripts/embed-frontend.ts && bun scripts/browse.ts"
+    "browse": "bun scripts/embed-frontend.ts && bun scripts/browse.ts",
+    "prototype": "VITE_PROTOTYPE=true bun run build:frontend && bun run browse"
   },
   "dependencies": {
     "cors": "^2.8.5",
