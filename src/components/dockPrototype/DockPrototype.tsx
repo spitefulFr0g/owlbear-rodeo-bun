@@ -1,5 +1,5 @@
 // PROTOTYPE: the dock and Asset Manager for v0.5.0 (#136, decisions 20–27),
-// on fixed data. Seven layouts on the room route, switched by ?variant=A..G,
+// on fixed data. Ten layouts on the room route, switched by ?variant=A..J,
 // with ?role=gm|player. Replaces the token bar while ?variant= is present.
 // Throwaway: lives only on the prototype/dock-asset-manager branch.
 import { ReactNode } from "react";
@@ -15,6 +15,9 @@ import VariantD, { name as nameD } from "./VariantD";
 import VariantE, { name as nameE } from "./VariantE";
 import VariantF, { name as nameF } from "./VariantF";
 import VariantG, { name as nameG } from "./VariantG";
+import VariantH, { name as nameH } from "./VariantH";
+import VariantI, { name as nameI } from "./VariantI";
+import VariantJ, { name as nameJ } from "./VariantJ";
 
 const variants = [
   { key: "A", name: nameA },
@@ -24,6 +27,9 @@ const variants = [
   { key: "E", name: nameE },
   { key: "F", name: nameF },
   { key: "G", name: nameG },
+  { key: "H", name: nameH },
+  { key: "I", name: nameI },
+  { key: "J", name: nameJ },
 ];
 
 function StateReadout({ proto, fullScreen }: { proto: Proto; fullScreen: boolean }) {
@@ -83,6 +89,9 @@ function Prototype({ role, variant, canvas }: { role: Role; variant: string; can
       {variant === "E" && <VariantE {...props} />}
       {variant === "F" && <VariantF {...props} />}
       {variant === "G" && <VariantG {...props} />}
+      {variant === "H" && <VariantH {...props} />}
+      {variant === "I" && <VariantI {...props} />}
+      {variant === "J" && <VariantJ {...props} />}
       <StateReadout proto={proto} fullScreen={fullScreen} />
       <PrototypeSwitcher variants={variants} current={variant}>
         <button

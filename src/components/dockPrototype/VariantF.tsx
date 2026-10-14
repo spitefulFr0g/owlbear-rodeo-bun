@@ -5,15 +5,17 @@
 // set is a read-only "compendium" that pops out in its own window. The Asset
 // Manager is a floating file-picker window that leaves the map in view, with a
 // source per library, a breadcrumb, tile or list view and a preview pane.
-import { ReactNode, useEffect, useRef, useState } from "react";
+import { ReactNode, useState } from "react";
 import { Box, Button, Flex, IconButton, Input, Text } from "theme-ui";
 
 import { Asset, AssetType, scenes, typeLabels } from "./data";
 import { filterOptions, Proto, Section, SectionId, tabLabel, tabsFor } from "./model";
 import {
   AssetDetails,
+  FloatingWindow,
   FolderGlyph,
   FolderSelect,
+  libraryColour,
   moveLabel,
   QuotaBar,
   selectStyle,
@@ -24,14 +26,6 @@ import {
 } from "./parts";
 
 export const name = "Sidebar directory + file picker (Foundry)";
-
-const libraryColour: Record<SectionId, string> = {
-  room: "hsl(265, 35%, 32%)",
-  players: "hsl(28, 45%, 30%)",
-  account: "hsl(200, 40%, 28%)",
-  server: "hsl(150, 25%, 26%)",
-  mine: "hsl(265, 35%, 32%)",
-};
 
 type Menu = { asset: Asset; x: number; y: number };
 
@@ -208,68 +202,6 @@ function ContextMenu({ proto, menu, onClose }: { proto: Proto; menu: Menu; onClo
   );
 }
 
-/** A small window over the canvas that the user drags by its title bar */
-function Window({
-  title,
-  initial,
-  width,
-  height,
-  onClose,
-  children,
-}: {
-  title: string;
-  initial: { x: number; y: number };
-  width: number;
-  height: number;
-  onClose: () => void;
-  children: ReactNode;
-}) {
-  const [pos, setPos] = useState(initial);
-  const drag = useRef<{ dx: number; dy: number } | null>(null);
-  useEffect(() => {
-    function move(e: MouseEvent) {
-      if (drag.current) setPos({ x: e.clientX - drag.current.dx, y: e.clientY - drag.current.dy });
-    }
-    function up() {
-      drag.current = null;
-    }
-    window.addEventListener("mousemove", move);
-    window.addEventListener("mouseup", up);
-    return () => {
-      window.removeEventListener("mousemove", move);
-      window.removeEventListener("mouseup", up);
-    };
-  }, []);
-  return (
-    <Flex
-      style={{ position: "fixed", left: pos.x, top: pos.y, width, height }}
-      sx={{
-        zIndex: 50,
-        bg: "background",
-        flexDirection: "column",
-        border: "1px solid",
-        borderColor: "border",
-        borderRadius: "6px",
-        boxShadow: "0 6px 24px rgba(0,0,0,0.6)",
-        overflow: "hidden",
-      }}
-    >
-      <Flex
-        onMouseDown={(e) => {
-          drag.current = { dx: e.clientX - pos.x, dy: e.clientY - pos.y };
-        }}
-        sx={{ alignItems: "center", px: 2, py: 1, bg: "muted", cursor: "move", userSelect: "none" }}
-      >
-        <Text sx={{ flexGrow: 1, fontSize: 1 }}>{title}</Text>
-        <IconButton sx={{ width: 24, height: 24 }} onClick={onClose}>
-          ✕
-        </IconButton>
-      </Flex>
-      {children}
-    </Flex>
-  );
-}
-
 function Sidebar({
   proto,
   onMenu,
@@ -417,6 +349,9 @@ function Sidebar({
               <Text variant="caption">{server.count} · read-only ↗</Text>
             </Flex>
           )}
+          <Box sx={{ px: 2, pt: 2 }}>
+            <QuotaBar proto={proto} />
+          </Box>
           <Text variant="caption" sx={{ px: 2, py: 1 }}>
             Click to place, right-click for more
           </Text>
@@ -429,7 +364,7 @@ function Sidebar({
 function Compendium({ proto, onClose, onMenu }: { proto: Proto; onClose: () => void; onMenu: (m: Menu) => void }) {
   const server = proto.dockSections.find((s) => s.id === "server");
   return (
-    <Window title={`Server set: ${tabLabel(proto.tab)}`} initial={{ x: 140, y: 90 }} width={280} height={420} onClose={onClose}>
+    <FloatingWindow title={`Server set: ${tabLabel(proto.tab)}`} initial={{ x: 140, y: 90 }} width={280} height={420} onClose={onClose}>
       <Text variant="caption" sx={{ px: 2, py: 1 }}>
         Read-only. Uses the sidebar's search.
       </Text>
@@ -442,7 +377,7 @@ function Compendium({ proto, onClose, onMenu }: { proto: Proto; onClose: () => v
           server.assets.map((asset) => <Row key={asset.id} proto={proto} asset={asset} depth={0} onMenu={onMenu} />)
         )}
       </Box>
-    </Window>
+    </FloatingWindow>
   );
 }
 
@@ -461,7 +396,7 @@ function Picker({ proto }: { proto: Proto }) {
 
   const items = current ? current.assets : section?.assets ?? [];
   return (
-    <Window
+    <FloatingWindow
       title="Asset Manager"
       initial={{ x: 150, y: 50 }}
       width={800}
@@ -599,7 +534,7 @@ function Picker({ proto }: { proto: Proto }) {
           </Button>
         )}
       </Flex>
-    </Window>
+    </FloatingWindow>
   );
 }
 

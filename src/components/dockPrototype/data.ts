@@ -43,6 +43,16 @@ export const scenes = ["Goblin cave", "Shrine of the moon", "The Wayward Inn"];
 /** The player the prototype pretends to be in player view */
 export const me = "Mira";
 
+/**
+ * Room storage the fixed data doesn't list, by uploader ("" is the GM), so the
+ * storage gauges sit at a believable level instead of near empty
+ */
+export const unlistedBytes: Record<string, number> = {
+  "": 1100 * 1024 * 1024,
+  Mira: 46 * 1024 * 1024,
+  Tobin: 21 * 1024 * 1024,
+};
+
 const t = tokenSources as Record<string, string>;
 const m = mapSources as Record<string, string>;
 const MB = 1024 * 1024;

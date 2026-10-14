@@ -1,5 +1,6 @@
 // PROTOTYPE: small pieces every variant may use (#136). No layout lives here.
-import { Box, Button, Flex, Image, Text } from "theme-ui";
+import { DragEvent, ReactNode, useEffect, useRef, useState } from "react";
+import { Box, Button, Flex, IconButton, Image, Text } from "theme-ui";
 
 import SelectMapIcon from "../../icons/SelectMapIcon";
 import TokenPropIcon from "../../icons/TokenPropIcon";
@@ -8,8 +9,8 @@ import TokenCharacterIcon from "../../icons/TokenCharacterIcon";
 import TokenAttachmentIcon from "../../icons/TokenAttachmentIcon";
 import GroupIcon from "../../icons/GroupIcon";
 
-import { Asset, AssetType, assetTypes, typeLabels } from "./data";
-import { formatBytes, Proto, Tab } from "./model";
+import { Asset, AssetType, assetTypes, typeLabels, unlistedBytes } from "./data";
+import { formatBytes, Proto, SectionId, Tab } from "./model";
 
 export function TabIcon({ tab }: { tab: Tab }) {
   switch (tab) {
@@ -204,4 +205,212 @@ export function StarGlyph({ on }: { on: boolean }) {
 /** Asset types a role may see; players have no maps */
 export function typesFor(proto: Proto) {
   return proto.role === "gm" ? assetTypes : assetTypes.filter((x) => x !== "map");
+}
+
+/** One colour per library, shared by the variants that colour-code them */
+export const libraryColour: Record<SectionId, string> = {
+  room: "hsl(265, 35%, 32%)",
+  players: "hsl(28, 45%, 30%)",
+  account: "hsl(200, 40%, 28%)",
+  server: "hsl(150, 25%, 26%)",
+  mine: "hsl(265, 35%, 32%)",
+};
+
+/** A brighter shade of a library's colour, for thin marks such as gauges */
+export const libraryAccent: Record<SectionId, string> = {
+  room: "hsl(265, 70%, 70%)",
+  players: "hsl(28, 85%, 62%)",
+  account: "hsl(200, 75%, 62%)",
+  server: "hsl(150, 50%, 55%)",
+  mine: "hsl(265, 70%, 70%)",
+};
+
+export type StoragePart = { id: SectionId; label: string; bytes: number };
+
+/**
+ * What fills the quota, split so a gauge can colour each part: for the GM, the
+ * room's own uploads and each player's; for a player, their own uploads
+ */
+export function storageParts(proto: Proto): StoragePart[] {
+  const room = proto.assets.filter((x) => x.library === "room");
+  const sum = (xs: typeof room) => xs.reduce((total, x) => total + x.bytes, 0);
+  if (proto.role === "player") {
+    return [{ id: "mine", label: "My uploads", bytes: proto.quota.used }];
+  }
+  const players = [...new Set(room.filter((x) => x.uploader).map((x) => x.uploader as string))].sort();
+  return [
+    { id: "room", label: "GM's uploads", bytes: sum(room.filter((x) => !x.uploader)) + unlistedBytes[""] },
+    ...players.map((name) => ({
+      id: "players" as SectionId,
+      label: `From ${name}`,
+      bytes: sum(room.filter((x) => x.uploader === name)) + (unlistedBytes[name] ?? 0),
+    })),
+  ];
+}
+
+export function formatQuota(of: number) {
+  return of >= 1024 * 1024 * 1024 ? `${of / 1024 / 1024 / 1024} GB` : `${of / 1024 / 1024} MB`;
+}
+
+// Raises the window the user last touched above the others
+let topWindow = 50;
+
+/** A small window over the canvas that the user drags by its title bar */
+export function FloatingWindow({
+  title,
+  initial,
+  width,
+  height,
+  onClose,
+  accent,
+  children,
+}: {
+  title: ReactNode;
+  initial: { x: number; y: number };
+  width: number;
+  height: number;
+  onClose: () => void;
+  /** The title bar's colour, when the window belongs to one library */
+  accent?: string;
+  children: ReactNode;
+}) {
+  const [pos, setPos] = useState(initial);
+  const [z, setZ] = useState(() => ++topWindow);
+  const drag = useRef<{ dx: number; dy: number } | null>(null);
+  useEffect(() => {
+    function move(e: MouseEvent) {
+      if (drag.current) setPos({ x: e.clientX - drag.current.dx, y: e.clientY - drag.current.dy });
+    }
+    function up() {
+      drag.current = null;
+    }
+    window.addEventListener("mousemove", move);
+    window.addEventListener("mouseup", up);
+    return () => {
+      window.removeEventListener("mousemove", move);
+      window.removeEventListener("mouseup", up);
+    };
+  }, []);
+  return (
+    <Flex
+      onMouseDown={() => setZ(++topWindow)}
+      style={{ position: "fixed", left: pos.x, top: pos.y, width, height, zIndex: z }}
+      sx={{
+        bg: "background",
+        flexDirection: "column",
+        border: "1px solid",
+        borderColor: "border",
+        borderRadius: "6px",
+        boxShadow: "0 6px 24px rgba(0,0,0,0.6)",
+        overflow: "hidden",
+      }}
+    >
+      <Flex
+        onMouseDown={(e) => {
+          drag.current = { dx: e.clientX - pos.x, dy: e.clientY - pos.y };
+        }}
+        style={accent ? { background: accent } : undefined}
+        sx={{ alignItems: "center", px: 2, py: 1, bg: "muted", cursor: "move", userSelect: "none", flexShrink: 0 }}
+      >
+        <Text sx={{ flexGrow: 1, fontSize: 1 }}>{title}</Text>
+        <IconButton sx={{ width: 24, height: 24 }} onClick={onClose}>
+          ✕
+        </IconButton>
+      </Flex>
+      {children}
+    </Flex>
+  );
+}
+
+const assetDrag = "application/x-prototype-asset";
+
+function ours(e: DragEvent) {
+  return e.dataTransfer.types.includes(assetDrag);
+}
+
+/** Props that make an element drag an asset */
+export function dragSource(asset: Asset) {
+  return {
+    draggable: true,
+    onDragStart: (e: DragEvent) => {
+      e.dataTransfer.setData(assetDrag, asset.id);
+      e.dataTransfer.effectAllowed = "copyMove";
+    },
+  };
+}
+
+/** Props that make an element take an asset dropped on it */
+export function dropTarget(onDrop: (id: string) => void) {
+  return {
+    onDragOver: (e: DragEvent) => {
+      if (ours(e)) e.preventDefault();
+    },
+    onDrop: (e: DragEvent) => {
+      if (!ours(e)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      onDrop(e.dataTransfer.getData(assetDrag));
+    },
+  };
+}
+
+/** Keeps the room's image-drop overlay from opening on the prototype's own drags */
+export const shieldImageDrop = {
+  onDragEnter: (e: DragEvent) => ours(e) && e.stopPropagation(),
+  onDragLeave: (e: DragEvent) => ours(e) && e.stopPropagation(),
+  onDragOver: (e: DragEvent) => ours(e) && e.stopPropagation(),
+  onDrop: (e: DragEvent) => ours(e) && e.stopPropagation(),
+};
+
+/** The map, taking a dragged asset as a place at the drop point */
+export function CanvasDrop({ proto, children }: { proto: Proto; children: ReactNode }) {
+  return (
+    <Flex
+      sx={{ flexGrow: 1, minWidth: 0 }}
+      {...dropTarget((id) => {
+        const asset = proto.assets.find((x) => x.id === id);
+        if (asset) proto.actions.place(asset);
+      })}
+    >
+      {children}
+    </Flex>
+  );
+}
+
+/** The quota as one bar split by uploader, with a legend under it */
+export function StorageBreakdown({ proto }: { proto: Proto }) {
+  const parts = storageParts(proto);
+  const { label, used, of } = proto.quota;
+  const mb = (bytes: number) => `${Math.round(bytes / 1024 / 1024)} MB`;
+  return (
+    <Box sx={{ fontFamily: "body2", fontSize: 0 }}>
+      <Flex sx={{ justifyContent: "space-between" }}>
+        <Text>{label}</Text>
+        <Text>
+          {mb(used)} of {formatQuota(of)} · {mb(of - used)} free
+        </Text>
+      </Flex>
+      <Flex sx={{ height: "8px", bg: "muted", borderRadius: "4px", mt: "3px", overflow: "hidden" }}>
+        {parts.map((p, i) => (
+          <Box
+            key={p.label}
+            title={`${p.label}: ${mb(p.bytes)}`}
+            style={{ width: `${(p.bytes / of) * 100}%`, background: libraryAccent[p.id], opacity: 1 - i * 0.2 }}
+          />
+        ))}
+      </Flex>
+      {parts.length > 1 && (
+        <Flex sx={{ gap: 2, mt: "3px", flexWrap: "wrap" }}>
+          {parts.map((p, i) => (
+            <Flex key={p.label} sx={{ alignItems: "center", gap: "4px" }}>
+              <Box style={{ width: 8, height: 8, borderRadius: 2, background: libraryAccent[p.id], opacity: 1 - i * 0.2 }} />
+              <Text>
+                {p.label} {mb(p.bytes)}
+              </Text>
+            </Flex>
+          ))}
+        </Flex>
+      )}
+    </Box>
+  );
 }

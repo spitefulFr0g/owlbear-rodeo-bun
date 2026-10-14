@@ -4,7 +4,7 @@
 import { useMemo, useState } from "react";
 import Fuse from "fuse.js";
 
-import { Asset, AssetType, initialAssets, me, typeLabels } from "./data";
+import { Asset, AssetType, initialAssets, me, typeLabels, unlistedBytes } from "./data";
 
 export type Role = "gm" | "player";
 /** "room" is "This room" for the GM and "My uploads" for a player */
@@ -144,7 +144,9 @@ export function buildSections(assets: Asset[], options: ViewOptions): Section[] 
 export function formatBytes(bytes: number) {
   return bytes >= 1024 * 1024 * 1024
     ? `${(bytes / 1024 / 1024 / 1024).toFixed(1)} GB`
-    : `${Math.round(bytes / 1024 / 1024)} MB`;
+    : bytes >= 1024 * 1024
+      ? `${Math.round(bytes / 1024 / 1024)} MB`
+      : `${Math.max(1, Math.round(bytes / 1024))} KB`;
 }
 
 export function usePrototype(role: Role) {
@@ -290,16 +292,17 @@ export function usePrototype(role: Role) {
     role === "gm"
       ? {
           label: "This room",
-          used: assets
-            .filter((x) => x.library === "room")
-            .reduce((sum, x) => sum + x.bytes, 0),
+          used:
+            assets.filter((x) => x.library === "room").reduce((sum, x) => sum + x.bytes, 0) +
+            Object.values(unlistedBytes).reduce((sum, x) => sum + x, 0),
           of: 2 * 1024 * 1024 * 1024,
         }
       : {
           label: "My uploads",
-          used: assets
-            .filter((x) => x.library === "room" && x.uploader === me)
-            .reduce((sum, x) => sum + x.bytes, 0),
+          used:
+            assets
+              .filter((x) => x.library === "room" && x.uploader === me)
+              .reduce((sum, x) => sum + x.bytes, 0) + unlistedBytes[me],
           of: 100 * 1024 * 1024,
         };
 
