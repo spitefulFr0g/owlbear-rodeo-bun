@@ -88,6 +88,8 @@ const layout = `
     id TEXT PRIMARY KEY, kind TEXT NOT NULL, libraryId TEXT NOT NULL, data TEXT NOT NULL
   );
   CREATE INDEX IF NOT EXISTS library_assets_library ON library_assets(kind, libraryId);
+  CREATE INDEX IF NOT EXISTS library_assets_visible ON library_assets(kind, libraryId, id)
+    WHERE COALESCE(json_extract(data, '$.uploading'), 0) = 0;
   CREATE TABLE IF NOT EXISTS library_folders (
     id TEXT PRIMARY KEY, kind TEXT NOT NULL, libraryId TEXT NOT NULL, data TEXT NOT NULL
   );
@@ -121,6 +123,7 @@ export class OwlbearDatabase {
           }
         }
         this.connection.exec(layout);
+        this.library.initializeUsage();
         if (!existing || version < LAYOUT_VERSION) {
           this.connection.exec(`PRAGMA user_version = ${LAYOUT_VERSION}`);
         }

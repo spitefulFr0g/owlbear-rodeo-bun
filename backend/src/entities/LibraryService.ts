@@ -50,13 +50,8 @@ export default class LibraryService {
     const read = (library: LibraryIdentity) => {
       const key = `${library.kind}:${library.id}`;
       let records = cache.get(key);
-      if (!records) { records = { assets: repo.assets(library), folders: repo.folders(library) }; cache.set(key, records); }
+      if (!records) { records = { assets: repo.visibleAssets(library), folders: repo.folders(library) }; cache.set(key, records); }
       return records;
-    };
-    const usage = (records: { assets: LibraryAsset[]; folders: LibraryFolder[] }, uploader?: string | null) => {
-      const assets = records.assets.filter(a => uploader === undefined || a.uploader === uploader);
-      return { bytes: assets.filter(a => !a.uploading).reduce((n, a) => n + assetBytes(a.files), 0),
-        reservedBytes: assets.filter(a => a.uploading).reduce((n, a) => n + assetBytes(a.files), 0) };
     };
     const room = this.identity(context, "room");
     const roomRecords = read(room);
@@ -64,12 +59,20 @@ export default class LibraryService {
     const accountRecords = context.role === "gm" ? read(account) : { assets: [], folders: [] };
     const assets = [...roomRecords.assets, ...accountRecords.assets].filter(a => !a.uploading && (context.role === "gm" || a.uploader === context.browser));
     const folders = [...roomRecords.folders, ...accountRecords.folders].filter(f => context.role === "gm" ? f.owner === null : f.owner === context.browser);
-    if (context.role !== "gm") return { assets, folders, usage: { player: { ...usage(roomRecords, context.browser), quota: repo.playerQuota(context.roomId) } } };
-    const players: Record<string, number> = Object.create(null);
-    for (const asset of roomRecords.assets) if (asset.uploader) players[asset.uploader] = (players[asset.uploader] ?? 0) + assetBytes(asset.files);
-    const own = usage(roomRecords, null);
-    return { assets, folders, usage: { room: { ...usage(roomRecords), quota: repo.quota(room) }, gmBytes: own.bytes + own.reservedBytes,
-      players, playerQuota: repo.playerQuota(context.roomId), account: { ...usage(accountRecords), quota: repo.quota(account) } } };
+    return { assets, folders, usage: this.usage(context) };
+  }
+  private usage(context: Context): LibrarySnapshot["usage"] {
+    const repo = this.database.library;
+    const room = this.identity(context, "room");
+    const bytes = (library: LibraryIdentity, uploader?: string | null) => {
+      const { bytes, reservedBytes } = repo.usage(library, uploader);
+      return { bytes, reservedBytes };
+    };
+    if (context.role !== "gm") return { player: { ...bytes(room, context.browser), quota: repo.playerQuota(context.roomId) } };
+    const account = this.identity(context, "account");
+    const own = bytes(room, null);
+    return { room: { ...bytes(room), quota: repo.quota(room) }, gmBytes: own.bytes + own.reservedBytes,
+      players: repo.playerBytes(room), playerQuota: repo.playerQuota(context.roomId), account: { ...bytes(account), quota: repo.quota(account) } };
   }
   joined(socket: Socket, roomId: string): void {
     if (socket.data.castDisplay) return;
@@ -81,7 +84,7 @@ export default class LibraryService {
     for (const [id, reservation] of this.reservations) if (this.tokens.connection(reservation.token)?.socketId === socket.id) this.cancel(id, false);
     this.broadcast();
   }
-  broadcast(): void {
+  broadcast(usageOnly = false): void {
     const cache = new Map<string, { assets: LibraryAsset[]; folders: LibraryFolder[] }>();
     for (const socket of this.io.sockets.sockets.values()) {
       const before = this.views.get(socket.id);
@@ -89,7 +92,17 @@ export default class LibraryService {
       const roomId = [...socket.rooms].find(id => !!this.rooms.games[id]);
       if (!roomId) continue;
       try {
-        const after = this.snapshot(this.context(socket, roomId), cache);
+        const context = this.context(socket, roomId);
+        if (usageOnly) {
+          const usage = this.usage(context);
+          if (JSON.stringify(before.usage) !== JSON.stringify(usage)) {
+            const empty = () => ({ added: [], changed: [], removed: [] });
+            socket.emit("library_delta", { assets: empty(), folders: empty(), usage } satisfies LibraryDelta);
+            this.views.set(socket.id, { ...before, usage });
+          }
+          continue;
+        }
+        const after = this.snapshot(context, cache);
         const diff = <T extends { id: string }>(old: T[], next: T[]) => {
           const previous = new Map(old.map(record => [record.id, record]));
           const current = new Set(next.map(record => record.id));
@@ -115,9 +128,10 @@ export default class LibraryService {
     if (!asset || (context.role !== "gm" && asset.uploader !== context.browser)) throw new Error("You cannot change that asset");
     return asset;
   }
-  private folder(context: Context, id: string | null | undefined, library: LibraryIdentity, owner: string | null): void {
+  private folder(id: string | null | undefined, library: LibraryIdentity, owner: string | null): void {
     if (id == null) return;
-    if (!this.folders(context).some(f => f.id === id && sameLibrary(f.library, library) && f.owner === owner)) throw new Error("Choose a folder belonging to this asset's library and uploader");
+    const folder = this.database.library.folder(id);
+    if (!folder || !sameLibrary(folder.library, library) || folder.owner !== owner) throw new Error("Choose a folder belonging to this asset's library and uploader");
   }
   private command(context: Context, value: LibraryCommand): string | undefined {
     if (!value || typeof value !== "object") throw new Error("Invalid library command");
@@ -155,7 +169,7 @@ export default class LibraryService {
     if (value.action !== "edit" || !value.changes || Object.keys(value.changes).some(k => !["name", "type", "defaults", "folderId"].includes(k))) throw new Error("Invalid asset edit");
     const changed = { ...asset, ...value.changes };
     this.validateMetadata(context, changed);
-    this.folder(context, changed.folderId, asset.library, asset.uploader);
+    this.folder(changed.folderId, asset.library, asset.uploader);
     repo.saveAsset({ ...changed, name: checkLibraryName(changed.name)! });
   }
   private validateMetadata(context: Context, value: Pick<LibraryAsset, "name" | "type" | "width" | "height" | "outline" | "defaults">): void {
@@ -181,7 +195,7 @@ export default class LibraryService {
     if (request.import !== undefined && typeof request.import !== "boolean") throw new Error("Invalid import flag");
     const library = this.identity(context, request.import ? "account" : "room");
     const uploader = context.role === "gm" ? null : context.browser;
-    this.folder(context, request.folderId, library, uploader);
+    this.folder(request.folderId, library, uploader);
     if (!request.files?.original || Object.keys(request.files).some(role => !storedFileRoles.includes(role as any))) throw new Error("Declare the original and each file role");
     const files = Object.fromEntries(Object.entries(request.files).map(([role, file]) => {
       if (!file || !Number.isSafeInteger(file.size) || file.size < 1 || file.size > this.maxBytes || typeof file.mime !== "string" || !/^(image\/[\w.+-]+|application\/octet-stream)$/.test(file.mime)) throw new Error("Invalid file size or media type");
@@ -197,7 +211,7 @@ export default class LibraryService {
     repo.saveAsset({ id: assetId, library, name: checkLibraryName(request.name)!, type: request.type, width: request.width, height: request.height,
       outline: request.outline, defaults: request.defaults, files, folderId: request.folderId ?? null, uploader, uploaderName: uploader ? this.rooms.games[context.roomId].presenceState[context.socket.id]?.nickname || uploader : undefined, created: this.clock.now(), uploading: true });
     this.reservations.set(assetId, { token, request, uploading: new Set(), cancelTimer: this.clock.after(15 * 60 * 1000, () => this.cancel(assetId)) });
-    this.broadcast();
+    this.broadcast(true);
     return { assetId, files };
   }
   async stop(): Promise<void> {
@@ -214,7 +228,7 @@ export default class LibraryService {
       this.cleanup.add(cleanup);
       cleanup.finally(() => this.cleanup.delete(cleanup)).catch(error => console.error("LIBRARY_UPLOAD_CLEANUP_ERROR", error));
     }
-    if (broadcast) this.broadcast();
+    if (broadcast) this.broadcast(true);
   }
   private reserved(context: Context, token: string, id: string): { asset: LibraryAsset; reservation: Reservation } {
     const asset = this.database.library.asset(id);
