@@ -11,6 +11,7 @@ Issues and specs for this repo live as GitHub issues. Use the `gh` CLI for all o
 - **Comment on an issue**: `gh issue comment <number> --body "..."`
 - **Apply / remove labels**: `gh issue edit <number> --add-label "..."` / `--remove-label "..."`
 - **Close**: `gh issue close <number> --comment "..."`
+- **A spec's pull request** lists `Closes #<n>` for the spec and for each of its tickets, one per line, so merging it closes them all. GitHub closes them only when the pull request merges into the default branch.
 
 This repo is a fork with two remotes. Issues live on the fork, `spitefulFr0g/owlbear-rodeo-bun` (`origin`). Pass `-R spitefulFr0g/owlbear-rodeo-bun` to every `gh` command: `gh` picks the repo from a local setting that a fresh clone does not have, and can otherwise resolve to `upstream`. Never create issues, pull requests or comments on `owlbear-rodeo/owlbear-rodeo-legacy`.
 

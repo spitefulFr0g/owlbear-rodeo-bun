@@ -47,7 +47,7 @@ function run(command) {
   if (command === "check") execFileSync(process.execPath, [path.join(root, "scripts/frontend.test.cjs")], {
     cwd: root, stdio: "inherit",
   });
-  if (command === "check") execFileSync(process.execPath, ["--test", path.join(root, "scripts/checks.test.cjs")], {
+  if (command === "check") execFileSync(process.execPath, ["--test", path.join(root, "scripts/checks.test.cjs"), path.join(root, "scripts/release-notes.test.cjs")], {
     cwd: root, stdio: "inherit",
   });
   const commands = {

@@ -1,7 +1,8 @@
 name: Release
 
 # A pushed tag `v<version>` builds both executables, checks them and leaves a
-# draft release holding them. A person writes the notes and publishes it.
+# draft release holding them, with its notes from docs/releases/v<version>.md.
+# A person checks the draft and publishes it.
 #
 # A pull request that changes the build runs everything but the draft. A
 # manual run makes a draft for a tag that does not exist, to be deleted after.
@@ -34,6 +35,9 @@ jobs:
               exit 1
             fi
           done
+      - name: The release notes are written
+        if: github.ref_type == 'tag'
+        run: node scripts/release-notes.cjs "$GITHUB_REF_NAME" last "$GITHUB_REPOSITORY" > /dev/null
       - run: corepack enable
       - uses: actions/setup-node@v4
         with:
@@ -110,6 +114,7 @@ jobs:
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
           name: executables
@@ -119,12 +124,15 @@ jobs:
           if [ "$GITHUB_REF_TYPE" = tag ]; then
             tag="$GITHUB_REF_NAME"
             verify=--verify-tag
+            last="$(gh release view --repo "$GITHUB_REPOSITORY" --json tagName --jq .tagName)"
+            node scripts/release-notes.cjs "$tag" "$last" "$GITHUB_REPOSITORY" > "$RUNNER_TEMP/notes.md"
           else
             tag="trial-$GITHUB_RUN_NUMBER"
             verify=
+            echo "Made by the release workflow from $GITHUB_SHA. A trial: delete it after." > "$RUNNER_TEMP/notes.md"
           fi
           gh release create "$tag" dist/owlbear-rodeo-linux-x64 dist/owlbear-rodeo-windows-x64.exe \
             --repo "$GITHUB_REPOSITORY" --draft $verify --target "$GITHUB_SHA" --title "$tag" \
-            --notes "Made by the release workflow from $GITHUB_SHA. Write the notes, then publish."
+            --notes-file "$RUNNER_TEMP/notes.md"
         env:
           GH_TOKEN: ${{ github.token }}

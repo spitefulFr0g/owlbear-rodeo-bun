@@ -57,8 +57,11 @@ and installed dependency versions. Ordinary commits run fresh checks.
 Backend test runs print `CHECK_TIMINGS` and save a report beneath the worktree's
 Git directory at `check-reports/backend-tests.json`. A test taking at least
 30 seconds and half the measured test time fails the check for investigation,
-even when its assertions pass. Preserve the count boundary and diagnose the
-production path before proceeding with dependent merges.
+even when its assertions pass. CI runs the backend tests about five times
+slower than a local run, so a test that takes 6 seconds here can trip the
+check there. A test that counts up to a large cap does not make every request:
+it starts the server with a smaller cap through a `ServerOptions` field, as
+`maxLibraryAssets` does, and the shared rule's own test keeps the real number.
 
 Frontend checks end with a Vite build, so a broken import fails the commit.
 
@@ -74,16 +77,26 @@ start owned processes on the real clock.
 the GM, restarts, and fails on anything unexpected on stderr. Give it a
 compiled executable to check a release: `bun scripts/smoke.ts dist/<file>`.
 Add `--from <the last release's executable>` to check the upgrade: the old
-executable makes the data and the new one opens it.
+executable makes the data, is stopped with a hard kill as Windows stops every
+process, and the new one opens it.
 
 ## Releasing
 
 Set the version in both `package.json` files, merge, then push the tag
 `v<version>` to the fork. `.github/workflows/release.yml` builds both
 executables, runs the smoke and upgrade checks on Linux and Windows, and
-leaves a draft release holding them. Write the notes on the draft and publish
-it. A manual run of the workflow makes a draft named `trial-<n>` with no tag;
+leaves a draft release holding them, with the notes taken from
+`docs/releases/v<version>.md`. The tag fails the workflow when that file is
+missing or still says it is pending release, so write the notes before
+tagging. Check the notes on the draft and publish it. A manual run of the
+workflow makes a draft named `trial-<n>` with no tag and placeholder notes;
 delete it after.
+
+No release waits on a hand check. Before a release, an agent checks
+everything it can itself: the tests, the smoke and upgrade checks, and the
+app in the preview browser for an interface change. A spec plans no hand
+check, and its notes do not call a release pending one. The owner tests by
+using it.
 
 ## Seeing it in a browser
 

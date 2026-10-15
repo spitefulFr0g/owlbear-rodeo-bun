@@ -3,6 +3,7 @@ import { expect, spyOn, test } from "bun:test";
 import { createHash } from "crypto";
 import { mkdir, rm, stat, writeFile } from "fs/promises";
 import { join } from "path";
+// eslint-disable-next-line no-restricted-imports -- the spy holds a password check open; no request can.
 import Auth from "./entities/Auth";
 import { uploadLibrary, sendBatch, createRoom, inviteAccount, nextMessage, setupAdministrator, startTestServer } from "./testing/serverHelpers";
 
