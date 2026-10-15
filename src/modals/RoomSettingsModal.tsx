@@ -2,10 +2,13 @@ import { ReactNode, useEffect, useRef, useState } from "react";
 import { Button, Checkbox, Divider, Flex, Input, Label, Text } from "theme-ui";
 import { useParams } from "react-router-dom";
 import Modal from "../components/Modal";
+import QuotaField from "../components/QuotaField";
+import { useLibrary } from "../contexts/LibraryContext";
 import { useRole, useRoom } from "../contexts/RoomContext";
 import { defaultRoomSwitches, getRoleControls } from "../helpers/roomControls";
 import Session from "../network/Session";
 import { RoomSwitches } from "../types/Room";
+import { RoomLibraryUsage } from "../sceneRules/library";
 
 const switchLabels: Record<Exclude<keyof RoomSwitches, "ownerOnly">, string> = {
   tokens: "Tokens",
@@ -29,6 +32,10 @@ export default function RoomSettingsModal({
 }) {
   const room = useRoom();
   const isGM = getRoleControls(useRole()).room;
+  const { usage, command } = useLibrary();
+  // Only the GM's view carries the room's quotas
+  const roomUsage =
+    usage && "playerQuota" in usage ? (usage as RoomLibraryUsage) : undefined;
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
   const [password, setPassword] = useState("");
@@ -180,6 +187,28 @@ export default function RoomSettingsModal({
           tokens, and trusted players are exempt.
         </Text>
         <Divider />
+        <Text as="h3" variant="heading" py={2}>Player quota</Text>
+        <Text variant="caption" mb={2}>
+          The most each player may upload in this room, trusted players
+          included. Lowering it deletes nothing; a player over it can upload
+          again once they are back under.
+        </Text>
+        {roomUsage ? (
+          <QuotaField
+            id="player-quota"
+            label="Player quota"
+            bytes={roomUsage.playerQuota}
+            maxBytes={roomUsage.room.quota}
+            onSave={async (bytes) => {
+              await command({ action: "player-quota", bytes });
+            }}
+          />
+        ) : (
+          <Text variant="caption" mb={2}>
+            The room's library has not loaded yet.
+          </Text>
+        )}
+        <Divider mt={2} />
         <Label htmlFor="room-password" py={2}>Room password</Label>
         <Text variant="caption" mb={2}>
           Set or change the password for new players. People already in the room

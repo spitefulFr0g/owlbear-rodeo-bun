@@ -5,6 +5,7 @@ import { useToasts } from "react-toast-notifications";
 import RoomRow from "./RoomRow";
 import FormError from "../account/FormError";
 import LoadingOverlay from "../LoadingOverlay";
+import LibraryQuotaLine from "../LibraryQuotaLine";
 
 import DeleteRoomModal from "../../modals/DeleteRoomModal";
 import RoomNameModal from "../../modals/RoomNameModal";
@@ -12,6 +13,7 @@ import RoomNameModal from "../../modals/RoomNameModal";
 import { copyText } from "../../helpers/clipboard";
 
 import {
+  AccountLibrary,
   ApiError,
   Room,
   createRoom,
@@ -31,12 +33,15 @@ function RoomList() {
   const { addToast } = useToasts();
 
   const [rooms, setRooms] = useState<Room[]>();
+  const [accountLibrary, setAccountLibrary] = useState<AccountLibrary>();
   const [error, setError] = useState<ApiError>();
 
   const load = useCallback(async () => {
     setError(undefined);
     try {
-      setRooms(sortByName(await listRooms()));
+      const { rooms, accountLibrary } = await listRooms();
+      setRooms(sortByName(rooms));
+      setAccountLibrary(accountLibrary);
     } catch (error) {
       setError(
         error instanceof ApiError
@@ -130,6 +135,18 @@ function RoomList() {
               onDelete={setDeletingRoom}
             />
           ))}
+        </Box>
+      )}
+      {accountLibrary && (
+        <Box mt={2}>
+          <LibraryQuotaLine
+            label="Your account library"
+            usage={{
+              bytes: accountLibrary.sizeBytes,
+              reservedBytes: 0,
+              quota: accountLibrary.quota,
+            }}
+          />
         </Box>
       )}
       <DeleteRoomModal

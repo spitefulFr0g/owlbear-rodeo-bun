@@ -6,6 +6,7 @@ import OneUseLinkBox from "./OneUseLinkBox";
 import FormError from "../account/FormError";
 import RemoveAccountModal from "../../modals/RemoveAccountModal";
 import LoadingOverlay from "../LoadingOverlay";
+import QuotaField from "../QuotaField";
 
 import {
   Account,
@@ -13,10 +14,13 @@ import {
   OneUseLink,
   createInvite,
   createResetLink,
+  getLibraryQuotas,
   listAccounts,
+  setAccountQuota,
   setAdministrator,
   removeAccount,
 } from "../../network/api";
+import { QuotaUsage, checkQuota } from "../../sceneRules/library";
 
 function asApiError(error: unknown, message: string) {
   return error instanceof ApiError
@@ -58,12 +62,25 @@ function AccountList({
     await load();
   }
   const [accounts, setAccounts] = useState<Account[]>();
+  const [libraries, setLibraries] = useState<Map<string, QuotaUsage>>();
   const [error, setError] = useState<ApiError>();
 
   const load = useCallback(async () => {
     setError(undefined);
     try {
-      setAccounts(await listAccounts());
+      const [accounts, quotas] = await Promise.all([
+        listAccounts(),
+        getLibraryQuotas(),
+      ]);
+      setAccounts(accounts);
+      setLibraries(
+        new Map(
+          quotas.accounts.map((account) => [
+            account.id,
+            { ...account.usage, quota: account.quota },
+          ])
+        )
+      );
     } catch (error) {
       setError(asApiError(error, "Unable to load the accounts."));
     }
@@ -198,6 +215,16 @@ function AccountList({
                   Reset password
                 </Button>
               </Flex>
+              {libraries?.has(account.id) && (
+                <AccountQuota
+                  account={account}
+                  usage={libraries.get(account.id)!}
+                  onSave={async (bytes) => {
+                    await setAccountQuota(account.id, bytes);
+                    await load();
+                  }}
+                />
+              )}
             </AccountRow>
           ))}
         </Box>
@@ -211,6 +238,37 @@ function AccountList({
         An invite link is the only way onto this server. The person who opens it
         picks their own username and password.
       </Text>
+    </Box>
+  );
+}
+
+/**
+ * The account library's quota. The page shows no storage figure per account,
+ * only whether a lowered quota has left the library over it.
+ */
+function AccountQuota({
+  account,
+  usage,
+  onSave,
+}: {
+  account: Account;
+  usage: QuotaUsage;
+  onSave: (bytes: number) => Promise<void>;
+}) {
+  return (
+    <Box sx={{ width: "100%" }}>
+      <QuotaField
+        id={`account-quota-${account.id}`}
+        label={`Account library quota for ${account.username}`}
+        bytes={usage.quota}
+        onSave={onSave}
+      />
+      {!checkQuota(usage, 0) && (
+        <Text as="p" variant="caption" m={0} sx={{ color: "error" }}>
+          This library is over its quota. Nothing has been deleted, but new
+          imports and moves in are refused until it is back under.
+        </Text>
+      )}
     </Box>
   );
 }
