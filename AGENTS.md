@@ -1,5 +1,12 @@
 ## Agent skills
 
+### Personal skills and agent tooling
+
+Keep personal agent skills and workflow helpers in private repositories outside
+this project. Contributors choose their own tools and can complete the
+contribution workflow with the documented repository commands. Personal skills
+remain optional for every contributor.
+
 ### Issue tracker
 
 Issues and specs live as GitHub issues on the fork, `spitefulFr0g/owlbear-rodeo-bun`, never on upstream. See `docs/agents/issue-tracker.md`.
