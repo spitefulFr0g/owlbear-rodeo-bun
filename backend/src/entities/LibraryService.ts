@@ -205,7 +205,7 @@ export default class LibraryService {
     })) as LibraryFiles;
     const repo = this.database.library;
     const usage = repo.usage(library);
-    const overLimit = !checkAssetCount(usage.assets, usage.reservedAssets) ? "Library asset count limit reached" : quotaError(assetBytes(files), { ...usage, quota: repo.quota(library) }, library.kind,
+    const overLimit = !checkAssetCount(usage.assets, usage.reservedAssets, 1, repo.maxAssets) ? "Library asset count limit reached" : quotaError(assetBytes(files), { ...usage, quota: repo.quota(library) }, library.kind,
       uploader ? { ...repo.usage(library, uploader), quota: repo.playerQuota(context.roomId) } : undefined);
     // One reservation at a time per library may pass a full library: players choose their own uploader identity.
     if (overLimit && [...this.reservations].some(([id, reservation]) => { const held = reservation.overLimit && repo.asset(id); return held && sameLibrary(held.library, library); })) throw new Error(overLimit);

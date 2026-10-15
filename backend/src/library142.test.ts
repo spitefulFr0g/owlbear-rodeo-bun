@@ -1,9 +1,6 @@
 import { expect, test } from "bun:test";
-import { beginLibrary, createRoom, inviteAccount, libraryCommand, libraryMetadata, nextMessage, setupAdministrator, startTestServer, uploadLibrary, sendBatch } from "./testing/serverHelpers";
+import { beginLibrary, createRoom, inviteAccount, libraryCommand, nextMessage, setupAdministrator, startTestServer, uploadLibrary, sendBatch } from "./testing/serverHelpers";
 import { tokenItem } from "./testing/sceneFixtures";
-import { randomUUID } from "crypto";
-import { join } from "path";
-import { OwlbearDatabase } from "./database";
 import type { LibraryReservation } from "../../src/sceneRules/library";
 
 const auth = (token: string) => ({ Authorization: `Bearer ${token}` });
@@ -289,28 +286,17 @@ test("the fixed folder cap counts every player's folders", async () => {
   } finally { await server.dispose(); }
 }, 600000);
 
-test("the fixed asset cap counts incomplete uploads", async () => {
+test("the asset cap counts incomplete uploads", async () => {
   const f = await fixture(); const { server, admin, room } = f;
   try {
-    // Ten thousand begin requests take half a minute on CI, so unlike other tests this one writes
-    // most of the cap as held assets into the stopped server's data, then reserves the rest.
-    const reserved = 100;
-    await server.restart({}, dataDir => {
-      const database = new OwlbearDatabase(join(dataDir, "owlbear.db"));
-      try {
-        database.transaction(() => {
-          for (let i = 0; i < 10000 - reserved; i++) database.library.saveAsset({ ...libraryMetadata, id: randomUUID(), library: { kind: "room", id: room.id },
-            files: { original: { id: randomUUID(), size: 1 } }, folderId: null, uploader: null, created: 0, uploading: false });
-        });
-      } finally { database.close(); }
-    });
+    // The shared rule's test holds the cap at ten thousand; the server is started with a small one.
+    await server.restart({ maxLibraryAssets: 4 });
     const gm = await server.joinRoomAsGM(room.id, admin.cookie);
     await new Promise(resolve => gm.socket.emit("session", true, resolve));
+    await uploadLibrary(server, gm.token, "first");
+    await uploadLibrary(server, gm.token, "second");
     const files = { original: { size: 1, mime: "image/png" } };
-    for (let i = 0; i < reserved; i++) {
-      const response = await beginLibrary(server, gm.token, { files });
-      if (response.status !== 201) throw new Error(`Reservation ${i}: ${await response.text()}`);
-    }
+    for (let i = 0; i < 2; i++) expect((await beginLibrary(server, gm.token, { files })).status).toBe(201);
     expect(await f.refusal(gm.token, { files })).toBe("Library asset count limit reached");
   } finally { await server.dispose(); }
 });

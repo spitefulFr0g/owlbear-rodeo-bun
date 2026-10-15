@@ -1,5 +1,5 @@
 import type { OwlbearDatabase } from "./index";
-import { assetBytes, checkAssetCount, quotaError, defaultLibraryQuota, defaultPlayerQuota } from "../../../src/sceneRules/library";
+import { assetBytes, checkAssetCount, quotaError, defaultLibraryQuota, defaultPlayerQuota, maxLibraryAssets } from "../../../src/sceneRules/library";
 import type { LibraryAsset, LibraryFolder, LibraryIdentity } from "../../../src/sceneRules/library";
 
 export function documentFileIds(value: unknown): Set<string> {
@@ -18,6 +18,8 @@ export function documentFileIds(value: unknown): Set<string> {
 
 /** Persistence only: callers authorize and validate in a database transaction. */
 export class LibraryRepository {
+  /** The asset count cap for each library. Only a test sets another. */
+  maxAssets = maxLibraryAssets;
   constructor(private readonly database: OwlbearDatabase) {}
   /** Connection-local totals are rebuilt once; triggers participate in every rollback and direct delete. */
   initializeUsage(): void {
@@ -103,7 +105,7 @@ export class LibraryRepository {
       const duplicate = this.duplicate(library, asset.files.original.id);
       if (duplicate) throw new Error(`The destination already holds ${duplicate.name}`);
       const usage = this.usage(library);
-      if (!checkAssetCount(usage.assets, usage.reservedAssets, 1)) throw new Error("Library asset count limit reached");
+      if (!checkAssetCount(usage.assets, usage.reservedAssets, 1, this.maxAssets)) throw new Error("Library asset count limit reached");
       const error = quotaError(assetBytes(asset.files), { ...usage, quota: this.quota(library) }, library.kind);
       if (error) throw new Error(error);
       const moved = { ...asset, library, folderId: null, uploader: null };

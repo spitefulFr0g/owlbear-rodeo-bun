@@ -29,8 +29,8 @@ export function mayUpload(role: Person["role"], uploads: boolean): boolean {
 function countFits(held: number, reserved: number, incoming: number, cap: number): boolean {
   return [held, reserved, incoming].every(value => Number.isSafeInteger(value) && value >= 0) && held + reserved + incoming <= cap;
 }
-export function checkAssetCount(held: number, reserved = 0, incoming = 1): boolean {
-  return countFits(held, reserved, incoming, maxLibraryAssets);
+export function checkAssetCount(held: number, reserved = 0, incoming = 1, cap = maxLibraryAssets): boolean {
+  return countFits(held, reserved, incoming, cap);
 }
 export function checkFolderCount(held: number, incoming = 1): boolean {
   return countFits(held, 0, incoming, maxLibraryFolders);

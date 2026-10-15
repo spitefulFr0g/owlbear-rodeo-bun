@@ -42,6 +42,8 @@ export interface ServerOptions {
   reopenSetup?: boolean;
   behindProxy?: boolean;
   databaseUpgrades?: readonly UpgradeStep[];
+  /** Lets a test reach the library asset cap without ten thousand uploads. */
+  maxLibraryAssets?: number;
 }
 
 export interface RunningServer {
@@ -58,6 +60,7 @@ export async function startServer(options: ServerOptions): Promise<RunningServer
   const releaseDirectory = lockDataDirectory(dataDir);
   try {
   const database = new OwlbearDatabase(join(dataDir, "owlbear.db"), options.databaseUpgrades ?? upgradeSteps);
+  if (options.maxLibraryAssets !== undefined) database.library.maxAssets = options.maxLibraryAssets;
   const assetStore = new FsAssetStore(join(dataDir, "assets"), MAX_ASSET_BYTES, options.clock, database);
   try {
     await assetStore.init();
