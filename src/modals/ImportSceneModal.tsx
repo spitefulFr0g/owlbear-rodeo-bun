@@ -10,7 +10,6 @@ import MapEditor from "../components/map/MapEditor";
 import useMapEdits from "../hooks/useMapEdits";
 import useResponsiveLayout from "../hooks/useResponsiveLayout";
 
-import { useMapData } from "../contexts/MapDataContext";
 import { importedSceneName } from "../scene/mapItem";
 import { maxSceneNameLength } from "../sceneRules";
 
@@ -20,7 +19,7 @@ type ImportSceneProps = {
   isOpen: boolean;
   /** What the importer is doing, said at its top */
   label: string;
-  /** A map of the browser library, or none for a scene left without a map */
+  /** A library map, or none for an empty scene */
   map: Map | undefined;
   /** Said where the map would be when there is none */
   noMapText?: string;
@@ -29,7 +28,7 @@ type ImportSceneProps = {
   startFogFill?: boolean;
   confirmText: string;
   pickText: string;
-  /** To the map picker */
+  /** Return to the New scene choices */
   onPickAnother: () => void;
   /** Takes the map off. Not offered without it */
   onRemoveMap?: () => void;
@@ -38,13 +37,13 @@ type ImportSceneProps = {
    * Given the map as it is now saved and the scene's name. Resolves with
    * nothing once done, or with what to tell the GM went wrong.
    */
+  onSaveMap: (id: string, changes: Partial<Map>) => Promise<void>;
   onConfirm: (map: Map | undefined, name: string, fogFill: boolean) => Promise<string | undefined>;
 };
 
 /**
  * The importer: aligns a map to the grid and names the scene. The alignment
- * is saved on the map's own record. What confirming does with the two is up
- * to whoever opened it: making a scene or editing one.
+ * is saved through the room library facade before creating the scene.
  */
 function ImportSceneModal({
   isOpen,
@@ -59,10 +58,10 @@ function ImportSceneModal({
   onRemoveMap,
   onCancel,
   onConfirm,
+  onSaveMap,
 }: ImportSceneProps) {
   const { theme } = useThemeUI();
-  const { updateMap } = useMapData();
-  const { edited, change, save } = useMapEdits(map, updateMap);
+  const { edited, change, save } = useMapEdits(map, onSaveMap);
 
   // Undefined until the GM types a name
   const [typedName, setTypedName] = useState(startName);
@@ -82,7 +81,7 @@ function ImportSceneModal({
       failure = await onConfirm(await save(), name, fogFill);
     } catch (error) {
       console.error(error);
-      failure = "Unable to save the scene. Try again in a moment.";
+      failure = error instanceof Error ? error.message : "Unable to save the scene. Try again in a moment.";
     }
     // Done, whoever opened the importer has closed it
     if (failure === undefined) return;
