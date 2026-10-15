@@ -9,6 +9,11 @@ decide lives in the checks (`.githooks/pre-commit`, `.github/workflows/`).
   `startTestServer()` from `backend/src/testing/serverHelpers.ts` and talks to
   it with `fetch` and the socket client, the way a browser does. It opens no
   database and calls no module inside the server.
+- **A cap too large to reach by requests is lowered, not seeded.** The test
+  starts the server with a smaller value through a `ServerOptions` field,
+  like `maxLibraryAssets`, and the shared rule's test holds the real value.
+  `backend/.eslintrc.json` refuses a test that imports the database,
+  `bun:sqlite`, an entity or a controller; an exception says why on its line.
 - **Except the rules shared with the interface.** Pure rules that both sides
   import are also tested directly, beside their code, with `bun test`.
 - **Time rules are tested by moving the test clock**, with no wall-clock wait.

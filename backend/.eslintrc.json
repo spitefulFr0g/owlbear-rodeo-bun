@@ -31,5 +31,71 @@
   },
   "globals": {
     "Bun": "readonly"
-  }
+  },
+  "overrides": [
+    {
+      "files": [
+        "src/**/*.test.ts"
+      ],
+      "excludedFiles": [
+        "src/startup.test.ts"
+      ],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "paths": [
+              {
+                "name": "bun:sqlite",
+                "message": "Tests go through the whole server and open no database. See CODING_STANDARDS.md."
+              }
+            ],
+            "patterns": [
+              {
+                "group": [
+                  "**/database",
+                  "**/database/*",
+                  "**/entities/*",
+                  "**/controllers/*"
+                ],
+                "message": "Tests go through the whole server and call no module inside it. See CODING_STANDARDS.md."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": [
+        "src/entities/**/*.test.ts",
+        "src/controllers/**/*.test.ts",
+        "src/database/**/*.test.ts"
+      ],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "paths": [
+              {
+                "name": "bun:sqlite",
+                "message": "Tests go through the whole server and open no database. See CODING_STANDARDS.md."
+              }
+            ],
+            "patterns": [
+              {
+                "group": [
+                  "**/database",
+                  "**/database/*",
+                  "**/entities/*",
+                  "**/controllers/*",
+                  "./*"
+                ],
+                "message": "Tests go through the whole server and call no module inside it. See CODING_STANDARDS.md."
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
 }

@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+// eslint-disable-next-line no-restricted-imports -- a unit test from before the whole-server rule.
 import Auth from "./Auth";
 
 describe("Auth", () => {

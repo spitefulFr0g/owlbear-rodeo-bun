@@ -30,7 +30,11 @@ const expected = [
 ];
 const unexpected: string[] = [];
 
-/** Starts a server. Only the one under test has its stderr judged, a released one has shipped. */
+/**
+ * Starts a server. Only the one under test has its stderr judged, a released one has shipped.
+ * A released one is stopped with a hard kill, as Windows stops every process, so Linux
+ * checks the same unclean stop.
+ */
 async function start(command: string[], judged = true) {
   const server = Bun.spawn([...command, "--port", "0", "--data-dir", dataDir], { stdout: "pipe", stderr: "pipe" });
   const errors = (async () => {
@@ -46,7 +50,7 @@ async function start(command: string[], judged = true) {
       return {
         address,
         async stop() {
-          server.kill("SIGTERM");
+          server.kill(judged ? "SIGTERM" : "SIGKILL");
           await server.exited;
           await errors;
         },
@@ -111,15 +115,20 @@ try {
   const styledGrid = { ...grid, opacity: 0.8, lineWidth: 3, color: "#333333" };
   const gridAnswer = await new Promise<any>(resolve => first.socket.emit("scene_settings", { sceneId: savedSceneId, grid: styledGrid }, resolve));
   if (!gridAnswer.ok) throw new Error("The smoke grid was not changed");
+  const { uploadLibrary, libraryCommand } = await import("../src/testing/libraryHelpers");
   if (released) {
-  const upload = await fetch(`${server.address}/assets/smoke-image`, {
-    method: "PUT",
-    body: image,
-    headers: { Authorization: `Bearer ${first.token}`, "Content-Type": "image/png", "X-Asset-Width": "4", "X-Asset-Height": "2", "X-Asset-Owner": "gm" },
-  });
-  if (upload.status !== 201) throw new Error(`The image upload answered ${upload.status}: ${await upload.text()}`);
+    // A release before libraries takes the file by PUT. A later one refuses
+    // that and takes a library upload, whose asset stays in the library.
+    const upload = await fetch(`${server.address}/assets/smoke-image`, {
+      method: "PUT",
+      body: image,
+      headers: { Authorization: `Bearer ${first.token}`, "Content-Type": "image/png", "X-Asset-Width": "4", "X-Asset-Height": "2", "X-Asset-Owner": "gm" },
+    });
+    const answer = await upload.text();
+    if (upload.status === 403 && answer.includes("Begin a library upload")) {
+      storedImageId = (await uploadLibrary(server, first.token, image)).files.original.id;
+    } else if (upload.status !== 201) throw new Error(`The image upload answered ${upload.status}: ${answer}`);
   } else {
-    const { uploadLibrary, libraryCommand } = await import("../src/testing/libraryHelpers");
     const asset = await uploadLibrary(server, first.token, image);
     storedImageId = asset.files.original.id;
     const deleted = await libraryCommand(first.socket, { action: "delete", id: asset.id });
@@ -130,15 +139,15 @@ try {
     first.socket.emit("scene_changes", { id: "smoke-image-place", sceneId: savedSceneId, changes: [{ type: "add", item: {
       id: "smoke-placed-image", kind: "image", layer: "character", position: { x: 0, y: 0 }, rotation: 0,
       scale: { x: 1, y: 1 }, order: 0, owner: "gm", locked: false, hidden: false, metadata: {},
-      image: { type: "file", file: "smoke-image" }, width: 4, height: 2, label: "Smoke",
+      image: { type: "file", file: storedImageId }, width: 4, height: 2, label: "Smoke",
       outline: { type: "circle", x: 2, y: 1, radius: 1 },
     } }] });
     const imageAnswer = await placedImage;
     if (imageAnswer.refused.length || imageAnswer.applied.length !== 1) throw new Error("The released server did not place the smoke image");
   }
   // Long enough for a timer that fires at once to show itself on stderr. A
-  // release saves a room up to three seconds after its last change, and on
-  // Windows stop() kills it without a clean shutdown, so wait that save out too.
+  // release saves a room up to three seconds after its last change, and stop()
+  // kills it without a clean shutdown, so wait that save out too.
   await Bun.sleep(released ? 5000 : 3000);
   first.socket.disconnect();
 
