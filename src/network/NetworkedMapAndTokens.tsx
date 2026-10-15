@@ -6,7 +6,7 @@ import Session from "./Session";
 import WelcomeScreen from "../components/WelcomeScreen";
 import Map from "../components/map/Map";
 import Dock from "../components/dock/Dock";
-import AssetManager from "../components/assetManager/AssetManager";
+import BrowserLibraryManager from "../components/assetManager/BrowserLibraryManager";
 import { NewSceneExtension } from "../components/scene/SceneImporter";
 import GlobalImageDrop from "../components/image/GlobalImageDrop";
 
@@ -23,7 +23,7 @@ function NetworkedMapAndTokens({ session }: { session: Session }) {
     <GlobalImageDrop>
       <Map session={session} />
       <Dock />
-      <AssetManager />
+      <BrowserLibraryManager />
       <NewSceneExtension />
     </GlobalImageDrop>
   );
