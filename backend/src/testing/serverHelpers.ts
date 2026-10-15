@@ -103,10 +103,12 @@ export async function startTestServer(prepare?: (dataDir: string) => Promise<voi
       });
     },
     stop: () => server.stop(),
-    async restart(overrides: { reopenSetup?: boolean; behindProxy?: boolean } = {}) {
+    /** prepare sees the stopped server's data directory, as an operator's tool would. */
+    async restart(overrides: { reopenSetup?: boolean; behindProxy?: boolean } = {}, prepare?: (dataDir: string) => void) {
       await server.stop();
       for (const socket of sockets) socket.disconnect();
       sockets.clear();
+      prepare?.(dataDir);
       server = await startServer({ ...options, ...overrides });
     },
     async dispose() {

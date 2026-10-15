@@ -1,6 +1,9 @@
 import { expect, test } from "bun:test";
-import { beginLibrary, createRoom, inviteAccount, libraryCommand, nextMessage, setupAdministrator, startTestServer, uploadLibrary, sendBatch } from "./testing/serverHelpers";
+import { beginLibrary, createRoom, inviteAccount, libraryCommand, libraryMetadata, nextMessage, setupAdministrator, startTestServer, uploadLibrary, sendBatch } from "./testing/serverHelpers";
 import { tokenItem } from "./testing/sceneFixtures";
+import { randomUUID } from "crypto";
+import { join } from "path";
+import { OwlbearDatabase } from "./database";
 import type { LibraryReservation } from "../../src/sceneRules/library";
 
 const auth = (token: string) => ({ Authorization: `Bearer ${token}` });
@@ -287,17 +290,32 @@ test("the fixed folder cap counts every player's folders", async () => {
 }, 600000);
 
 test("the fixed asset cap counts incomplete uploads", async () => {
-  const f = await fixture(); const { server, gm } = f;
+  const f = await fixture(); const { server, admin, room } = f;
   try {
-    for (let i = 0; i < 10000; i++) {
-      const response = await beginLibrary(server, gm.token, { files: { original: { size: 1, mime: "image/png" } } });
+    // Ten thousand begin requests take half a minute on CI, so unlike other tests this one writes
+    // most of the cap as held assets into the stopped server's data, then reserves the rest.
+    const reserved = 100;
+    await server.restart({}, dataDir => {
+      const database = new OwlbearDatabase(join(dataDir, "owlbear.db"));
+      try {
+        database.transaction(() => {
+          for (let i = 0; i < 10000 - reserved; i++) database.library.saveAsset({ ...libraryMetadata, id: randomUUID(), library: { kind: "room", id: room.id },
+            files: { original: { id: randomUUID(), size: 1 } }, folderId: null, uploader: null, created: 0, uploading: false });
+        });
+      } finally { database.close(); }
+    });
+    const gm = await server.joinRoomAsGM(room.id, admin.cookie);
+    await new Promise(resolve => gm.socket.emit("session", true, resolve));
+    const files = { original: { size: 1, mime: "image/png" } };
+    for (let i = 0; i < reserved; i++) {
+      const response = await beginLibrary(server, gm.token, { files });
       if (response.status !== 201) throw new Error(`Reservation ${i}: ${await response.text()}`);
     }
-    expect(await f.refusal(gm.token, { files: { original: { size: 1, mime: "image/png" } } })).toBe("Library asset count limit reached");
+    expect(await f.refusal(gm.token, { files })).toBe("Library asset count limit reached");
   } finally { await server.dispose(); }
-}, 600000);
+});
 
-test("a full library still recognises a duplicate, holding one over-limit reservation at a time", async () => {
+test("a full library still recognises a duplicate, holding one over-limit reservation at a time per library", async () => {
   const f = await fixture(); const { server, gm, player, admin, room } = f;
   try {
     await f.change(true);
@@ -317,6 +335,13 @@ test("a full library still recognises a duplicate, holding one over-limit reserv
     expect((await uploadLibrary(server, gm.token, "image", { import: true })).id).toBe(imported.id);
     await f.quota("rooms", room.id, 1);
     expect((await uploadLibrary(server, player.token, "own")).id).toBe(own.id);
+    // The hold is per library, so another player identity cannot take a second one.
+    expect((await beginLibrary(server, player.token)).status).toBe(201);
+    const rejoined = await server.joinRoom(room.id, "", "renamed");
+    const second = await beginLibrary(server, rejoined.token);
+    expect(second.status).toBe(400);
+    expect((await second.json() as any).error).toBe("Room quota exceeded");
+    expect(await f.refusal(gm.token)).toBe("Room quota exceeded");
   } finally { await server.dispose(); }
 });
 

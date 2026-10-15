@@ -136,8 +136,10 @@ try {
     const imageAnswer = await placedImage;
     if (imageAnswer.refused.length || imageAnswer.applied.length !== 1) throw new Error("The released server did not place the smoke image");
   }
-  // Long enough for a timer that fires at once to show itself on stderr.
-  await Bun.sleep(3000);
+  // Long enough for a timer that fires at once to show itself on stderr. A
+  // release saves a room up to three seconds after its last change, and on
+  // Windows stop() kills it without a clean shutdown, so wait that save out too.
+  await Bun.sleep(released ? 5000 : 3000);
   first.socket.disconnect();
 
   await server.stop();

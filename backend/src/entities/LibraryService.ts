@@ -207,8 +207,8 @@ export default class LibraryService {
     const usage = repo.usage(library);
     const overLimit = !checkAssetCount(usage.assets, usage.reservedAssets) ? "Library asset count limit reached" : quotaError(assetBytes(files), { ...usage, quota: repo.quota(library) }, library.kind,
       uploader ? { ...repo.usage(library, uploader), quota: repo.playerQuota(context.roomId) } : undefined);
-    // One reservation at a time per library and uploader may pass a full library.
-    if (overLimit && [...this.reservations].some(([id, reservation]) => { const held = reservation.overLimit && repo.asset(id); return held && sameLibrary(held.library, library) && held.uploader === uploader; })) throw new Error(overLimit);
+    // One reservation at a time per library may pass a full library: players choose their own uploader identity.
+    if (overLimit && [...this.reservations].some(([id, reservation]) => { const held = reservation.overLimit && repo.asset(id); return held && sameLibrary(held.library, library); })) throw new Error(overLimit);
     const assetId = randomUUID();
     repo.saveAsset({ id: assetId, library, name: checkLibraryName(request.name)!, type: request.type, width: request.width, height: request.height,
       outline: request.outline, defaults: request.defaults, files, folderId: request.folderId ?? null, uploader, uploaderName: uploader ? this.rooms.games[context.roomId].presenceState[context.socket.id]?.nickname || uploader : undefined, created: this.clock.now(), uploading: true });
