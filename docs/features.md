@@ -28,7 +28,7 @@ A row with a split verdict names which part is which.
 
 Ten steps, grouped into releases. They are built in number order, except that step 8 is built before step 7. Steps 1 to 5 run on today's canvas. Step 6 is the one large rewrite. Steps 7 to 10 build on it. The move from Create React App to Vite is done between steps 7 and 9 and is not a numbered step.
 
-The scope through v0.4.0 is implemented. See the [v0.4.0 release notes](releases/v0.4.0.md) for scenes, live play and upgrade instructions, and the [v0.4.1 release notes](releases/v0.4.1.md) for the fixes that followed. v0.5.0 is planned and not built. v0.6.0 is a forecast.
+The scope through v0.4.0 is implemented. See the [v0.4.0 release notes](releases/v0.4.0.md) for scenes, live play and upgrade instructions, and the [v0.4.1 release notes](releases/v0.4.1.md) for the fixes that followed. The v0.5.0 implementation is described in the [v0.5.0 release notes](releases/v0.5.0.md). v0.6.0 is a forecast.
 
 ### v0.1.0: the shared screen
 
@@ -146,7 +146,7 @@ Decided for this release, in [Plan v0.4.0: scenes and live play](https://github.
 
 | Step | What is built |
 | --- | --- |
-| 9. Libraries and dock | The room library, the account library and the server set ([ADR 0005](adr/0005-assets-belong-to-a-room-or-an-account.md)). A dock along the bottom and one Asset Manager, replacing the token bar, the two pickers and the Scenes dialog. Dropping image files on the canvas with a type picker. A quota on each room library and account library, and a player quota in each room. The one-off import of a browser library into the account library. Today's Import / Export dialog and the `.owlbear` file are removed. |
+| 9. Libraries and dock | The room library, the account library and the server set ([ADR 0005](adr/0005-assets-belong-to-a-room-or-an-account.md)). A dock down the right side and one Asset Manager, replacing the token bar, the two pickers and the Scenes dialog. Dropping image files on the canvas with a type picker. A quota on each room library and account library, and a player quota in each room. The one-off import of a browser library into the account library. Today's Import / Export dialog and the `.owlbear` file are removed. |
 
 The asset library stays in the browser until step 9. The reference suggested moving it to the server during the storage work, before the item model. It waits so that the server library is built once, against asset types that are layers, and not first against today's separate map and token tables.
 
@@ -163,8 +163,8 @@ Decided for this release, in [Plan v0.5.0: libraries and dock](https://github.co
 - **Account library:** it is seen only in the rooms its account runs. An account holder in someone else's room is an ordinary player. A removed account's folders pass to the administrator with its library and merge by name.
 - **Trusted players:** their dock is a player's dock. They may upload with the uploads switch off.
 - **What a player may place:** an image in the server set, their own upload, or an image already placed in a scene of that room, with uploads on or off. A room asset the GM has not placed cannot be placed by a player.
-- **Dock:** a tab per asset type and a Scenes tab. The Map and Scenes tabs are the GM's alone. It collapses to its tab strip, is hidden in fullscreen, and carries the same filter and search as the Asset Manager, with folders as expandable groups.
-- **Asset Manager:** it exists only inside a room. The GM sees this room, then my library, then the server set, under a heading each, and a filter narrows to one. A player has it over their own uploads only, and the GM sees those ungrouped under a "from players" heading.
+- **Dock:** a panel down the right side, with a tab per asset type and a Scenes tab. The Map and Scenes tabs are the GM's alone. It collapses to its tab strip, is hidden in fullscreen, and carries the same filter and search as the Asset Manager, with folders as expandable groups.
+- **Asset Manager:** it exists only inside a room. The GM sees this room, then my library, then the server set, under a heading each, and a filter narrows to one. A player has it over their own uploads only, and the GM sees those under a "From players" heading, with their folders.
 - **Order:** folders first by name, then assets by name or newest first, remembered per browser. Arranging tiles by hand is dropped. Dragging a tile onto a folder still files it.
 - **Editing an asset:** it changes only items placed afterwards.
 - **Maps from the dock:** dragging a Map asset places it on the Map layer at the drop point, locked and unaligned. "New scene" in the Scenes tab is the only route through the importer, and offers a Map asset from the libraries or a fresh upload.
@@ -176,6 +176,16 @@ Decided for this release, in [Plan v0.5.0: libraries and dock](https://github.co
 - **Caps:** the number of assets and folders in a library and the length of a name have fixed caps far above real play, checked by the server, and are not settings.
 - **Unused files:** they are cleared when the server starts and when a room is deleted, so undo within a sitting always finds its image.
 - **Sizes shown:** a room's size is its saved document, its room library and any other image its scenes place. The account library's size is one more line on the room list.
+
+
+- **Upload reservations:** begin reserves bytes and an asset slot before bytes arrive. The original arrives first; only completion publishes the asset. Duplicate originals are found on the server within the permitted library scope, and a player sees duplicates only among their own uploads.
+- **Import:** the GM imports every uploaded map and token directly from this browser into their account library, with no file route or pick list. Built-ins are skipped; groups become folders, merging map/token groups with the same name. Names, token defaults and saved map grids survive; vehicle becomes Mount and hide-in-dock is dropped. The import sends bytes rather than claiming old stored-file ids and leaves the browser library, identity and settings untouched.
+- **Import progress and failures:** progress ends with an imported/skipped summary. An existing original is skipped safely on repeat; unreadable and oversized images are listed. An account quota refusal stops the import and keeps completed assets. Use the browser and original server address that hold the library.
+- **Moves and folders:** moving into a library holding the same original is refused with the existing asset's name. Deleting a folder leaves its assets at the top level. Folders remain one level deep.
+- **Image editor:** one editor retains both token defaults and the saved map grid across type changes. A file name such as `cave 10x8.png` fills a new Map asset's grid regardless of image size. Importer alignment updates the asset's saved grid, except for the read-only server set.
+- **Placement and server set:** clicking places at the centre of the view and dragging places at the drop point. The server set can be popped out read-only. The dock quota bar separates the GM's and players' uploads; a player sees their own usage.
+- **Exact limits:** names are trimmed to 1–100 characters, with 10,000 assets and 1,000 folders per library. Quotas use decimal bytes, include reservations and allow equality. GET/HEAD downloads grant no placement rights. Placed-file references are rebuilt from scenes at startup and only grow during a sitting, preserving undo.
+- **Administrator total:** counts the database and every stored file on disk. The upgrade to layout 4 keeps a pre-upgrade database copy; rollback requires restoring a complete backup because startup also clears unused files.
 
 ### v0.6.0: small tools
 
@@ -355,9 +365,9 @@ Decision: [Screen asset manager and image features (sections F and G)](https://g
 | Feature | Verdict | Step | Note |
 | --- | --- | --- | --- |
 | Six image types | In: Map, Prop, Mount, Character, Attachment. Later: Note | 9 | Called asset types. A type is the layer an asset is placed on by default. Notes stay text items. |
-| Dock along the bottom, a tab per type plus Scenes | In | 9 | Replaces the token bar and the Scenes dialog. |
+| Dock down the right side, a tab per type plus Scenes | In | 9 | Replaces the token bar and the Scenes dialog. |
 | Dock search with fuzzy name match and a tag preview | In: search. Out: tag preview | 9 | |
-| Asset Manager dialog | In | 9 | One dialog replaces the map picker and the token picker. |
+| Asset Manager window | In | 9 | One floating window replaces the map picker and the token picker. |
 | Sort by created or by name | In | 9 | Replaces arranging tiles by hand. |
 | Folders | In as today's one-level groups. Later: nesting, colours, "Move to" | 9 | One list of folders per library, holding images of any type. |
 | Collections per campaign | In as the room library and the account library | 9 | There is no collection to create or switch. |

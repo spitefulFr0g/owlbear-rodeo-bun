@@ -46,7 +46,7 @@ install locally with Yarn.
 ## Checks
 
 `.githooks/pre-commit` runs what CI runs for the half a commit touches, and
-prints only on failure. A fresh clone turns it on with
+prints only on failure. Backend changes also run the real-server smoke check. A fresh clone turns it on with
 `git config core.hooksPath .githooks`; worktrees share that setting.
 
 Frontend checks end with a Vite build, so a broken import fails the commit.

@@ -174,11 +174,11 @@ The most storage one player's uploads may take in a room. The room's GM sets it,
 _Avoid_: Upload limit, allowance
 
 **Dock**:
-The strip along the bottom of a room from which assets are placed on the canvas. It has a tab for each asset type and, for the GM, a tab listing the room's scenes.
+The panel down the right side of a room from which assets are placed on the canvas. It has a tab for each asset type and, for the GM, a tab listing the room's scenes.
 _Avoid_: Token bar, sidebar, tray
 
 **Asset Manager**:
-The dialog in a room where a person organises the assets they can see: naming them, setting their asset type, filing them in folders, moving them between libraries and deleting them.
+The floating window in a room where a person organises the assets they can see: naming them, setting their asset type, filing them in folders, moving them between libraries and deleting them.
 _Avoid_: Map picker, token picker, library dialog
 
 **Browser library**:
