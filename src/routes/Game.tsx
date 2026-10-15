@@ -1,3 +1,4 @@
+import { LibraryProvider } from "../contexts/LibraryContext";
 import { useState, useEffect, useRef } from "react";
 import { Flex } from "theme-ui";
 import { useParams } from "react-router-dom";
@@ -145,6 +146,7 @@ function Game() {
   return (
     <RoomProvider session={session}>
       <AssetsProvider>
+      <LibraryProvider session={session}>
         <AssetURLsProvider>
           <MapLoadingProvider>
             <MapDataProvider>
@@ -199,6 +201,7 @@ function Game() {
             </MapDataProvider>
           </MapLoadingProvider>
         </AssetURLsProvider>
+      </LibraryProvider>
       </AssetsProvider>
     </RoomProvider>
   );
