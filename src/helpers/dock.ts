@@ -146,10 +146,16 @@ export function mayFileIn(asset: LibraryAsset, folder: LibraryFolder): boolean {
   return sameLibrary(folder.library, asset.library) && folder.owner === asset.uploader;
 }
 
-/** The GM moves an asset between this room's library and their account library */
-export function moveAction(asset: LibraryAsset, role: LibraryRole): { destination: "room" | "account"; label: string } | undefined {
-  if (role !== "gm") return undefined;
-  return asset.library.kind === "account"
-    ? { destination: "room", label: "Move to this room" }
-    : { destination: "account", label: "Move to my library" };
+export type MoveAction = { destination: "room" | "account"; label: string };
+
+/**
+ * The GM's moves between this room's library and their account library. A
+ * player's upload can also be taken into this room's own assets, where it
+ * stops being theirs.
+ */
+export function moveActions(asset: LibraryAsset, role: LibraryRole): MoveAction[] {
+  if (role !== "gm") return [];
+  if (asset.library.kind === "account") return [{ destination: "room", label: "Move to this room" }];
+  const add: MoveAction = { destination: "account", label: "Add to my library" };
+  return asset.uploader === null ? [add] : [{ destination: "room", label: "Take into this room" }, add];
 }

@@ -6,7 +6,7 @@ import ConfirmModal from "../../modals/ConfirmModal";
 import DockNameModal from "./DockNameModal";
 
 import { useLibrary } from "../../contexts/LibraryContext";
-import { dockTabLabels, mayChangeAsset, mayFileIn, moveAction } from "../../helpers/dock";
+import { dockTabLabels, mayChangeAsset, mayFileIn, moveActions } from "../../helpers/dock";
 import {
   assetTypes,
   LibraryAsset,
@@ -28,6 +28,8 @@ type DockMenuProps = {
   /** Reports a refused action in the person's words */
   onError: (message: string) => void;
   onClose: () => void;
+  /** Offers the image editor, where the menu opens inside the Asset Manager */
+  onEdit?: (asset: LibraryAsset) => void;
 };
 
 function MenuItem({ children, onClick }: { children: React.ReactNode; onClick: () => void }) {
@@ -82,7 +84,7 @@ function MenuSelect({ label, value, options, onChange }: {
 }
 
 /** The actions on a dock row, opened by right-clicking it */
-function DockMenu({ target, person, onPlace, onError, onClose }: DockMenuProps) {
+function DockMenu({ target, person, onPlace, onError, onClose, onEdit }: DockMenuProps) {
   const { command, folders, openExtension } = useLibrary();
   const [dialog, setDialog] = useState<"rename" | "delete" | null>(null);
 
@@ -104,21 +106,25 @@ function DockMenu({ target, person, onPlace, onError, onClose }: DockMenuProps) 
   const folder = target.kind === "folder" ? target.folder : undefined;
   const name = target.kind === "asset" ? target.asset.name : target.folder.name;
   const changeable = asset ? mayChangeAsset(asset, person) : !!folder;
-  const move = asset && moveAction(asset, person.role);
+  const moves = asset ? moveActions(asset, person.role) : [];
 
   let items: React.ReactNode;
   if (target.kind === "asset") {
     items = (
       <>
         <MenuItem onClick={() => { onClose(); onPlace(target.asset); }}>Place on the map</MenuItem>
-        {person.role === "gm" && (
+        {!onEdit && (
           <MenuItem onClick={() => { onClose(); openExtension({ extension: "manager", asset: target.asset as LibraryAsset | BundledLibraryAsset }); }}>
             Open in Asset Manager
           </MenuItem>
         )}
         {asset && changeable ? (
           <>
-            <MenuItem onClick={() => setDialog("rename")}>Rename…</MenuItem>
+            {onEdit ? (
+              <MenuItem onClick={() => { onClose(); onEdit(asset); }}>Edit…</MenuItem>
+            ) : (
+              <MenuItem onClick={() => setDialog("rename")}>Rename…</MenuItem>
+            )}
             <MenuSelect
               label="Type"
               value={asset.type}
@@ -139,11 +145,11 @@ function DockMenu({ target, person, onPlace, onError, onClose }: DockMenuProps) 
               ]}
               onChange={(folderId) => run({ action: "edit", id: asset.id, changes: { folderId: folderId || null } })}
             />
-            {move && (
-              <MenuItem onClick={() => run({ action: "move", id: asset.id, destination: move.destination })}>
+            {moves.map((move) => (
+              <MenuItem key={move.destination} onClick={() => run({ action: "move", id: asset.id, destination: move.destination })}>
                 {move.label}
               </MenuItem>
-            )}
+            ))}
             <Divider my={1} />
             <MenuItem onClick={() => setDialog("delete")}>Delete…</MenuItem>
           </>

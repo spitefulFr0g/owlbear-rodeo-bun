@@ -13,7 +13,7 @@ import { Group } from "../../types/Group";
 
 type MapTileProps = {
   mapsById: Record<string, Map>;
-  onMapEdit: (mapId: string) => void;
+  onMapEdit?: (mapId: string) => void;
   onMapSelect: (groupId: string) => void;
   subgroup: boolean;
 };
