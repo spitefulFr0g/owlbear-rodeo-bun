@@ -1,6 +1,6 @@
 import { tokenItem } from "./testing/sceneFixtures";
 import { expect, test } from "bun:test";
-import { sendBatch, createRoom, nextMessage, setupAdministrator, startTestServer } from "./testing/serverHelpers";
+import { uploadLibrary, libraryCommand, sendBatch, createRoom, nextMessage, setupAdministrator, startTestServer } from "./testing/serverHelpers";
 
 async function startRoomServer() {
   const server = await startTestServer();
@@ -81,33 +81,29 @@ test("the old display link joins after restart without restoring presence, dice,
   } finally { await server.dispose(); }
 });
 
-test("saved image references remain downloadable and incremental edits survive restart", async () => {
+test("a refused image replacement does not change the saved item and unused bytes are cleared", async () => {
   const server = await startRoomServer();
   try {
     const { owner, observer } = await change(server);
     const image = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 1, 2, 3, 4]);
-    const uploaded = await fetch(`${server.address}/assets/image`, {
-      method: "PUT", body: image, headers: { Authorization: `Bearer ${owner.token}`,
-        "Content-Type": "image/png", "X-Asset-Width": "4", "X-Asset-Height": "2", "X-Asset-Owner": "gm" },
-    });
-    expect(uploaded.status).toBe(201);
-    await uploaded.text();
+    const asset = await uploadLibrary(server, owner.token, image);
+    await libraryCommand(owner.socket, { action: "delete", id: asset.id });
     await server.clock.advance(3000);
     await sendBatch(owner.socket, { id: "image", sceneId: owner.snapshot!.scene!.id, changes: [
-      { type: "update", id: "hero", fields: { image: { type: "file", file: "image" }, label: "The door is open" } },
+      { type: "update", id: "hero", fields: { image: { type: "file", file: asset.files.original.id }, label: "The door is open" } },
     ] });
     owner.socket.disconnect();
     observer.socket.disconnect();
     await server.restart();
     const joined = await server.joinRoomAsGM(server.roomId, server.cookie);
     const item = joined.snapshot!.scene!.items.hero;
-    expect(item).toEqual({ ...tokenItem, image: { type: "file", file: "image" }, label: "The door is open" });
+    expect(item).toEqual(tokenItem);
     for (const token of [joined.token, (await server.joinRoom(server.roomId)).token]) {
-      const response = await fetch(`${server.address}/assets/image`, {
+      const response = await fetch(`${server.address}/assets/${asset.files.original.id}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      expect(response.status).toBe(200);
-      expect(new Uint8Array(await response.arrayBuffer())).toEqual(image);
+      expect(response.status).toBe(404);
+      await response.text();
     }
   } finally { await server.dispose(); }
 });

@@ -1,6 +1,6 @@
 {
   "name": "owlbear-rodeo",
-  "version": "0.4.1",
+  "version": "0.5.0",
   "private": true,
   "packageManager": "yarn@1.22.22",
   "engines": {
@@ -67,6 +67,7 @@
     "uuid": "^8.3.2"
   },
   "scripts": {
+    "check": "node scripts/checks.cjs all",
     "start": "vite",
     "build": "vite build",
     "test": "vitest",

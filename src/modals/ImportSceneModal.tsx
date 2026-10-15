@@ -1,4 +1,4 @@
-import { ChangeEvent, FormEvent, useState } from "react";
+import { ChangeEvent, FormEvent, useEffect, useState } from "react";
 import { Box, Button, Flex, Checkbox, Input, Label, Text, useThemeUI } from "theme-ui";
 import SimpleBar from "simplebar-react";
 
@@ -10,7 +10,7 @@ import MapEditor from "../components/map/MapEditor";
 import useMapEdits from "../hooks/useMapEdits";
 import useResponsiveLayout from "../hooks/useResponsiveLayout";
 
-import { useMapData } from "../contexts/MapDataContext";
+import { shownFile } from "../helpers/shownFile";
 import { importedSceneName } from "../scene/mapItem";
 import { maxSceneNameLength } from "../sceneRules";
 
@@ -20,7 +20,7 @@ type ImportSceneProps = {
   isOpen: boolean;
   /** What the importer is doing, said at its top */
   label: string;
-  /** A map of the browser library, or none for a scene left without a map */
+  /** A library map, or none for an empty scene */
   map: Map | undefined;
   /** Said where the map would be when there is none */
   noMapText?: string;
@@ -29,7 +29,7 @@ type ImportSceneProps = {
   startFogFill?: boolean;
   confirmText: string;
   pickText: string;
-  /** To the map picker */
+  /** Return to the New scene choices */
   onPickAnother: () => void;
   /** Takes the map off. Not offered without it */
   onRemoveMap?: () => void;
@@ -38,13 +38,15 @@ type ImportSceneProps = {
    * Given the map as it is now saved and the scene's name. Resolves with
    * nothing once done, or with what to tell the GM went wrong.
    */
+  onSaveMap: (id: string, changes: Partial<Map>) => Promise<void>;
   onConfirm: (map: Map | undefined, name: string, fogFill: boolean) => Promise<string | undefined>;
+  /** Brings a stored file into this browser, so a map uploaded elsewhere can be aligned */
+  fetchFile: (id: string) => Promise<unknown>;
 };
 
 /**
  * The importer: aligns a map to the grid and names the scene. The alignment
- * is saved on the map's own record. What confirming does with the two is up
- * to whoever opened it: making a scene or editing one.
+ * is saved through the room library facade before creating the scene.
  */
 function ImportSceneModal({
   isOpen,
@@ -59,10 +61,26 @@ function ImportSceneModal({
   onRemoveMap,
   onCancel,
   onConfirm,
+  onSaveMap,
+  fetchFile,
 }: ImportSceneProps) {
   const { theme } = useThemeUI();
-  const { updateMap } = useMapData();
-  const { edited, change, save } = useMapEdits(map, updateMap);
+  const { edited, change, save } = useMapEdits(map, onSaveMap);
+
+  // The file the editor shows, fetched before it mounts, as it reads only
+  // what this browser holds. Choosing another quality fetches that copy.
+  const shown = edited?.type === "file" ? shownFile(edited) : undefined;
+  const [fetched, setFetched] = useState<string>();
+  const [fetchError, setFetchError] = useState<string>();
+  useEffect(() => {
+    if (!shown) return;
+    let current = true;
+    setFetchError(undefined);
+    fetchFile(shown)
+      .then(() => current && setFetched(shown))
+      .catch((error: Error) => current && setFetchError(`The map could not load: ${error.message}`));
+    return () => { current = false; };
+  }, [shown, fetchFile]);
 
   // Undefined until the GM types a name
   const [typedName, setTypedName] = useState(startName);
@@ -82,7 +100,7 @@ function ImportSceneModal({
       failure = await onConfirm(await save(), name, fogFill);
     } catch (error) {
       console.error(error);
-      failure = "Unable to save the scene. Try again in a moment.";
+      failure = error instanceof Error ? error.message : "Unable to save the scene. Try again in a moment.";
     }
     // Done, whoever opened the importer has closed it
     if (failure === undefined) return;
@@ -128,7 +146,13 @@ function ImportSceneModal({
         >
           {edited ? (
             <>
-              <MapEditor key={edited.id} map={edited} onSettingsChange={change} />
+              {shown && fetched !== shown ? (
+                <Text as="p" variant="body2" sx={{ textAlign: "center" }} my={4} role={fetchError ? "alert" : undefined}>
+                  {fetchError || "Loading the map…"}
+                </Text>
+              ) : (
+                <MapEditor key={edited.id} map={edited} onSettingsChange={change} />
+              )}
               <MapSettings map={edited} onSettingsChange={change} />
             </>
           ) : (

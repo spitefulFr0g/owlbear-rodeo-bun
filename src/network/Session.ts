@@ -3,6 +3,9 @@ import io, { Socket } from "socket.io-client";
 import msgParser from "socket.io-msgpack-parser";
 import { EventEmitter } from "events";
 
+import { LibrarySnapshot, LibraryDelta } from "../sceneRules/library";
+import { applyLibraryDelta } from "../helpers/library";
+
 import { JoinInfo, Role, RoomState } from "../types/Room";
 
 /** Handles the connection to the server. */
@@ -26,6 +29,8 @@ class Session extends EventEmitter {
    * Only set while joined.
    */
   joinToken?: string;
+
+  library: LibrarySnapshot | null = null;
 
   /**
    * When the server will take a room password again, in milliseconds since
@@ -74,6 +79,16 @@ class Session extends EventEmitter {
         withCredentials: true,
         parser: msgParser,
         transports: ["websocket"],
+      });
+      this.socket.on("library_snapshot", (snapshot: LibrarySnapshot) => {
+        this.library = snapshot;
+        this.emit("library", snapshot);
+      });
+      this.socket.on("library_delta", (delta: LibraryDelta) => {
+        if (this.library) {
+          this.library = applyLibraryDelta(this.library, delta);
+          this.emit("library", this.library);
+        }
       });
       this.socket.on("player_joined", this._handlePlayerJoined.bind(this));
       this.socket.on("player_left", this._handlePlayerLeft.bind(this));
@@ -154,6 +169,8 @@ class Session extends EventEmitter {
   _handleDisplayError() {
     this._left = true;
     this.joinToken = undefined;
+    this.library = null;
+    this.emit("library", null);
     this.emit("status", "display_error");
     this.socket?.disconnect();
   }
@@ -221,6 +238,8 @@ class Session extends EventEmitter {
     this._password = "";
     this._displayToken = undefined;
     this.joinToken = undefined;
+    this.library = null;
+    this.emit("library", null);
     this.emit("status", "room_deleted");
     this.socket?.disconnect();
   }
@@ -233,12 +252,14 @@ class Session extends EventEmitter {
   }
 
   _handleSocketDisconnect() {
+    this.joinToken = undefined;
+    this.library = null;
+    this.emit("library", null);
     // A disconnect that ends the visit, there is nothing to come back to
     if (this._left) {
       return;
     }
     // The server forgets the token when the socket disconnects
-    this.joinToken = undefined;
     this.emit("status", "reconnecting");
   }
 
@@ -279,6 +300,7 @@ export type RoomStateHandler = (room: RoomState) => void;
 export type RoleHandler = (role: Role) => void;
 
 declare interface Session {
+  on(event: "library", listener: (snapshot: LibrarySnapshot | null) => void): this;
   /** Display token replaced by this GM connection */
   on(event: "displayToken", listener: (token: string) => void): this;
   /** Session Status Event - Status of the session has changed */

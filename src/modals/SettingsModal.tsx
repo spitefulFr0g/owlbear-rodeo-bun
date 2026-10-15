@@ -20,7 +20,6 @@ import { useDatabase } from "../contexts/DatabaseContext";
 import useSetting from "../hooks/useSetting";
 
 import ConfirmModal from "./ConfirmModal";
-import ImportExportModal from "./ImportExportModal";
 
 import { RequestCloseEventHandler } from "../types/Events";
 
@@ -30,7 +29,7 @@ type SettingsModalProps = {
 };
 
 function SettingsModal({ isOpen, onRequestClose }: SettingsModalProps) {
-  const { database, databaseStatus } = useDatabase();
+  const { database } = useDatabase();
   const userId = useUserId();
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [labelSize, setLabelSize] = useSetting<number>("map.labelSize");
@@ -41,7 +40,6 @@ function SettingsModal({ isOpen, onRequestClose }: SettingsModalProps) {
   const [fogEditOpacity, setFogEditOpacity] =
     useSetting<number>("fog.editOpacity");
   const [storageEstimate, setStorageEstimate] = useState<StorageEstimate>();
-  const [isImportExportModalOpen, setIsImportExportModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
@@ -177,15 +175,6 @@ function SettingsModal({ isOpen, onRequestClose }: SettingsModalProps) {
               Erase All Content and Reset
             </Button>
           </Flex>
-          <Flex py={2}>
-            <Button
-              sx={{ flexGrow: 1 }}
-              onClick={() => setIsImportExportModalOpen(true)}
-              disabled={databaseStatus !== "loaded"}
-            >
-              Import / Export Data
-            </Button>
-          </Flex>
           {storageEstimate! && (
             <Flex sx={{ justifyContent: "center" }}>
               <Text variant="caption">
@@ -210,10 +199,6 @@ function SettingsModal({ isOpen, onRequestClose }: SettingsModalProps) {
         label="Erase All Content?"
         description="This will remove all data including saved maps and tokens."
         confirmText="Erase"
-      />
-      <ImportExportModal
-        isOpen={isImportExportModalOpen}
-        onRequestClose={() => setIsImportExportModalOpen(false)}
       />
     </>
   );

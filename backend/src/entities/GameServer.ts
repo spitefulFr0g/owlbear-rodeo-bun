@@ -1,4 +1,6 @@
-import { applyChange, visibleTo, changeFor, Item, Scene, mayChange, Person, checkChange, readBatch, topOrder, gmOwner, Change, SceneGrid, checkGrid, defaultSceneGrid, checkSceneName, maxScenes, readLive, dragFrom, dragFor, LiveMessage, maxLiveMessagesPerSecond, readPresence, PresenceUpdate, presenceSceneFor } from "../../../src/sceneRules";
+import LibraryService from "./LibraryService";
+import { mayPlaceImage } from "../../../src/sceneRules/library";
+import { ImageSource, applyChange, visibleTo, changeFor, Item, Scene, mayChange, Person, checkChange, readBatch, topOrder, gmOwner, Change, SceneGrid, checkGrid, defaultSceneGrid, checkSceneName, maxScenes, readLive, dragFrom, dragFor, LiveMessage, maxLiveMessagesPerSecond, readPresence, PresenceUpdate, presenceSceneFor } from "../../../src/sceneRules";
 import { randomBytes } from "crypto";
 import Accounts from "../accounts/Accounts";
 import { clientAddress } from "../clientRequest";
@@ -16,6 +18,7 @@ import JoinTokens from "./JoinTokens";
 import { playerColours, isPlayerColour } from "../types/PlayerColour";
 
 export default class GameServer {
+  library?: LibraryService;
   private readonly io: IOServer;
   private stopping = false;
   readonly gameRepo;
@@ -65,6 +68,15 @@ export default class GameServer {
   private person(socket: Socket, gameId: string): Person {
     return { role: socket.data.castDisplay ? "display" : this.playerRole(socket, gameId),
       id: socket.data.castDisplay ? "" : socket.data.role === "gm" ? gmOwner : socket.data.playerId };
+  }
+
+  private mayPlace(gameId: string, person: Person, image: ImageSource): boolean {
+    const accountId = this.gameRepo.games[gameId].gmAccountId ?? undefined;
+    return mayPlaceImage(image, { person, roomId: gameId, accountId,
+      assets: this.database ? [...this.database.library.visibleAssets({ kind: "room", id: gameId }),
+        ...this.database.library.visibleAssets({ kind: "account", id: accountId ?? "" })] : [],
+      placedFileIds: this.database?.placedFileIds(gameId) ?? new Set(),
+    });
   }
 
   private sceneFor(socket: Socket, gameId: string): Scene | null {
@@ -177,6 +189,7 @@ export default class GameServer {
     for (const gameId of this.gameRepo.loadRoomsInSession()) this.startSessionCountdown(gameId);
     this.io.on("connect", async (socket: Socket) => {
       const gameState = new GameState(this.io, socket, this.gameRepo);
+      this.library?.attach(socket, () => gameState.getGameId());
       let _gameId: string;
       let joining = false;
       const account = this.accounts?.resolveAccount(socket.request);
@@ -193,7 +206,7 @@ export default class GameServer {
       // refused here too, before any handler can change or forward state.
       socket.use(([event], next) => {
         if (
-          socket.data.castDisplay && !["get_display_token", "join_display", "room_switches", "room_trust", "room_password", "new_display_link", "session", "scene_create", "scene_view", "scene_rename", "scene_delete", "scene_show", "scene_settings", "scene_bring", "scene_welcome", "scene_duplicate"].includes(event)
+          socket.data.castDisplay && !["library_command", "get_display_token", "join_display", "room_switches", "room_trust", "room_password", "new_display_link", "session", "scene_create", "scene_view", "scene_rename", "scene_delete", "scene_show", "scene_settings", "scene_bring", "scene_welcome", "scene_duplicate"].includes(event)
         ) {
           return;
         }
@@ -233,6 +246,7 @@ export default class GameServer {
       });
 
       socket.on("disconnecting", async () => {
+        this.library?.disconnected(socket);
         this.joinTokens.revoke(socket.id);
         if (socket.data.castDisplay) return;
         try {
@@ -320,6 +334,7 @@ export default class GameServer {
           }
           // Only the player who joined gets the token for the asset routes
           const token = this.joinTokens.issue(socket.id, gameId, role);
+          this.library?.joined(socket, gameId);
           socket.emit("joined_game", socket.id, token, { role: this.playerRole(socket, gameId), color: socket.data.color, room: this.gameRepo.roomState(gameId) });
           this.viewScene(socket, gameId, role === "gm" || game.session ? game.openSceneId : game.welcomeSceneId);
           if (role === "gm") socket.emit("scene_list", this.sceneList(gameId));
@@ -358,6 +373,10 @@ export default class GameServer {
             (Object.hasOwn(payload, "fogFill") && typeof payload.fogFill !== "boolean") ||
             (Object.hasOwn(payload, "map") && (!payload.map || payload.map.kind !== "image" ||
               payload.map.layer !== "map" || checkChange(scene, { type: "add", item: payload.map })))) {
+          if (typeof answer === "function") answer({ ok: false, error: "invalid" });
+          return;
+        }
+        if (payload.map && payload.map.kind === "image" && !this.mayPlace(gameId, this.person(socket, gameId), payload.map.image)) {
           if (typeof answer === "function") answer({ ok: false, error: "invalid" });
           return;
         }
@@ -659,11 +678,12 @@ export default class GameServer {
           const id = change.type === "add" ? change.item.id : change.id;
           const before = Object.hasOwn(scene.items, id) ? scene.items[id] : undefined;
           const refusedItem = before && visibleTo(person, before) ? before : null;
-          if (checkChange(scene, change) ||
+          const targetImage = change.type === "add" && change.item.kind === "image" ? change.item.image :
+            change.type === "update" ? change.fields.image : undefined;
+          const placementAllowed = !targetImage || this.mayPlace(gameId, person, targetImage);
+          if (!placementAllowed || checkChange(scene, change) ||
               !mayChange(person, { switches: game.switches, viewOnly: scene.viewOnly, welcomeScreen: !game.session && game.welcomeSceneId === scene.id, knownImage: image =>
-                image.type === "default" || [image.file, image.thumbnail, ...Object.values(image.resolutions ?? {})]
-                  .filter((id): id is string => id !== undefined)
-                  .every(id => this.database?.roomHasAsset(gameId, id) ?? false) },
+                this.mayPlace(gameId, person, image) },
                 change.type === "add" ? undefined : before, change) ||
               (socket.data.role !== "gm" && !socket.data.playerId)) {
             refused.push({ id, item: refusedItem });
@@ -689,6 +709,7 @@ export default class GameServer {
           }
           scene = { ...result.scene, name: scene.name };
           game.scenes[scene.id] = scene;
+          this.database?.recordPlacedFiles(gameId, scene.items[id]);
           applied.push(actual);
           transitions.push({ before, after: Object.hasOwn(scene.items, id) ? scene.items[id] : undefined, change: actual });
         }

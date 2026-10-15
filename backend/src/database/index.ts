@@ -1,6 +1,7 @@
+import { LibraryRepository, documentFileIds } from "./library";
 import { Database } from "bun:sqlite";
 import { existsSync, mkdirSync, statSync } from "fs";
-import { inspectDatabase } from "./startup";
+import { inspectDatabase, upgradeSteps } from "./startup";
 import { dirname } from "path";
 import type { AssetRecord } from "../entities/AssetStore";
 
@@ -15,11 +16,13 @@ export interface RoomRecord {
   displayToken: string;
   switches?: string;
   trustedPlayerIds?: string;
+  quota?: number;
+  playerQuota?: number;
   documentVersion: number;
   document: string;
 }
 
-export const LAYOUT_VERSION = 3;
+export const LAYOUT_VERSION = 4;
 
 // All v0.2.0 tables belong here, in the same layout version. Nothing in
 // this release has shipped yet, so later tickets extend this declaration.
@@ -43,6 +46,8 @@ const layout = `
     passwordHash TEXT NOT NULL,
     displayToken TEXT NOT NULL,
     switches TEXT NOT NULL DEFAULT '{"tokens":true,"drawing":true,"notes":true,"fog":false,"uploads":false}',
+    quota INTEGER NOT NULL DEFAULT 2000000000,
+    playerQuota INTEGER NOT NULL DEFAULT 100000000,
     trustedPlayerIds TEXT NOT NULL DEFAULT '[]',
     documentVersion INTEGER NOT NULL,
     document TEXT NOT NULL
@@ -51,6 +56,7 @@ const layout = `
     id TEXT PRIMARY KEY,
     username TEXT NOT NULL COLLATE NOCASE UNIQUE,
     passwordHash TEXT NOT NULL,
+    quota INTEGER NOT NULL DEFAULT 2000000000,
     administrator INTEGER NOT NULL
   );
   CREATE TABLE IF NOT EXISTS sign_ins (
@@ -69,14 +75,28 @@ const layout = `
     accountId TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
     expiresAt INTEGER NOT NULL
   );
-  CREATE TABLE IF NOT EXISTS room_assets (
+  CREATE TABLE IF NOT EXISTS placed_files (
     roomId TEXT NOT NULL REFERENCES rooms(id) ON DELETE CASCADE,
-    assetId TEXT NOT NULL REFERENCES assets(id) ON DELETE CASCADE,
-    PRIMARY KEY (roomId, assetId)
+    fileId TEXT NOT NULL REFERENCES assets(id) ON DELETE CASCADE,
+    PRIMARY KEY (roomId, fileId)
   );
-  CREATE INDEX IF NOT EXISTS room_assets_asset ON room_assets(assetId);
+  CREATE INDEX IF NOT EXISTS placed_files_asset ON placed_files(fileId);
   CREATE TABLE IF NOT EXISTS room_sessions (
     roomId TEXT PRIMARY KEY REFERENCES rooms(id) ON DELETE CASCADE
+  );
+  CREATE TABLE IF NOT EXISTS library_assets (
+    id TEXT PRIMARY KEY, kind TEXT NOT NULL, libraryId TEXT NOT NULL, data TEXT NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS library_assets_library ON library_assets(kind, libraryId);
+  CREATE INDEX IF NOT EXISTS library_assets_visible ON library_assets(kind, libraryId, id)
+    WHERE COALESCE(json_extract(data, '$.uploading'), 0) = 0;
+  CREATE TABLE IF NOT EXISTS library_folders (
+    id TEXT PRIMARY KEY, kind TEXT NOT NULL, libraryId TEXT NOT NULL, data TEXT NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS library_folders_library ON library_folders(kind, libraryId);
+  CREATE TABLE IF NOT EXISTS library_files (
+    entryId TEXT NOT NULL REFERENCES library_assets(id) ON DELETE CASCADE,
+    fileId TEXT NOT NULL, PRIMARY KEY(entryId, fileId)
   );
   CREATE TABLE IF NOT EXISTS metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 `;
@@ -86,7 +106,7 @@ const roomRecords = "SELECT rooms.*, EXISTS (SELECT 1 FROM room_sessions WHERE r
 export class OwlbearDatabase {
   readonly connection: Database;
 
-  constructor(private readonly path: string, upgrades: readonly import("./startup").UpgradeStep[] = []) {
+  constructor(private readonly path: string, upgrades: readonly import("./startup").UpgradeStep[] = upgradeSteps) {
     mkdirSync(dirname(path), { recursive: true });
     const existing = existsSync(path);
     const version = existing ? inspectDatabase(path, LAYOUT_VERSION) : LAYOUT_VERSION;
@@ -96,7 +116,14 @@ export class OwlbearDatabase {
         for (const step of upgrades) {
           if (step.version > version && step.version <= LAYOUT_VERSION) this.connection.exec(step.sql);
         }
+        if (existing && version < 4) {
+          for (const [table, column, value] of [["rooms", "quota", 2000000000], ["rooms", "playerQuota", 100000000], ["accounts", "quota", 2000000000]] as const) {
+            const columns = this.connection.query<{ name: string }, []>(`PRAGMA table_info(${table})`).all();
+            if (columns.length && !columns.some(field => field.name === column)) this.connection.exec(`ALTER TABLE ${table} ADD COLUMN ${column} INTEGER NOT NULL DEFAULT ${value}`);
+          }
+        }
         this.connection.exec(layout);
+        this.library.initializeUsage();
         if (!existing || version < LAYOUT_VERSION) {
           this.connection.exec(`PRAGMA user_version = ${LAYOUT_VERSION}`);
         }
@@ -153,36 +180,65 @@ export class OwlbearDatabase {
       .reduce((total, path) => total + (existsSync(path) ? statSync(path).size : 0), 0);
   }
 
-  /** Saved UTF-8 document bytes plus each image this room has used. */
+  /** Library references count in full; placed files outside that library count once. */
   roomSizeBytes(roomId: string): number {
-    return this.connection.query<{ sizeBytes: number }, [string]>(`
+    const usage = this.library.usage({ kind: "room", id: roomId });
+    return (this.connection.query<{ sizeBytes: number }, [string]>(`
       SELECT length(CAST(document AS BLOB)) + COALESCE((
-        SELECT SUM(assets.size) FROM room_assets
-        JOIN assets ON assets.id = room_assets.assetId WHERE room_assets.roomId = rooms.id
-      ), 0) AS sizeBytes FROM rooms WHERE id = ?`).get(roomId)?.sizeBytes ?? 0;
+        SELECT SUM(assets.size) FROM assets JOIN placed_files ON fileId = assets.id
+        WHERE roomId = rooms.id AND NOT EXISTS (
+          SELECT 1 FROM library_files JOIN library_assets ON entryId = library_assets.id
+          WHERE library_files.fileId = assets.id AND kind = 'room' AND libraryId = rooms.id)
+      ), 0) AS sizeBytes FROM rooms WHERE id = ?`).get(roomId)?.sizeBytes ?? 0) + usage.bytes + usage.reservedBytes;
   }
 
-  roomHasAsset(roomId: string, assetId: string): boolean {
-    return !!this.connection.query("SELECT 1 FROM room_assets WHERE roomId = ? AND assetId = ?").get(roomId, assetId);
+  accountLibrarySizeBytes(accountId: string): number {
+    const usage = this.library.usage({ kind: "account", id: accountId });
+    return usage.bytes + usage.reservedBytes;
   }
 
-  recordRoomAsset(roomId: string, assetId: string): void {
-    this.connection.query(`INSERT OR IGNORE INTO room_assets (roomId, assetId)
+  private recordPlacedFile(roomId: string, fileId: string): void {
+    this.connection.query(`INSERT OR IGNORE INTO placed_files (roomId, fileId)
       SELECT rooms.id, assets.id FROM rooms, assets WHERE rooms.id = ? AND assets.id = ?`)
-      .run(roomId, assetId);
+      .run(roomId, fileId);
   }
 
   deleteRoom(roomId: string): AssetRecord[] {
     return this.transaction(() => {
-      const unused = this.connection.query<AssetRecord, [string]>(`
-        SELECT assets.* FROM assets JOIN room_assets ON room_assets.assetId = assets.id
-        WHERE room_assets.roomId = ? AND NOT EXISTS (
-          SELECT 1 FROM room_assets other WHERE other.assetId = assets.id AND other.roomId != room_assets.roomId
-        )`).all(roomId);
-      this.connection.query("DELETE FROM room_assets WHERE roomId = ?").run(roomId);
+      for (const entry of this.library.assets({ kind: "room", id: roomId })) this.library.deleteAsset(entry.id);
+      for (const folder of this.library.folders({ kind: "room", id: roomId })) this.library.deleteFolder(folder.id);
+      this.connection.query("DELETE FROM placed_files WHERE roomId = ?").run(roomId);
       this.connection.query("DELETE FROM room_sessions WHERE roomId = ?").run(roomId);
       this.connection.query("DELETE FROM rooms WHERE id = ?").run(roomId);
-      for (const asset of unused) this.deleteAsset(asset.id);
+      return this.collectUnusedFiles();
+    });
+  }
+
+  readonly library = new LibraryRepository(this);
+
+  placedFileIds(roomId: string): Set<string> {
+    return new Set(this.connection.query<{ fileId: string }, [string]>("SELECT fileId FROM placed_files WHERE roomId = ?").all(roomId).map(row => row.fileId));
+  }
+
+  recordPlacedFiles(roomId: string, document: unknown): void {
+    for (const id of documentFileIds(document)) this.recordPlacedFile(roomId, id);
+  }
+
+  rebuildPlacedFiles(): void {
+    this.transaction(() => {
+      this.connection.exec("DELETE FROM placed_files");
+      for (const room of this.connection.query<{ id: string; document: string }, []>("SELECT id, document FROM rooms").all()) {
+        this.recordPlacedFiles(room.id, JSON.parse(room.document));
+      }
+    });
+  }
+
+  collectUnusedFiles(): AssetRecord[] {
+    return this.transaction(() => {
+      const unused = this.connection.query<AssetRecord, []>(`SELECT * FROM assets WHERE
+        NOT EXISTS (SELECT 1 FROM placed_files WHERE fileId = assets.id) AND
+        NOT EXISTS (SELECT 1 FROM library_files WHERE fileId = assets.id)`).all();
+      for (const file of unused) this.deleteAsset(file.id);
       return unused;
     });
   }

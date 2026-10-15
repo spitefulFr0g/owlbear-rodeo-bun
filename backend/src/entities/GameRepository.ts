@@ -69,6 +69,7 @@ export default class GameRepository {
       name: game.name, gmAccountId: game.gmAccountId, hasPassword: Number(game.hasPassword), session: Number(game.session),
       trustedPlayerIds: JSON.stringify([...game.trustedPlayerIds]),
       switches: JSON.stringify(game.switches), displayToken: game.displayToken, documentVersion: 3, document: JSON.stringify({ openSceneId: game.openSceneId, welcomeSceneId: game.welcomeSceneId, scenes: game.scenes }) });
+    this.database?.recordPlacedFiles(gameId, game.scenes);
     this.pending.get(gameId)?.cancel();
     this.pending.delete(gameId);
   }

@@ -47,6 +47,9 @@ function run(command) {
   if (command === "check") execFileSync(process.execPath, [path.join(root, "scripts/frontend.test.cjs")], {
     cwd: root, stdio: "inherit",
   });
+  if (command === "check") execFileSync(process.execPath, ["--test", path.join(root, "scripts/checks.test.cjs")], {
+    cwd: root, stdio: "inherit",
+  });
   const commands = {
     typecheck: ["typescript/bin/tsc", "--noEmit"],
     lint: ["eslint/bin/eslint.js", "--ext", ".js,.jsx,.ts,.tsx", "src", "--max-warnings=0"],

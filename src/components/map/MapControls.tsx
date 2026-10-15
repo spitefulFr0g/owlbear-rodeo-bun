@@ -6,8 +6,6 @@ import RadioIconButton from "../RadioIconButton";
 import Divider from "../Divider";
 import SceneControls from "../scene/SceneControls";
 
-import ScenesButton from "../scene/ScenesButton";
-
 import ExpandMoreIcon from "../../icons/ExpandMoreIcon";
 import FullScreenIcon from "../../icons/FullScreenIcon";
 import FullScreenExitIcon from "../../icons/FullScreenExitIcon";
@@ -23,8 +21,6 @@ import { Settings } from "../../types/Settings";
 import { useKeyboard } from "../../contexts/KeyboardContext";
 
 import shortcuts from "../../shortcuts";
-import { useRole } from "../../contexts/RoomContext";
-import { getRoleControls } from "../../helpers/roomControls";
 import { useScene, useToolPermissions } from "../../scene/SceneContext";
 import { fogItems } from "../../scene/fogItem";
 import { drawingsInOrder } from "../../scene/drawingItem";
@@ -49,7 +45,6 @@ function MapContols({
 
   const permissions = useToolPermissions();
   const { scene, readOnly, canChange, undo: onUndo, redo: onRedo, canUndo, canRedo } = useScene();
-  const isGM = getRoleControls(useRole()).hidden;
 
   const disabledSettings = useMemo(() => {
     const disabled: Partial<Record<keyof Settings, string[]>> = {
@@ -82,10 +77,6 @@ function MapContols({
   }, [selectedToolId, disabledControls, onSelectedToolChange]);
 
   const sections = [
-    {
-      id: "map",
-      component: <ScenesButton />,
-    },
     { id: "scene", component: <SceneControls /> },
     {
       id: "tools",
@@ -116,23 +107,10 @@ function MapContols({
         </>
       ),
     },
-  ].filter((section) => section.id !== "map" || isGM);
+  ];
 
   let controls = null;
-  if (sections.length === 1 && sections[0].id === "map") {
-    controls = (
-      <Box
-        sx={{
-          display: "block",
-          backgroundColor: "overlay",
-          borderRadius: "4px",
-        }}
-        m={2}
-      >
-        {sections[0].component}
-      </Box>
-    );
-  } else if (sections.length > 0) {
+  if (sections.length > 0) {
     controls = (
       <>
         <IconButton

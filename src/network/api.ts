@@ -1,3 +1,8 @@
+import type {
+  AccountLibrarySummary,
+  AdministratorLibraryQuotas,
+} from "../sceneRules/library";
+
 /** An account on the server */
 export type Account = {
   id: string;
@@ -105,9 +110,14 @@ export function signOut() {
   return request<void>("POST", "/sign-out");
 }
 
-export async function listRooms() {
-  const { rooms } = await request<{ rooms: Room[] }>("GET", "/rooms");
-  return rooms;
+/** How much the account's own library holds, and how much it may */
+export type AccountLibrary = AccountLibrarySummary;
+
+export function listRooms() {
+  return request<{ rooms: Room[]; accountLibrary?: AccountLibrary }>(
+    "GET",
+    "/rooms"
+  );
 }
 
 export async function createRoom(name: string, password: string) {
@@ -195,13 +205,42 @@ export function changePassword(currentPassword: string, newPassword: string) {
   });
 }
 
-export type AdministratorRoom = Room & { gm: { id: string; username: string } };
+export type AdministratorRoom = Room & {
+  gm: { id: string; username: string };
+  /** Room library quota in bytes, missing on servers without libraries */
+  quota?: number;
+  playerQuota?: number;
+};
 
 export function listAdministratorRooms() {
   return request<{ rooms: AdministratorRoom[]; totalBytes: number }>(
     "GET",
     "/admin/rooms"
   );
+}
+
+export function getLibraryQuotas() {
+  return request<AdministratorLibraryQuotas>("GET", "/admin/library-quotas");
+}
+
+// The library endpoints answer a refusal with its plain reason as `error`
+async function setQuota(path: string, bytes: number) {
+  try {
+    await request<{ ok: true }>("PATCH", path, { bytes });
+  } catch (error) {
+    if (error instanceof ApiError && [400, 404].includes(error.status)) {
+      throw new ApiError("quota_refused", error.code, error.status);
+    }
+    throw error;
+  }
+}
+
+export function setRoomQuota(id: string, bytes: number) {
+  return setQuota(`/admin/rooms/${encodeURIComponent(id)}/quota`, bytes);
+}
+
+export function setAccountQuota(id: string, bytes: number) {
+  return setQuota(`/admin/accounts/${encodeURIComponent(id)}/quota`, bytes);
 }
 
 export function setAdministrator(id: string, administrator: boolean) {

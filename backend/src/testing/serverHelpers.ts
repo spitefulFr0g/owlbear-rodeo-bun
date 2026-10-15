@@ -7,6 +7,8 @@ import { Batch, Change, Item, Scene } from "../../../src/sceneRules";
 import { Clock } from "../clock";
 import { RunningServer, startServer } from "../server";
 
+export { beginLibrary, libraryCommand, libraryMetadata, uploadLibrary } from "./libraryHelpers";
+
 export class TestClock implements Clock {
   maximumScheduledDelay = 0;
   private time: number;
@@ -101,7 +103,7 @@ export async function startTestServer(prepare?: (dataDir: string) => Promise<voi
       });
     },
     stop: () => server.stop(),
-    async restart(overrides: { reopenSetup?: boolean; behindProxy?: boolean } = {}) {
+    async restart(overrides: { reopenSetup?: boolean; behindProxy?: boolean; maxLibraryAssets?: number } = {}) {
       await server.stop();
       for (const socket of sockets) socket.disconnect();
       sockets.clear();

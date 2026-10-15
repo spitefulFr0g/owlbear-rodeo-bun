@@ -49,7 +49,7 @@ jobs:
         working-directory: backend
         run: bun run build:frontend
       - run: yarn check:frontend
-      - run: bun test
+      - run: bun run test
         working-directory: backend
       - run: bun run typecheck
         working-directory: backend

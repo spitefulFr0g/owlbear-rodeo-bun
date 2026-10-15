@@ -1,37 +1,10 @@
 #!/bin/sh
-# Runs the checks CI runs, for the half of the repo the commit touches.
-# Quiet when they pass; prints the end of the failing check's output when not.
-# Turn it on once per clone: git config core.hooksPath .githooks
-root=$(git rev-parse --show-toplevel) || exit 1
+# The same checks run locally, in guarded merges and in CI.
+set -eu
+root=$(git rev-parse --show-toplevel)
 log=$(mktemp)
 trap 'rm -f "$log"' EXIT
-
-check() {
-  if ! "$@" >"$log" 2>&1; then
-    echo "pre-commit: '$*' failed in $(pwd)" >&2
-    tail -n 40 "$log" >&2
-    exit 1
-  fi
-}
-
-# The frontend is everything outside backend/ and the docs, so a new file at
-# the root is checked without being listed here.
-frontend=$(git diff --cached --name-only | grep -v -e '^backend/' -e '^docs/' -e '\.md$')
-backend=$(git diff --cached --name-only -- backend src/sceneRules src/scene package.json yarn.lock)
-
-if [ -n "$frontend" ] || [ -n "$backend" ]; then
-  cd "$root" || exit 1
-  check node scripts/frontend.cjs setup
-fi
-
-if [ -n "$backend" ]; then
-  cd "$root/backend" || exit 1
-  check bun run typecheck
-  check bun run test
-  check bun run lint
-fi
-
-if [ -n "$frontend" ]; then
-  cd "$root" || exit 1
-  check node scripts/frontend.cjs check
+if ! node "$root/scripts/checks.cjs" staged >"$log" 2>&1; then
+  tail -n 60 "$log" >&2
+  exit 1
 fi

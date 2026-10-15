@@ -1,12 +1,12 @@
 {
   "name": "owlbear-rodeo-server",
-  "version": "0.4.1",
+  "version": "0.5.0",
   "description": "",
   "type": "module",
   "scripts": {
     "start": "bun scripts/embed-frontend.ts && bun src/index.ts",
     "dev": "bun scripts/embed-frontend.ts && bun --watch src/index.ts --allow-origin '^http://localhost:3000$'",
-    "test": "bun test ./src ../src/sceneRules ../src/scene",
+    "test": "node ../scripts/checks.cjs backend-test",
     "typecheck": "bun scripts/embed-frontend.ts && tsc --noEmit",
     "build:frontend": "bun scripts/build-frontend.ts",
     "build": "bun scripts/build.ts",

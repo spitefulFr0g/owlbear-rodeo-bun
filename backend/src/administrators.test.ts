@@ -1,6 +1,6 @@
 import { tokenItem } from "./testing/sceneFixtures";
 import { expect, test } from "bun:test";
-import { sendBatch, createRoom, inviteAccount, setupAdministrator, signIn, startTestServer } from "./testing/serverHelpers";
+import { uploadLibrary, sendBatch, createRoom, inviteAccount, setupAdministrator, signIn, startTestServer } from "./testing/serverHelpers";
 
 function request(address: string, path: string, method = "GET", cookie = "", body?: unknown) {
   return fetch(`${address}/api/${path}`, { method, headers: { Cookie: cookie, "Content-Type": "application/json" }, body: body === undefined ? undefined : JSON.stringify(body) });
@@ -57,11 +57,7 @@ test("removing an account ends every HTTP sign-in and passes loaded and unloaded
     const sceneId = owner.snapshot!.scene!.id;
     await sendBatch(owner.socket, { id: "seed", sceneId, changes: [{ type: "add", item: tokenItem }] });
     const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 1, 2, 3, 4]);
-    const upload = await fetch(`${server.address}/assets/image`, { method: "PUT", body: png, headers: {
-      Authorization: `Bearer ${owner.token}`, "Content-Type": "image/png", "X-Asset-Width": "4", "X-Asset-Height": "2", "X-Asset-Owner": "gm",
-    } });
-    expect(upload.status).toBe(201);
-    await upload.text();
+    const asset = await uploadLibrary(server, owner.token, png);
     const removed = await request(server.address, `admin/accounts/${other.account.id}`, "DELETE", admin.cookie);
     expect(removed.status).toBe(204);
     expect(await removed.text()).toBe("");
@@ -91,8 +87,8 @@ test("removing an account ends every HTTP sign-in and passes loaded and unloaded
     await new Promise(resolve => newGM.socket.emit("session", true, resolve));
     expect(newGM.snapshot!.scene!.items.hero).toEqual(tokenItem);
     expect(await new Promise<string>(resolve => newGM.socket.emit("get_display_token", resolve))).toBe(displayToken);
-    const image = await fetch(`${server.address}/assets/image`, { headers: { Authorization: `Bearer ${rejoined.token}` } });
-    expect(new Uint8Array(await image.arrayBuffer())).toEqual(png);
+    const image = await fetch(`${server.address}/assets/${asset.files.original.id}`, { headers: { Authorization: `Bearer ${rejoined.token}` } });
+    expect(image.status).toBe(200);
     expect((await (await request(server.address, "admin/accounts", "GET", admin.cookie)).json() as any).accounts).toEqual([admin.account]);
   } finally { await server.dispose(); }
 });

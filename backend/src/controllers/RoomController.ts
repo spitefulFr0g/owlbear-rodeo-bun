@@ -31,6 +31,8 @@ export default class RoomController {
         const rooms = this.database.administratorRooms().map(room => ({
           id: room.id, name: room.name, hasPassword: !!room.hasPassword,
           sizeBytes: this.database.roomSizeBytes(room.id),
+          quota: this.database.library.quota({ kind: "room", id: room.id }),
+          playerQuota: this.database.library.playerQuota(room.id),
           gm: { id: room.gmAccountId, username: room.gmUsername },
         }));
         res.json({ rooms, totalBytes: await this.totalBytes() });
@@ -46,7 +48,7 @@ export default class RoomController {
       next();
     });
     router.get("/rooms", (_req, res) => {
-      res.json({ rooms: this.database.roomsForGM(res.locals.account.id).map(room => ({ id: room.id, name: room.name, hasPassword: !!room.hasPassword, sizeBytes: this.database.roomSizeBytes(room.id) })) });
+      res.json({ accountLibrary: { sizeBytes: this.database.accountLibrarySizeBytes(res.locals.account.id), quota: this.database.library.quota({ kind: "account", id: res.locals.account.id }) }, rooms: this.database.roomsForGM(res.locals.account.id).map(room => ({ id: room.id, name: room.name, hasPassword: !!room.hasPassword, sizeBytes: this.database.roomSizeBytes(room.id) })) });
     });
     router.post("/rooms", roomName, async (req, res, next) => {
       try {
