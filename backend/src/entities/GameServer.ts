@@ -73,8 +73,8 @@ export default class GameServer {
   private mayPlace(gameId: string, person: Person, image: ImageSource): boolean {
     const accountId = this.gameRepo.games[gameId].gmAccountId ?? undefined;
     return mayPlaceImage(image, { person, roomId: gameId, accountId,
-      assets: this.database ? [...this.database.library.assets({ kind: "room", id: gameId }),
-        ...this.database.library.assets({ kind: "account", id: accountId ?? "" })] : [],
+      assets: this.database ? [...this.database.library.visibleAssets({ kind: "room", id: gameId }),
+        ...this.database.library.visibleAssets({ kind: "account", id: accountId ?? "" })] : [],
       placedFileIds: this.database?.placedFileIds(gameId) ?? new Set(),
     });
   }
