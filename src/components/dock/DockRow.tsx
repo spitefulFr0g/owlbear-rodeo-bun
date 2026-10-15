@@ -46,6 +46,17 @@ export function Thumbnail({ asset, size = 24 }: { asset: LibraryViewAsset; size?
   );
 }
 
+/** Use the standard keyboard menu keys at the focused row, not at the pointer. */
+export function openKeyboardMenu(event: React.KeyboardEvent) {
+  if (event.key !== "ContextMenu" && !(event.shiftKey && event.key === "F10")) return;
+  event.preventDefault();
+  event.stopPropagation();
+  const rect = event.currentTarget.getBoundingClientRect();
+  event.currentTarget.dispatchEvent(new MouseEvent("contextmenu", {
+    bubbles: true, cancelable: true, clientX: rect.left, clientY: rect.bottom,
+  }));
+}
+
 type DockRowProps = {
   asset: LibraryViewAsset;
   caption?: string;
@@ -65,8 +76,10 @@ function DockRow({ asset, caption, depth = 0, title, onClick, onContextMenu }: D
       title={title}
       onClick={onClick}
       onKeyDown={(event) => {
+        openKeyboardMenu(event);
         if (onClick && (event.key === "Enter" || event.key === " ")) {
           event.preventDefault();
+          event.stopPropagation();
           onClick();
         }
       }}

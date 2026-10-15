@@ -1,7 +1,7 @@
 import React from "react";
 import { Box, Flex, Text } from "theme-ui";
 
-import { Thumbnail } from "../dock/DockRow";
+import { openKeyboardMenu, Thumbnail } from "../dock/DockRow";
 import GroupIcon from "../../icons/GroupIcon";
 
 import { dockTabLabels } from "../../helpers/dock";
@@ -31,11 +31,14 @@ function Item({ selected, title, onClick, onDoubleClick, onContextMenu, children
       onClick={onClick}
       onDoubleClick={onDoubleClick}
       onKeyDown={(event) => {
+        if (onContextMenu) openKeyboardMenu(event);
         if (event.key === " ") {
           event.preventDefault();
+          event.stopPropagation();
           onClick();
         } else if (event.key === "Enter") {
           event.preventDefault();
+          event.stopPropagation();
           (onDoubleClick || onClick)();
         }
       }}

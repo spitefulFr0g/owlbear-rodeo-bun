@@ -6,9 +6,11 @@ type DraggableProps = {
   id: string;
   children: React.ReactNode;
   data?: Data;
+  /** The child supplies its own focusable placement/selection action. */
+  interactiveChild?: boolean;
 };
 
-function Draggable({ id, children, data }: DraggableProps) {
+function Draggable({ id, children, data, interactiveChild }: DraggableProps) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id,
     data,
@@ -21,7 +23,9 @@ function Draggable({ id, children, data }: DraggableProps) {
   };
 
   return (
-    <div ref={setNodeRef} style={style} {...listeners} {...attributes}>
+    <div ref={setNodeRef} style={style} {...listeners} {...attributes}
+      role={interactiveChild ? undefined : attributes.role}
+      tabIndex={interactiveChild ? -1 : attributes.tabIndex}>
       {children}
     </div>
   );

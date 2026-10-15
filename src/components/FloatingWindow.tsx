@@ -1,4 +1,4 @@
-import React, { useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Box, Close, Flex, Text } from "theme-ui";
 
@@ -27,7 +27,27 @@ function FloatingWindow({
   colour,
   children,
 }: FloatingWindowProps) {
+  const windowRef = useRef<HTMLDivElement>(null);
   const [position, setPosition] = useState(initial);
+  const clamp = useCallback((point: { x: number; y: number }) => {
+    return {
+      x: Math.max(8, Math.min(point.x, window.innerWidth - Math.min(width, window.innerWidth - 16) - 8)),
+      y: Math.max(8, Math.min(point.y, window.innerHeight - Math.min(height, window.innerHeight - 16) - 8)),
+    };
+  }, [width, height]);
+  useEffect(() => {
+    const previous = document.activeElement;
+    windowRef.current?.focus();
+    return () => {
+      if (previous instanceof HTMLElement && previous.isConnected) previous.focus();
+    };
+  }, []);
+  useEffect(() => {
+    const fit = () => setPosition(point => clamp(point));
+    fit();
+    window.addEventListener("resize", fit);
+    return () => window.removeEventListener("resize", fit);
+  }, [clamp]);
   const dragRef = useRef<{ x: number; y: number } | null>(null);
 
   function handlePointerDown(event: React.PointerEvent<HTMLDivElement>) {
@@ -40,10 +60,7 @@ function FloatingWindow({
     const offset = dragRef.current;
     if (!offset) return;
     // Keep the title bar on screen so the window can always be grabbed again
-    setPosition({
-      x: Math.min(Math.max(event.clientX - offset.x, 0), window.innerWidth - 80),
-      y: Math.min(Math.max(event.clientY - offset.y, 0), window.innerHeight - 40),
-    });
+    setPosition(clamp({ x: event.clientX - offset.x, y: event.clientY - offset.y }));
   }
 
   function handlePointerUp() {
@@ -52,13 +69,16 @@ function FloatingWindow({
 
   return createPortal(
     <Flex
+      ref={windowRef}
+      tabIndex={-1}
       role="dialog"
       aria-label={title}
       sx={{
         position: "fixed",
-        left: position.x,
-        top: position.y,
+        left: `${position.x}px`,
+        top: `${position.y}px`,
         width,
+        maxWidth: "calc(100vw - 16px)",
         height,
         maxHeight: "calc(100vh - 16px)",
         flexDirection: "column",
@@ -87,7 +107,18 @@ function FloatingWindow({
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerUp}
       >
-        <Text variant="heading" sx={{ flexGrow: 1, fontSize: 1, color: colour ? "white" : "text" }}>
+        <Text
+          as="button"
+          aria-label={`Move ${title}; use arrow keys`}
+          onKeyDown={(event: React.KeyboardEvent) => {
+            const delta = { ArrowLeft: [-16, 0], ArrowRight: [16, 0], ArrowUp: [0, -16], ArrowDown: [0, 16] }[event.key];
+            if (!delta) return;
+            event.preventDefault();
+            event.stopPropagation();
+            setPosition(point => clamp({ x: point.x + delta[0], y: point.y + delta[1] }));
+          }}
+          sx={{ flexGrow: 1, fontSize: 1, color: colour ? "white" : "text", bg: "transparent", border: "none", textAlign: "left", cursor: "move" }}
+        >
           {title}
         </Text>
         <Close
