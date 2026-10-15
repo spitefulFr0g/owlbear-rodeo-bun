@@ -70,3 +70,36 @@ export function browserImportRecord(record: BrowserMap | Token, groups: Group[])
     folderName: folder?.type === "group" ? folder.name : undefined,
     outline: "outline" in record ? record.outline : { type: "rect" as const, x: 0, y: 0, width: record.width, height: record.height } };
 }
+
+/** Which account asset each browser original became, recorded by the browser that imported it */
+export type ImportMarks = Record<string, string>;
+
+/**
+ * The asset an earlier import made from this original, while it is still in
+ * the account library. A rerun skips it without reserving quota, so a nearly
+ * full library can still finish an interrupted import.
+ */
+export function importedAsset(marks: ImportMarks, assets: LibraryAsset[], accountId: string, originalId: string): LibraryAsset | undefined {
+  const id = marks[originalId];
+  return id === undefined ? undefined : assets.find(asset => asset.id === id && !asset.uploading &&
+    asset.library.kind === "account" && asset.library.id === accountId);
+}
+
+const importMarksKey = (accountId: string) => `owlbear.libraryImport.${accountId}`;
+
+export function rememberedImports(accountId: string): ImportMarks {
+  try {
+    const marks = JSON.parse(localStorage.getItem(importMarksKey(accountId)) || "{}");
+    return marks && typeof marks === "object" && !Array.isArray(marks) ? marks : {};
+  } catch {
+    return {};
+  }
+}
+
+export function rememberImports(accountId: string, marks: ImportMarks) {
+  try {
+    localStorage.setItem(importMarksKey(accountId), JSON.stringify(marks));
+  } catch {
+    // A rerun then relies on the server finding each duplicate.
+  }
+}

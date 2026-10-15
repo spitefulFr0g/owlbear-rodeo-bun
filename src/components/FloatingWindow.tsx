@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Box, Close, Flex, Text } from "theme-ui";
+import { ownKeys } from "../contexts/KeyboardContext";
 
 type FloatingWindowProps = {
   title: string;
@@ -73,6 +74,7 @@ function FloatingWindow({
       tabIndex={-1}
       role="dialog"
       aria-label={title}
+      {...ownKeys}
       sx={{
         position: "fixed",
         left: `${position.x}px`,

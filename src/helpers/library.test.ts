@@ -1,6 +1,6 @@
 import { sceneLibraryMap } from "./libraryScene";
 import { sceneFromMap } from "../scene/mapItem";
-import { applyLibraryDelta, browserImportRecord, dropPositions, filenameGridSize, libraryDefaults, libraryImage, libraryItem } from "./library";
+import { applyLibraryDelta, browserImportRecord, dropPositions, filenameGridSize, importedAsset, libraryDefaults, libraryImage, libraryItem } from "./library";
 import { defaultSceneGrid } from "../sceneRules";
 import { LibraryAsset, LibrarySnapshot } from "../sceneRules/library";
 import { FileMap } from "../types/Map";
@@ -96,4 +96,15 @@ test("a new scene aligns the saved small grid and retains every stored quality c
   expect(scene.map.scale).toEqual({ x: 1.5, y: 1.5 });
   expect(scene.map.locked).toBe(true);
   expect(asset.defaults.grid.size).toEqual({ x: 10, y: 8 });
+});
+
+test("a rerun skips an original only while the asset it became is still in the account library", () => {
+  const imported: LibraryAsset = { ...asset, id: "imported", library: { kind: "account", id: "account" } };
+  const marks = { "old-file": "imported" };
+  expect(importedAsset(marks, [imported], "account", "old-file")).toBe(imported);
+  expect(importedAsset(marks, [imported], "account", "other-file")).toBeUndefined();
+  expect(importedAsset(marks, [], "account", "old-file")).toBeUndefined();
+  expect(importedAsset(marks, [{ ...imported, library: { kind: "room", id: "room" } }], "account", "old-file")).toBeUndefined();
+  expect(importedAsset(marks, [imported], "another account", "old-file")).toBeUndefined();
+  expect(importedAsset(marks, [{ ...imported, uploading: true }], "account", "old-file")).toBeUndefined();
 });

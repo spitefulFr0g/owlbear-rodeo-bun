@@ -53,7 +53,7 @@ function SceneImporter({ onCancel, onCreated, refusal }: SceneImporterProps) {
   }
   return map ? <ImportSceneModal key={map.id} isOpen label="New scene from a map" map={map}
     confirmText="Create scene" pickText="Choose another map" onPickAnother={() => setSelected(undefined)}
-    onCancel={onCancel} onSaveMap={saveMap} onConfirm={create} /> :
+    onCancel={onCancel} onSaveMap={saveMap} onConfirm={create} fetchFile={library.fetchFile} /> :
     <Modal isOpen contentLabel="New scene" allowClose={!busy} onRequestClose={busy ? undefined : onCancel}>
       <><Label htmlFor="emptySceneName">New empty scene</Label>
       <Input id="emptySceneName" value={name} maxLength={100} onChange={event => setName(event.target.value)} />

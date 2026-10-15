@@ -12,6 +12,7 @@ import { editorCommand, editorDraft, EditorDraft, editorMap, editorToken, previe
 import { getGridUpdatedInset } from "../../helpers/grid";
 import { assetTypes, AssetType, LibraryAsset, maySetAssetType } from "../../sceneRules/library";
 import { Person } from "../../sceneRules/types";
+import { maxTextLength } from "../../sceneRules/caps";
 import { Grid, GridMeasurementType, GridType } from "../../types/Grid";
 
 const gridTypes: { value: GridType; label: string }[] = [
@@ -262,6 +263,7 @@ function AssetEditor({ asset, person, onClose }: AssetEditorProps) {
               <Input
                 id="assetLabel"
                 value={draft.defaults.defaultLabel}
+                maxLength={maxTextLength}
                 autoComplete="off"
                 onChange={(event) => changeDefaults({ defaultLabel: event.target.value })}
                 my={1}

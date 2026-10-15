@@ -8,6 +8,7 @@ import { useDatabase } from "./DatabaseContext";
 import useDebounce from "../hooks/useDebounce";
 
 import { omit } from "../helpers/shared";
+import { shownFile } from "../helpers/shownFile";
 import { Asset } from "../types/Asset";
 
 export type GetAssetEventHanlder = (
@@ -318,28 +319,9 @@ export function useDataURL(
   const [assetId, setAssetId] = useState<string | null>(null);
 
   useEffect(() => {
-    function loadAssetId() {
-      if (!data) {
-        return;
-      }
-      if (data.type === "default") {
-        setAssetId(data.key);
-      } else {
-        if (thumbnail && data.thumbnail) {
-          setAssetId(data.thumbnail);
-        } else if (
-          data.resolutions &&
-          data.quality &&
-          data.quality !== "original"
-        ) {
-          setAssetId(data.resolutions[data.quality]);
-        } else {
-          setAssetId(data.file);
-        }
-      }
+    if (data) {
+      setAssetId(shownFile(data, thumbnail) || null);
     }
-
-    loadAssetId();
   }, [data, thumbnail]);
 
   const assetURL = useAssetURL(

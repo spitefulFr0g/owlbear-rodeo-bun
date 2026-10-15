@@ -3,6 +3,7 @@ import express, { Router } from "express";
 import type { Server, Socket } from "socket.io";
 import { assetBytes, checkAssetCount, checkFolderCount, checkLibraryName, maySetAssetType, mayUpload, quotaError, sameLibrary, storedFileRoles } from "../../../src/sceneRules/library";
 import type { LibraryAsset, LibraryBegin, LibraryCommand, LibraryFiles, LibraryFolder, LibraryIdentity, LibrarySnapshot, LibraryDelta, LibraryReservation, LibraryRole } from "../../../src/sceneRules/library";
+import { maxTextLength } from "../../../src/sceneRules";
 import type { Clock } from "../clock";
 import type { OwlbearDatabase } from "../database";
 import type Accounts from "../accounts/Accounts";
@@ -179,7 +180,7 @@ export default class LibraryService {
     const defaults = value.defaults;
     const grid = defaults?.grid;
     const point = (p: any) => p && Number.isFinite(p.x) && Number.isFinite(p.y);
-    if (!defaults || !Number.isFinite(defaults.defaultSize) || defaults.defaultSize <= 0 || typeof defaults.defaultLabel !== "string" ||
+    if (!defaults || !Number.isFinite(defaults.defaultSize) || defaults.defaultSize <= 0 || typeof defaults.defaultLabel !== "string" || defaults.defaultLabel.length > maxTextLength ||
       !grid || !point(grid.size) || grid.size.x <= 0 || grid.size.y <= 0 || !point(grid.inset?.topLeft) || !point(grid.inset?.bottomRight) ||
       !["square", "hexVertical", "hexHorizontal"].includes(grid.type) || !["chebyshev", "alternating", "euclidean", "manhattan"].includes(grid.measurement?.type) || typeof grid.measurement.scale !== "string") throw new Error("Invalid asset defaults");
     const outline = value.outline;

@@ -6,6 +6,7 @@ import ConfirmModal from "../../modals/ConfirmModal";
 import DockNameModal from "./DockNameModal";
 
 import { useLibrary } from "../../contexts/LibraryContext";
+import { ownKeys } from "../../contexts/KeyboardContext";
 import { dockTabLabels, mayChangeAsset, mayFileIn, moveActions } from "../../helpers/dock";
 import {
   assetTypes,
@@ -183,6 +184,7 @@ function DockMenu({ target, person, onPlace, onError, onClose, onEdit }: DockMen
       {!dialog &&
         createPortal(
           <Box
+            {...ownKeys}
             sx={{ position: "fixed", inset: 0, zIndex: 70 }}
             onClick={onClose}
             onContextMenu={(event) => { event.preventDefault(); onClose(); }}

@@ -6,6 +6,10 @@ keyboardEmitter.setMaxListeners(100);
 
 const KeyboardContext = React.createContext({ keyEmitter: keyboardEmitter });
 
+/** Marks an element whose key presses never reach the room's shortcuts */
+const ownsKeys = "data-owns-keys";
+export const ownKeys = { [ownsKeys]: true };
+
 export function KeyboardProvider({ children }: { children: React.ReactNode }) {
   const [keyEmitter] = useState(keyboardEmitter);
   useEffect(() => {
@@ -14,6 +18,16 @@ export function KeyboardProvider({ children }: { children: React.ReactNode }) {
       if (
         event.target instanceof HTMLInputElement ||
         event.target instanceof HTMLTextAreaElement
+      ) {
+        return;
+      }
+      // Ignore keys pressed in the dock and the windows above the room, so
+      // Delete on an asset leaves the selected items alone. A window portalled
+      // to the body cannot stop them reaching this listener itself. Key ups
+      // still pass, so a key held over the room is released.
+      if (
+        event.target instanceof Element &&
+        event.target.closest(`[${ownsKeys}]`)
       ) {
         return;
       }

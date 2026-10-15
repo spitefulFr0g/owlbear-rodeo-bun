@@ -1,4 +1,4 @@
-import { ChangeEvent, FormEvent, useState } from "react";
+import { ChangeEvent, FormEvent, useEffect, useState } from "react";
 import { Box, Button, Flex, Checkbox, Input, Label, Text, useThemeUI } from "theme-ui";
 import SimpleBar from "simplebar-react";
 
@@ -10,6 +10,7 @@ import MapEditor from "../components/map/MapEditor";
 import useMapEdits from "../hooks/useMapEdits";
 import useResponsiveLayout from "../hooks/useResponsiveLayout";
 
+import { shownFile } from "../helpers/shownFile";
 import { importedSceneName } from "../scene/mapItem";
 import { maxSceneNameLength } from "../sceneRules";
 
@@ -39,6 +40,8 @@ type ImportSceneProps = {
    */
   onSaveMap: (id: string, changes: Partial<Map>) => Promise<void>;
   onConfirm: (map: Map | undefined, name: string, fogFill: boolean) => Promise<string | undefined>;
+  /** Brings a stored file into this browser, so a map uploaded elsewhere can be aligned */
+  fetchFile: (id: string) => Promise<unknown>;
 };
 
 /**
@@ -59,9 +62,25 @@ function ImportSceneModal({
   onCancel,
   onConfirm,
   onSaveMap,
+  fetchFile,
 }: ImportSceneProps) {
   const { theme } = useThemeUI();
   const { edited, change, save } = useMapEdits(map, onSaveMap);
+
+  // The file the editor shows, fetched before it mounts, as it reads only
+  // what this browser holds. Choosing another quality fetches that copy.
+  const shown = edited?.type === "file" ? shownFile(edited) : undefined;
+  const [fetched, setFetched] = useState<string>();
+  const [fetchError, setFetchError] = useState<string>();
+  useEffect(() => {
+    if (!shown) return;
+    let current = true;
+    setFetchError(undefined);
+    fetchFile(shown)
+      .then(() => current && setFetched(shown))
+      .catch((error: Error) => current && setFetchError(`The map could not load: ${error.message}`));
+    return () => { current = false; };
+  }, [shown, fetchFile]);
 
   // Undefined until the GM types a name
   const [typedName, setTypedName] = useState(startName);
@@ -127,7 +146,13 @@ function ImportSceneModal({
         >
           {edited ? (
             <>
-              <MapEditor key={edited.id} map={edited} onSettingsChange={change} />
+              {shown && fetched !== shown ? (
+                <Text as="p" variant="body2" sx={{ textAlign: "center" }} my={4} role={fetchError ? "alert" : undefined}>
+                  {fetchError || "Loading the map…"}
+                </Text>
+              ) : (
+                <MapEditor key={edited.id} map={edited} onSettingsChange={change} />
+              )}
               <MapSettings map={edited} onSettingsChange={change} />
             </>
           ) : (

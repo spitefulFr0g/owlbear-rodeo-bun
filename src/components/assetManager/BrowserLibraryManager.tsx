@@ -7,7 +7,7 @@ import { useDatabase } from "../../contexts/DatabaseContext";
 import { useLibrary } from "../../contexts/LibraryContext";
 import { useRole } from "../../contexts/RoomContext";
 import { useServerStatus } from "../../contexts/ServerStatusContext";
-import { browserImportRecord } from "../../helpers/library";
+import { browserImportRecord, importedAsset, rememberedImports, rememberImports } from "../../helpers/library";
 import { prepareLibraryUpload } from "../../helpers/libraryUpload";
 import { Map as BrowserMap } from "../../types/Map";
 import { Token } from "../../types/Token";
@@ -53,10 +53,16 @@ export default function BrowserLibraryManager() {
     setRunning(true); setProgress(0); setImported([]); setSkipped([]); setError("");
     const folders = new Map(library.folders.filter(folder => folder.library.kind === "account" && folder.library.id === account.id)
       .map(folder => [folder.name, folder.id]));
+    const marks = rememberedImports(account.id);
     try {
       for (let index = 0; index < records.length; index++) {
         const record = records[index];
         setCurrent(record.name);
+        if (importedAsset(marks, library.assets, account.id, record.originalId)) {
+          setSkipped(items => [...items, `${record.name}: Already in your account library.`]);
+          setProgress((index + 1) / records.length);
+          continue;
+        }
         let prepared;
         try {
           const original = await database.table<Asset>("assets").get(record.originalId);
@@ -80,6 +86,8 @@ export default function BrowserLibraryManager() {
         try {
           const result = await library.uploadPrepared({ ...prepared, metadata: { ...prepared.metadata, import: true, folderId } },
             (sent, total) => setProgress((index + sent / total) / records.length));
+          marks[record.originalId] = result.asset.id;
+          rememberImports(account.id, marks);
           if (result.duplicate) setSkipped(items => [...items, `${record.name}: Already in your account library.`]);
           else setImported(items => [...items, record.name]);
         } catch (failure) {

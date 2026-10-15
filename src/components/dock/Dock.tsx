@@ -30,6 +30,7 @@ import GroupIcon from "../../icons/GroupIcon";
 import DisplayPopoutIcon from "../../icons/DisplayPopoutIcon";
 
 import DragContext, { CustomDragEndEvent } from "../../contexts/DragContext";
+import { ownKeys } from "../../contexts/KeyboardContext";
 import { useLibrary } from "../../contexts/LibraryContext";
 import { useRoom } from "../../contexts/RoomContext";
 import { useServerStatus } from "../../contexts/ServerStatusContext";
@@ -221,6 +222,7 @@ function Dock() {
       <Box
         as="aside"
         aria-label="Dock"
+        {...ownKeys}
         sx={{
           display: fullScreen ? "none" : "flex",
           flexDirection: "column",
@@ -251,6 +253,7 @@ function Dock() {
       <Box
         as="aside"
         aria-label="Dock"
+        {...ownKeys}
         sx={{
           display: fullScreen ? "none" : "flex",
           flexDirection: "column",
