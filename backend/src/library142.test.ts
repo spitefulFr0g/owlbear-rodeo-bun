@@ -288,9 +288,11 @@ test("fixed library caps include incomplete uploads and every player's folders",
   } finally { await server.dispose(); }
 }, 600000);
 
-test("growing incomplete image metadata does not delay reservations or publish incomplete assets", async () => {
+test("growing incomplete image metadata does not delay reservations or placement or publish incomplete assets", async () => {
   const f = await fixture(); const { server, gm } = f;
   try {
+    const asset = await uploadLibrary(server, gm.token, "placed image");
+    await libraryCommand(gm.socket, { action: "edit", id: asset.id, changes: { name: "Placed image" } });
     const outline = { type: "path", points: Array.from({ length: 20000 }, (_, i) => i % 100) };
     const deltas: any[] = [];
     gm.socket.on("library_delta", delta => deltas.push(delta));
@@ -300,7 +302,14 @@ test("growing incomplete image metadata does not delay reservations or publish i
     }
     // Await the socket event rather than assuming HTTP and socket delivery order.
     while (deltas.at(-1)?.usage.room.reservedBytes !== 512) await nextMessage(gm.socket, "library_delta");
-    expect(deltas.at(-1).usage.room).toMatchObject({ bytes: 0, reservedBytes: 512 });
+    expect(deltas.at(-1).usage.room).toMatchObject({ bytes: 12, reservedBytes: 512 });
     expect(deltas.every(delta => Object.values(delta.assets).every((records: any) => records.length === 0))).toBe(true);
+    const sceneId = gm.snapshot?.scene?.id;
+    if (!sceneId) throw new Error("The GM must have a scene before placing images");
+    const changes = Array.from({ length: 64 }, (_, i) => ({ type: "add" as const,
+      item: { ...tokenItem, id: `during-upload-${i}`, image: { type: "file" as const, file: asset.files.original.id } } }));
+    const answer = await sendBatch(gm.socket, { id: "during-upload", sceneId, changes });
+    expect(answer.refused).toEqual([]);
+    expect(answer.applied).toHaveLength(64);
   } finally { await server.dispose(); }
 }, 10000);
