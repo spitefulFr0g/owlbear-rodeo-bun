@@ -6,7 +6,7 @@ import Session from "./Session";
 import useSceneMap from "../hooks/useSceneMap";
 import WelcomeScreen from "../components/WelcomeScreen";
 import Map from "../components/map/Map";
-import TokenBar from "../components/token/TokenBar";
+import Dock from "../components/dock/Dock";
 import GlobalImageDrop from "../components/image/GlobalImageDrop";
 import { Map as MapType } from "../types/Map";
 
@@ -31,7 +31,7 @@ function NetworkedMapAndTokens({ session }: { session: Session }) {
   return (
     <GlobalImageDrop onMapChange={handleMapChange}>
       <Map session={session} />
-      <TokenBar />
+      <Dock />
     </GlobalImageDrop>
   );
 }
