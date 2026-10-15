@@ -127,7 +127,7 @@ async function backendTests(args, repo = root) {
   let output = "";
   const started = Date.now();
   const exitCode = await new Promise((resolve, reject) => {
-    const child = spawn("bun", ["test", "./src", "../src/sceneRules", "../src/scene", "./scripts/browse.test.ts", ...args], {
+    const child = spawn("bun", ["test", "./src", "../src/sceneRules", "../src/scene", "./scripts/browse.test.ts", "./scripts/lint.test.ts", ...args], {
       cwd: path.join(repo, "backend"), env: { ...process.env, FORCE_COLOR: "0", NO_COLOR: "1" }, stdio: ["inherit", "pipe", "pipe"],
     });
     for (const [stream, target] of [[child.stdout, process.stdout], [child.stderr, process.stderr]]) {
