@@ -49,6 +49,24 @@ test("failed checks and checks that edit their source cannot create reusable rec
   assert.equal(fs.existsSync(receiptFile), false);
 });
 
+test("changing a command's local dotenv file reruns verification and exposes its failure", async t => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "check-dotenv-"));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const repo = path.join(dir, "repo"); fs.mkdirSync(repo);
+  const cwd = path.join(repo, "backend"); fs.mkdirSync(cwd);
+  execFileSync("git", ["init"], { cwd: repo, stdio: "pipe" });
+  fs.writeFileSync(path.join(repo, ".gitignore"), ".env*\n");
+  const dotenv = path.join(cwd, ".env");
+  fs.writeFileSync(dotenv, "RETRO_CHECK_DOTENV=good\n");
+  const env = { ...process.env };
+  delete env.RETRO_CHECK_DOTENV;
+  const command = ["bun", "-e", "if (process.env.RETRO_CHECK_DOTENV !== 'good') process.exit(7)"];
+  const options = { repo, cwd, env, receiptFile: path.join(dir, "receipt.json"), quiet: true };
+  await runCheck(command, options);
+  fs.writeFileSync(dotenv, "RETRO_CHECK_DOTENV=bad\n");
+  await assert.rejects(runCheck(command, options), { exitCode: 7 });
+});
+
 test("timing summaries expose dominant slow tests while preserving units and failed cases", () => {
   const report = testTimings("src/library.test.ts:\n(pass) count caps [418432.85ms]\n(pass) remaining behaviour [28000.00ms]\n(fail) tiny [10.00µs]\n(pass) no duration printed\n");
   assert.equal(report.dominant[0].name, "count caps");

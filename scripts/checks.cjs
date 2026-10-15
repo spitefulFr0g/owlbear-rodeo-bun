@@ -48,7 +48,9 @@ function fingerprint(repo, command, cwd, env) {
     } else { add(file); add(fs.readFileSync(file)); }
   }
   include(path.join(repo, "build"));
-  for (const name of [".env", ".env.local", ".env.development", ".env.development.local", ".env.production", ".env.production.local", ".env.test", ".env.test.local"]) include(path.join(repo, name));
+  for (const directory of new Set([path.resolve(repo), path.resolve(cwd)])) {
+    for (const name of [".env", ".env.local", ".env.development", ".env.development.local", ".env.production", ".env.production.local", ".env.test", ".env.test.local"]) include(path.join(directory, name));
+  }
   for (const directory of ["node_modules", "backend/node_modules"]) {
     const modules = path.join(repo, directory);
     if (!fs.existsSync(modules)) { add([directory, null]); continue; }
