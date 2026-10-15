@@ -13,7 +13,8 @@ import type JoinTokens from "./JoinTokens";
 import type { FsAssetStore } from "./AssetStore";
 
 type Context = { roomId: string; accountId: string | null; browser: string; role: LibraryRole; socket: Socket };
-type Reservation = { token: string; request: LibraryBegin; uploading: Set<string>; cancelTimer: () => void };
+/** overLimit holds the refusal for a full library, which still takes the original to recognise a duplicate. */
+type Reservation = { token: string; request: LibraryBegin; uploading: Set<string>; cancelTimer: () => void; overLimit?: string };
 
 /** Owns authorization and the reservation lifecycle; repository owns durable records. */
 export default class LibraryService {
@@ -204,14 +205,14 @@ export default class LibraryService {
     })) as LibraryFiles;
     const repo = this.database.library;
     const usage = repo.usage(library);
-    if (!checkAssetCount(usage.assets, usage.reservedAssets)) throw new Error("Library asset count limit reached");
-    const error = quotaError(assetBytes(files), { ...usage, quota: repo.quota(library) }, library.kind,
+    const overLimit = !checkAssetCount(usage.assets, usage.reservedAssets) ? "Library asset count limit reached" : quotaError(assetBytes(files), { ...usage, quota: repo.quota(library) }, library.kind,
       uploader ? { ...repo.usage(library, uploader), quota: repo.playerQuota(context.roomId) } : undefined);
-    if (error) throw new Error(error);
+    // One reservation at a time per library and uploader may pass a full library.
+    if (overLimit && [...this.reservations].some(([id, reservation]) => { const held = reservation.overLimit && repo.asset(id); return held && sameLibrary(held.library, library) && held.uploader === uploader; })) throw new Error(overLimit);
     const assetId = randomUUID();
     repo.saveAsset({ id: assetId, library, name: checkLibraryName(request.name)!, type: request.type, width: request.width, height: request.height,
       outline: request.outline, defaults: request.defaults, files, folderId: request.folderId ?? null, uploader, uploaderName: uploader ? this.rooms.games[context.roomId].presenceState[context.socket.id]?.nickname || uploader : undefined, created: this.clock.now(), uploading: true });
-    this.reservations.set(assetId, { token, request, uploading: new Set(), cancelTimer: this.clock.after(15 * 60 * 1000, () => this.cancel(assetId)) });
+    this.reservations.set(assetId, { token, request, uploading: new Set(), cancelTimer: this.clock.after(15 * 60 * 1000, () => this.cancel(assetId)), overLimit });
     this.broadcast(true);
     return { assetId, files };
   }
@@ -280,6 +281,7 @@ export default class LibraryService {
         reservation.uploading.delete(role);
         const duplicate = role === "original" ? this.database.library.duplicate(asset.library, file.id, asset.uploader ?? undefined) : undefined;
         if (duplicate) { this.cancel(asset.id); await Promise.all(this.cleanup); res.json({ id: file.id, duplicate }); }
+        else if (reservation.overLimit) throw new Error(reservation.overLimit);
         else res.status(201).json({ id: file.id });
       } catch (error: any) {
         if (owns) { this.cancel(req.params.id); await Promise.all(this.cleanup); }
@@ -290,6 +292,7 @@ export default class LibraryService {
       try {
         const { asset, reservation } = this.reserved(res.locals.context, res.locals.token, req.params.id);
         if (reservation.uploading.size || Object.values(asset.files).some(file => !this.database.asset(file.id))) throw new Error("Upload every declared file before completing");
+        if (reservation.overLimit) throw new Error(reservation.overLimit);
         const duplicate = this.database.library.duplicate(asset.library, asset.files.original.id, asset.uploader ?? undefined);
         if (duplicate) { this.cancel(asset.id); res.json({ asset: duplicate, duplicate: true }); return; }
         const complete = { ...asset, uploading: false }; this.database.library.saveAsset(complete); reservation.cancelTimer(); this.reservations.delete(asset.id); this.broadcast(); res.json({ asset: complete });

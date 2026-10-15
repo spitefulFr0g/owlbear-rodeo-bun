@@ -16,7 +16,14 @@ async function fixture() {
   const quota = (kind: "rooms" | "accounts", id: string, bytes: number) => fetch(`${server.address}/api/admin/${kind}/${id}/quota`, { method: "PATCH", headers: { Cookie: admin.cookie, "Content-Type": "application/json" }, body: JSON.stringify({ bytes }) });
   const put = (r: LibraryReservation, token: string, bytes: string, role = "original") => fetch(`${server.address}/api/library/${r.assetId}/files/${role}`, { method: "PUT", headers: auth(token), body: bytes });
   const complete = (r: LibraryReservation, token = gm.token) => fetch(`${server.address}/api/library/${r.assetId}/complete`, { method: "POST", headers: auth(token) });
-  return { server, admin, room, gm, player, other, change, quota, put, complete };
+  // A full library still takes one original to recognise a duplicate, so its refusal can arrive at the upload.
+  const refusal = async (token: string, fields: Record<string, unknown> = {}) => {
+    const begin = await beginLibrary(server, token, fields); const answer = await begin.json() as any;
+    if (begin.status !== 201) return answer.error;
+    const upload = await put(answer, token, "z".repeat(answer.files.original.size));
+    return upload.status === 201 ? undefined : (await upload.json() as any).error;
+  };
+  return { server, admin, room, gm, player, other, change, quota, put, complete, refusal };
 }
 
 test("reserved uploads bind files to connection and role, publish only complete entries, deduplicate within visibility and survive restart", async () => {
@@ -55,17 +62,16 @@ test("quota equality succeeds, a byte over and concurrent reservations refuse, l
     await f.change(true);
     expect((await f.quota("rooms", room.id, 10)).status).toBe(200);
     expect(await libraryCommand(gm.socket, { action: "player-quota", bytes: 5 })).toEqual({ ok: true });
-    const responses = await Promise.all([beginLibrary(server, player.token), beginLibrary(server, player.token)]);
-    expect(responses.map(r => r.status).sort()).toEqual([201, 400]);
-    const reserved = await responses.find(r => r.status === 201)!.json() as LibraryReservation;
-    expect((await f.put(reserved, player.token, "longer")).status).toBe(400);
+    const responses = await Promise.all([beginLibrary(server, player.token), beginLibrary(server, player.token), beginLibrary(server, player.token)]);
+    expect(responses.map(r => r.status).sort()).toEqual([201, 201, 400]); // The second only looks for a duplicate.
+    for (const response of responses.filter(r => r.status === 201)) expect((await f.put(await response.json() as LibraryReservation, player.token, "longer")).status).toBe(400);
     const own = await uploadLibrary(server, player.token);
-    expect((await beginLibrary(server, player.token, { files: { original: { size: 1, mime: "image/png" } } })).status).toBe(400);
+    expect(await f.refusal(player.token, { files: { original: { size: 1, mime: "image/png" } } })).toBe("Player quota exceeded");
     await uploadLibrary(server, other.token, "other");
     const fresh = await server.joinRoom(room.id, "", "new-browser");
-    expect((await beginLibrary(server, fresh.token, { files: { original: { size: 1, mime: "image/png" } } })).status).toBe(400);
+    expect(await f.refusal(fresh.token, { files: { original: { size: 1, mime: "image/png" } } })).toBe("Room quota exceeded");
     await f.quota("rooms", room.id, 1);
-    expect((await beginLibrary(server, gm.token)).status).toBe(400);
+    expect(await f.refusal(gm.token)).toBe("Room quota exceeded");
     expect(await libraryCommand(player.socket, { action: "delete", id: own.id })).toEqual({ ok: true });
     await f.quota("rooms", room.id, 10);
     const held = await (await beginLibrary(server, gm.token)).json() as LibraryReservation;
@@ -119,9 +125,9 @@ test("moves remove player entries, free player quota, fan account changes across
     await f.quota("accounts", admin.account.id, 5);
     const another = await uploadLibrary(server, gm.token, "other");
     expect((await libraryCommand(gm.socket, { action: "move", id: another.id, destination: "account" })).error).toBe("Account quota exceeded");
-    expect((await beginLibrary(server, gm.token, { import: true })).status).toBe(400);
+    expect(await f.refusal(gm.token, { import: true })).toBe("Account quota exceeded");
     await f.quota("accounts", admin.account.id, 0);
-    expect((await beginLibrary(server, gm.token, { import: true })).status).toBe(400);
+    expect(await f.refusal(gm.token, { import: true })).toBe("Account quota exceeded");
     await libraryCommand(player.socket, { action: "delete", id: secondOwn.id });
     await f.quota("rooms", room.id, 100);
     expect((await libraryCommand(gm.socket, { action: "move", id: own.id, destination: "room" })).ok).toBe(true);
@@ -237,13 +243,13 @@ test("derived bytes count at equality, lowered player quotas preserve entries, a
     const complete = await f.complete(r, player.token); const asset = (await complete.json() as any).asset;
     expect(asset.library).toEqual({ kind: "room", id: room.id }); expect(asset.uploader).toBe("player");
     await libraryCommand(gm.socket, { action: "player-quota", bytes: 1 });
-    expect((await beginLibrary(server, player.token, { files: { original: { size: 1, mime: "image/png" } } })).status).toBe(400);
+    expect(await f.refusal(player.token, { files: { original: { size: 1, mime: "image/png" } } })).toBe("Room quota exceeded");
     expect((await libraryCommand(gm.socket, { action: "move", id: asset.id, destination: "room" })).ok).toBe(true);
     await f.quota("rooms", room.id, 8);
     expect((await beginLibrary(server, player.token, { files: { original: { size: 1, mime: "image/png" } } })).status).toBe(201);
     await f.quota("accounts", admin.account.id, 5);
     const account = await uploadLibrary(server, gm.token, "12345", { import: true });
-    expect((await beginLibrary(server, gm.token, { import: true, files: { original: { size: 1, mime: "image/png" } } })).status).toBe(400);
+    expect(await f.refusal(gm.token, { import: true, files: { original: { size: 1, mime: "image/png" } } })).toBe("Account quota exceeded");
     expect((await libraryCommand(gm.socket, { action: "delete", id: account.id })).ok).toBe(true);
     expect((await beginLibrary(server, gm.token, { import: true })).status).toBe(201);
     for (const command of [{ action: "player-quota", bytes: 0 }, { action: "folder-create", library: "account", name: "Hidden" }, { action: "edit", id: asset.id, changes: { name: "Forbidden" } }, { action: "move", id: asset.id, destination: "account" }]) expect((await libraryCommand(player.socket, command)).ok).toBe(false);
@@ -268,25 +274,51 @@ test("simultaneous original uploads publish one entry and discard the duplicate'
   } finally { await server.dispose(); }
 });
 
-test("fixed library caps include incomplete uploads and every player's folders", async () => {
+// Each cap test uses the public interface; no fixture writes database records.
+test("the fixed folder cap counts every player's folders", async () => {
   const f = await fixture(); const { server, gm, player } = f;
   try {
-    // Each request uses the public interface; no fixture writes database records.
-    const folderIds: string[] = [];
     for (let i = 0; i < 1000; i++) {
       const created = await libraryCommand(i % 2 ? player.socket : gm.socket, { action: "folder-create", library: "room", name: `Folder ${i}` });
-      expect(created.ok).toBe(true); folderIds.push(created.id);
+      expect(created.ok).toBe(true);
     }
     expect((await libraryCommand(gm.socket, { action: "folder-create", library: "room", name: "One too many" })).error).toBe("Library folder count limit reached");
-    for (const id of folderIds) expect((await libraryCommand(gm.socket, { action: "folder-delete", id })).ok).toBe(true);
+  } finally { await server.dispose(); }
+}, 600000);
+
+test("the fixed asset cap counts incomplete uploads", async () => {
+  const f = await fixture(); const { server, gm } = f;
+  try {
     for (let i = 0; i < 10000; i++) {
       const response = await beginLibrary(server, gm.token, { files: { original: { size: 1, mime: "image/png" } } });
       if (response.status !== 201) throw new Error(`Reservation ${i}: ${await response.text()}`);
     }
-    const refused = await beginLibrary(server, gm.token, { files: { original: { size: 1, mime: "image/png" } } });
-    expect((await refused.json() as any).error).toBe("Library asset count limit reached");
+    expect(await f.refusal(gm.token, { files: { original: { size: 1, mime: "image/png" } } })).toBe("Library asset count limit reached");
   } finally { await server.dispose(); }
 }, 600000);
+
+test("a full library still recognises a duplicate, holding one over-limit reservation at a time", async () => {
+  const f = await fixture(); const { server, gm, player, admin, room } = f;
+  try {
+    await f.change(true);
+    await f.quota("accounts", admin.account.id, 5);
+    const imported = await uploadLibrary(server, gm.token, "image", { import: true });
+    expect((await uploadLibrary(server, gm.token, "image", { import: true })).id).toBe(imported.id);
+    await libraryCommand(gm.socket, { action: "player-quota", bytes: 3 });
+    const own = await uploadLibrary(server, player.token, "own");
+    expect((await uploadLibrary(server, player.token, "own")).id).toBe(own.id);
+    const held = await beginLibrary(server, gm.token, { import: true });
+    expect(held.status).toBe(201);
+    expect(await f.refusal(gm.token, { import: true })).toBe("Account quota exceeded");
+    expect(await f.refusal(player.token)).toBe("Player quota exceeded");
+    const reservation = await held.json() as LibraryReservation;
+    expect((await f.put(reservation, gm.token, "other")).status).toBe(400);
+    expect((await f.complete(reservation)).status).toBe(400);
+    expect((await uploadLibrary(server, gm.token, "image", { import: true })).id).toBe(imported.id);
+    await f.quota("rooms", room.id, 1);
+    expect((await uploadLibrary(server, player.token, "own")).id).toBe(own.id);
+  } finally { await server.dispose(); }
+});
 
 test("growing incomplete image metadata does not delay reservations or placement or publish incomplete assets", async () => {
   const f = await fixture(); const { server, gm } = f;
