@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdtemp, readdir, rm, writeFile } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
+// eslint-disable-next-line no-restricted-imports -- a unit test from before the whole-server rule.
 import {
   AssetExistsError,
   AssetTooLargeError,
