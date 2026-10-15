@@ -1,256 +1,71 @@
-import React, { useState, useRef } from "react";
-import { Box, Flex, Text } from "theme-ui";
+import React, { useRef, useState } from "react";
+import { Button, Flex, Label, Select, Text } from "theme-ui";
 import { useToasts } from "react-toast-notifications";
-
+import Modal from "../Modal";
 import LoadingOverlay from "../LoadingOverlay";
-
-import ConfirmModal from "../../modals/ConfirmModal";
-
-import { createMapFromFile } from "../../helpers/map";
-import { createTokenFromFile } from "../../helpers/token";
-import Vector2 from "../../helpers/Vector2";
-
-import { useRole } from "../../contexts/RoomContext";
-import { getRoleControls } from "../../helpers/roomControls";
-
-import { useUserId } from "../../contexts/UserIdContext";
-import { useMapData } from "../../contexts/MapDataContext";
-import { useTokenData } from "../../contexts/TokenDataContext";
-import { useAssets } from "../../contexts/AssetsContext";
-
+import { useLibrary } from "../../contexts/LibraryContext";
+import { useRoom } from "../../contexts/RoomContext";
+import { useScene } from "../../scene/SceneContext";
+import { defaultRoomSwitches } from "../../helpers/roomControls";
+import { dockTabLabels } from "../../helpers/dock";
+import { AssetType, assetTypes, LibraryAsset, mayUpload } from "../../sceneRules/library";
 import useImageDrop, { ImageDropEvent } from "../../hooks/useImageDrop";
+import { useMapStage } from "../../contexts/MapStageContext";
+import { clientPositionToWorld } from "../../scene/worldPosition";
+import useLibraryPlacement from "../../hooks/useLibraryPlacement";
 
-import { Map } from "../../types/Map";
-import { useAddTokens, useToolPermissions } from "../../scene/SceneContext";
-
-type GlobalImageDropProps = {
-  children?: React.ReactNode;
-  onMapChange: (map: Map) => void;
-};
-
-function GlobalImageDrop({
-  children,
-  onMapChange,
-}: GlobalImageDropProps) {
+function GlobalImageDrop({ children }: { children?: React.ReactNode }) {
   const { addToast } = useToasts();
-
-  const userId = useUserId();
-  const permissions = useToolPermissions();
-  const canChangeMap = getRoleControls(useRole()).map;
-  const { addMap } = useMapData();
-  const { addToken } = useTokenData();
-  const { addAssets } = useAssets();
-
-  const addTokens = useAddTokens();
-
-  const [isLargeImageWarningModalOpen, setShowLargeImageWarning] =
-    useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-
-  const droppedImagesRef = useRef<File[]>();
-  const dropPositionRef = useRef<Vector2>();
-  const [droppingType, setDroppingType] = useState<"maps" | "tokens">("tokens");
-
-  async function handleDrop({ files, dropPosition }: ImageDropEvent) {
-    if (
-      !permissions.uploads ||
-      (droppingType === "tokens" && !permissions.tokens)
-    ) {
-      addToast("Image uploads are unavailable in this room.");
-      return;
-    }
-    if (navigator.storage) {
-      // Attempt to enable persistant storage
-      await navigator.storage.persist();
-    }
-
-    dropPositionRef.current = dropPosition;
-
-    droppedImagesRef.current = [];
-    for (let file of files) {
-      if (file.size > 5e7) {
-        addToast(`Unable to import image ${file.name} as it is over 50MB`);
-      } else {
-        droppedImagesRef.current.push(file);
-      }
-    }
-
-    // Any file greater than 20MB
-    if (droppedImagesRef.current.some((file) => file.size > 2e7)) {
-      setShowLargeImageWarning(true);
-      return;
-    }
-
-    if (droppingType === "maps") {
-      await handleMaps();
-    } else {
-      await handleTokens();
-    }
+  const library = useLibrary();
+  const room = useRoom();
+  const store = useScene();
+  const place = useLibraryPlacement();
+  const stage = useMapStage();
+  const worldDrop = useRef<{ x: number; y: number }>();
+  const latest = useRef({ store, place });
+  latest.current = { store, place };
+  const [batch, setBatch] = useState<ImageDropEvent>();
+  const [type, setType] = useState<AssetType>("character");
+  const [busy, setBusy] = useState(false);
+  const allowed = mayUpload(store.person.role, (room.switches || defaultRoomSwitches).uploads);
+  function handleDrop(event: ImageDropEvent) {
+    if (store.person.role === "display" || !event.files.length) return;
+    if (!allowed) { addToast("Image uploads are unavailable in this room."); return; }
+    if (busy || batch) { addToast("Finish the current upload first."); return; }
+    worldDrop.current = stage.current ? clientPositionToWorld(stage.current, event.dropPosition) || undefined : undefined;
+    setType("character");
+    setBatch(event);
   }
-
-  function handleLargeImageWarningCancel() {
-    droppedImagesRef.current = undefined;
-    setShowLargeImageWarning(false);
-  }
-
-  async function handleLargeImageWarningConfirm() {
-    setShowLargeImageWarning(false);
-    if (droppingType === "maps") {
-      await handleMaps();
-    } else {
-      await handleTokens();
+  async function upload() {
+    if (!batch) return;
+    setBusy(true);
+    const sceneId = store.scene?.id;
+    const assets: LibraryAsset[] = [];
+    for (const file of batch.files) {
+      try { assets.push((await library.upload(file, type)).asset); }
+      catch (error) { addToast(`${file.name}: ${error instanceof Error ? error.message : "Upload failed"}`); }
     }
-  }
-
-  async function handleMaps() {
-    if (canChangeMap && droppedImagesRef.current && userId) {
-      setIsLoading(true);
-      let maps = [];
-      for (let file of droppedImagesRef.current) {
-        const { map, assets } = await createMapFromFile(file, userId);
-        await addMap(map);
-        await addAssets(assets);
-        maps.push(map);
-      }
-
-      // Change map if only 1 dropped
-      if (maps.length === 1) {
-        onMapChange(maps[0]);
-      }
-
-      setIsLoading(false);
-      droppedImagesRef.current = undefined;
+    const current = latest.current;
+    if (assets.length && (current.store.scene?.id !== sceneId || !current.place(assets, batch.dropPosition, worldDrop.current))) {
+      addToast("The images were uploaded, but could not be placed. Place them from the dock.");
     }
+    setBusy(false);
+    setBatch(undefined);
   }
-
-  async function handleTokens() {
-    if (
-      permissions.uploads &&
-      permissions.tokens &&
-      droppedImagesRef.current &&
-      userId
-    ) {
-      setIsLoading(true);
-      // Keep track of tokens so we can add them to the map
-      let tokens = [];
-      for (let file of droppedImagesRef.current) {
-        const { token, assets } = await createTokenFromFile(file, userId);
-        await addToken(token);
-        await addAssets(assets);
-        tokens.push(token);
-      }
-      setIsLoading(false);
-      droppedImagesRef.current = undefined;
-
-      if (dropPositionRef.current) await addTokens(tokens, dropPositionRef.current);
-    }
-  }
-
-  function handleMapsOver() {
-    setDroppingType("maps");
-  }
-
-  function handleTokensOver() {
-    setDroppingType("tokens");
-  }
-
-  const { dragging, containerListeners, overlayListeners } =
-    useImageDrop(handleDrop);
-
-  return (
-    <Flex sx={{ height: "100%", flexGrow: 1 }} {...containerListeners}>
-      {children}
-      {dragging && (
-        <Flex
-          sx={{
-            position: "absolute",
-            top: 0,
-            right: 0,
-            left: 0,
-            bottom: 0,
-            cursor: "copy",
-            flexDirection: "column",
-            zIndex: 100,
-          }}
-          {...overlayListeners}
-        >
-          {canChangeMap && (
-            <Flex
-              sx={{
-                height: "10%",
-                justifyContent: "center",
-                alignItems: "center",
-                color: droppingType === "maps" ? "primary" : "text",
-                opacity: droppingType === "maps" ? 1 : 0.8,
-                width: "100%",
-                position: "relative",
-              }}
-              onDragEnter={handleMapsOver}
-            >
-              <Box
-                bg="overlay"
-                sx={{
-                  position: "absolute",
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  margin: "4px 16px",
-                  border: "1px dashed",
-                  borderRadius: "12px",
-                  pointerEvents: "none",
-                }}
-              />
-              <Text sx={{ pointerEvents: "none", userSelect: "none" }}>
-                Drop as map
-              </Text>
-            </Flex>
-          )}
-          <Flex
-            sx={{
-              flexGrow: 1,
-              justifyContent: "center",
-              alignItems: "center",
-              color: droppingType === "tokens" ? "primary" : "text",
-              opacity: droppingType === "tokens" ? 1 : 0.8,
-              width: "100%",
-              position: "relative",
-            }}
-            onDragEnter={handleTokensOver}
-          >
-            <Box
-              bg="overlay"
-              sx={{
-                position: "absolute",
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                margin: "4px 16px",
-                border: "1px dashed",
-                borderRadius: "12px",
-                pointerEvents: "none",
-              }}
-            />
-            <Text sx={{ pointerEvents: "none", userSelect: "none" }}>
-              {permissions.uploads && permissions.tokens
-                ? "Drop as token"
-                : "Image uploads are unavailable in this room"}
-            </Text>
-          </Flex>
-        </Flex>
-      )}
-      <ConfirmModal
-        isOpen={isLargeImageWarningModalOpen}
-        onRequestClose={handleLargeImageWarningCancel}
-        onConfirm={handleLargeImageWarningConfirm}
-        confirmText="Continue"
-        label="Warning"
-        description="An imported image is larger than 20MB, this may cause slowness. Continue?"
-      />
-      {isLoading && <LoadingOverlay bg="overlay" />}
-    </Flex>
-  );
+  const { dragging, containerListeners, overlayListeners } = useImageDrop(handleDrop);
+  return <Flex sx={{ height: "100%", flexGrow: 1 }} {...(store.person.role === "display" ? {} : containerListeners)}>
+    {children}
+    {dragging && <Flex {...overlayListeners} sx={{ position: "absolute", inset: 0, zIndex: 100, bg: "overlay", justifyContent: "center", alignItems: "center" }}>
+      <Text>{allowed ? "Drop images to upload and place" : "Image uploads are unavailable in this room"}</Text>
+    </Flex>}
+    <Modal isOpen={!!batch} contentLabel="Upload dropped images" onRequestClose={busy ? undefined : () => setBatch(undefined)} allowClose={!busy}>
+      <><Label htmlFor="dropAssetType">Asset type for {batch?.files.length} images</Label>
+      <Select id="dropAssetType" value={type} disabled={busy} onChange={event => setType(event.target.value as AssetType)}>
+        {assetTypes.filter(value => value !== "map" || store.person.role === "gm").map(value => <option key={value} value={value}>{dockTabLabels[value]}</option>)}
+      </Select>
+      <Button mt={3} disabled={busy || !allowed} onClick={upload}>Upload and place</Button>
+      {busy && <LoadingOverlay bg="overlay" />}
+    </></Modal>
+  </Flex>;
 }
-
 export default GlobalImageDrop;

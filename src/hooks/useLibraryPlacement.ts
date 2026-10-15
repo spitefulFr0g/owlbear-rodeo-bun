@@ -9,11 +9,11 @@ import { dropPositions, libraryImage, libraryItem, PlaceableAsset } from "../hel
 export default function useLibraryPlacement() {
   const stage = useMapStage();
   const { scene, person, readOnly, canChange, act } = useScene();
-  return (assets: (LibraryAsset | PlaceableAsset)[], clientPoint?: { x: number; y: number }): boolean => {
+  return (assets: (LibraryAsset | PlaceableAsset)[], clientPoint?: { x: number; y: number }, worldPoint?: { x: number; y: number }): boolean => {
     if (!stage.current || !scene || readOnly || assets.length === 0) return false;
     const rect = visibleWorldRect(stage.current);
-    const center = clientPoint ? clientPositionToWorld(stage.current, clientPoint)
-      : rect && { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
+    const center = worldPoint || (clientPoint ? clientPositionToWorld(stage.current, clientPoint)
+      : rect && { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 });
     if (!center) return false;
     const positions = dropPositions(assets.length, center, scene.grid.unitsPerCell);
     const changes = assets.map((asset, index) => ({ type: "add" as const,

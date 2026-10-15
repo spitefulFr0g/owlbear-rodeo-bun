@@ -1,5 +1,5 @@
-import { ChangeEvent, ComponentType, FormEvent, useState } from "react";
-import { Box, Button, Flex, IconButton, Input, Label, Text } from "theme-ui";
+import { ComponentType, useState } from "react";
+import { Box, Button, Flex, IconButton, Text } from "theme-ui";
 
 import ChangeNicknameIcon from "../../icons/ChangeNicknameIcon";
 import RemoveMapIcon from "../../icons/RemoveMapIcon";
@@ -18,9 +18,8 @@ import {
   sceneMarks,
   sortScenes,
 } from "../../helpers/sceneList";
-import { maxSceneNameLength } from "../../sceneRules";
+import { useLibrary } from "../../contexts/LibraryContext";
 
-import SceneImporter from "./SceneImporter";
 import SceneEditor from "./SceneEditor";
 
 function refusal(answer: SceneAnswer) {
@@ -148,7 +147,7 @@ function RenameSceneEntry({ scene }: SceneEntryProps) {
   );
 }
 
-/** Opens the importer on the scene, which this GM connection views first */
+/** Edits scene settings after this GM connection views the scene. */
 function EditSceneEntry({ scene, onRefused, onDone }: SceneEntryProps) {
   const { scene: viewed, viewScene } = useScene();
   const [isEditing, setIsEditing] = useState(false);
@@ -276,30 +275,14 @@ type SceneListProps = {
  * the dialog that holds it.
  */
 function SceneList({ onDone }: SceneListProps) {
-  const { scene: viewed, sceneList, createScene } = useScene();
-  const [name, setName] = useState("");
-  const [isSending, setIsSending] = useState(false);
+  const { scene: viewed, sceneList } = useScene();
+  const { openExtension } = useLibrary();
   const [error, setError] = useState<string>();
-  const [isImporting, setIsImporting] = useState(false);
 
   if (!sceneList) return null;
 
   function handleRefused(answer: SceneAnswer) {
     setError(refusal(answer));
-  }
-
-  async function handleCreate(event: FormEvent<HTMLElement>) {
-    event.preventDefault();
-    setIsSending(true);
-    setError(undefined);
-    const answer = await createScene(name.trim());
-    setIsSending(false);
-    if (answer.ok) {
-      setName("");
-      onDone();
-    } else {
-      handleRefused(answer);
-    }
   }
 
   return (
@@ -331,45 +314,7 @@ function SceneList({ onDone }: SceneListProps) {
           );
         })}
       </Box>
-      <Box as="form" onSubmit={handleCreate}>
-        <Label htmlFor="newSceneName">New scene</Label>
-        <Flex>
-          <Input
-            id="newSceneName"
-            name="newSceneName"
-            placeholder="Name"
-            value={name}
-            onChange={(event: ChangeEvent<HTMLInputElement>) =>
-              setName(event.target.value)
-            }
-            maxLength={maxSceneNameLength}
-            autoComplete="off"
-            mr={2}
-          />
-          <Button sx={{ flexShrink: 0 }} disabled={!name.trim() || isSending}>
-            Create empty
-          </Button>
-        </Flex>
-      </Box>
-      <Button
-        type="button"
-        variant="secondary"
-        sx={{ width: "100%" }}
-        mt={2}
-        onClick={() => setIsImporting(true)}
-      >
-        Make a scene from a map
-      </Button>
-      {isImporting && (
-        <SceneImporter
-          onCancel={() => setIsImporting(false)}
-          onCreated={() => {
-            setIsImporting(false);
-            onDone();
-          }}
-          refusal={refusal}
-        />
-      )}
+      <Button type="button" sx={{ width: "100%" }} mt={2} onClick={() => openExtension({ extension: "new-scene" })}>New scene</Button>
       {error && (
         <Text as="p" role="alert" variant="caption" sx={{ color: "highlight" }} mt={2}>
           {error}

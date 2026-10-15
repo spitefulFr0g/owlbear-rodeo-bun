@@ -1,3 +1,5 @@
+import { sceneLibraryMap } from "./libraryScene";
+import { sceneFromMap } from "../scene/mapItem";
 import { applyLibraryDelta, browserImportRecord, dropPositions, filenameGridSize, libraryDefaults, libraryImage, libraryItem } from "./library";
 import { defaultSceneGrid } from "../sceneRules";
 import { LibraryAsset, LibrarySnapshot } from "../sceneRules/library";
@@ -84,4 +86,14 @@ test("library deltas replace records, remove departed entries and refresh quota 
   const changed = { ...asset, name: "Renamed" };
   expect(applyLibraryDelta(snapshot, { assets: { added: [], changed: [changed], removed: [] },
     folders: { added: [], changed: [], removed: [] }, usage }).assets).toEqual([changed]);
+});
+
+test("a new scene aligns the saved small grid and retains every stored quality copy", () => {
+  const map = sceneLibraryMap(asset);
+  const scene = sceneFromMap(map, undefined, "map-item");
+  expect(scene.name).toBe("Cave");
+  expect(scene.map.image).toEqual({ type: "file", file: "original", thumbnail: "thumb", resolutions: { medium: "medium" } });
+  expect(scene.map.scale).toEqual({ x: 1.5, y: 1.5 });
+  expect(scene.map.locked).toBe(true);
+  expect(asset.defaults.grid.size).toEqual({ x: 10, y: 8 });
 });
