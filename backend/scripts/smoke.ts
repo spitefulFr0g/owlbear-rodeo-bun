@@ -119,7 +119,7 @@ try {
   });
   if (upload.status !== 201) throw new Error(`The image upload answered ${upload.status}: ${await upload.text()}`);
   } else {
-    const { uploadLibrary, libraryCommand } = await import("../src/testing/serverHelpers");
+    const { uploadLibrary, libraryCommand } = await import("../src/testing/libraryHelpers");
     const asset = await uploadLibrary(server, first.token, image);
     storedImageId = asset.files.original.id;
     const deleted = await libraryCommand(first.socket, { action: "delete", id: asset.id });

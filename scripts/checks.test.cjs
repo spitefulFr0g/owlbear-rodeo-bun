@@ -60,7 +60,9 @@ test("changing a command's local dotenv file reruns verification and exposes its
   fs.writeFileSync(dotenv, "RETRO_CHECK_DOTENV=good\n");
   const env = { ...process.env };
   delete env.RETRO_CHECK_DOTENV;
-  const command = ["bun", "-e", "if (process.env.RETRO_CHECK_DOTENV !== 'good') process.exit(7)"];
+  // Node rather than Bun, which the frontend job does not install. Node reads
+  // the dotenv file only when told to, as Bun does by default.
+  const command = [process.execPath, "--env-file=.env", "-e", "if (process.env.RETRO_CHECK_DOTENV !== 'good') process.exit(7)"];
   const options = { repo, cwd, env, receiptFile: path.join(dir, "receipt.json"), quiet: true };
   await runCheck(command, options);
   fs.writeFileSync(dotenv, "RETRO_CHECK_DOTENV=bad\n");
