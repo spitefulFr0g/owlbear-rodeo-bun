@@ -7,6 +7,7 @@ import useSceneMap from "../hooks/useSceneMap";
 import WelcomeScreen from "../components/WelcomeScreen";
 import Map from "../components/map/Map";
 import Dock from "../components/dock/Dock";
+import AssetManager from "../components/assetManager/AssetManager";
 import GlobalImageDrop from "../components/image/GlobalImageDrop";
 import { Map as MapType } from "../types/Map";
 
@@ -32,6 +33,7 @@ function NetworkedMapAndTokens({ session }: { session: Session }) {
     <GlobalImageDrop onMapChange={handleMapChange}>
       <Map session={session} />
       <Dock />
+      <AssetManager />
     </GlobalImageDrop>
   );
 }

@@ -179,7 +179,7 @@ function Dock() {
   const canUpload = mayUpload(person.role, switches.uploads);
   const filters = libraryFilters(person.role);
   const folderLibrary = person.role === "gm" && library.filter === "account" ? "account" : "room";
-  const canCreateFolder = person.role === "gm" ? library.filter !== "server" : canUpload && library.filter !== "server";
+  const canCreateFolder = library.filter !== "server";
   const menuHandlers = {
     onAssetMenu: (asset: LibraryViewAsset, event: React.MouseEvent) =>
       setMenu({ kind: "asset", asset, x: event.clientX, y: event.clientY }),

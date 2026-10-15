@@ -3,7 +3,6 @@ import { Flex, Label, Box } from "theme-ui";
 import { useToasts } from "react-toast-notifications";
 import ReactResizeDetector from "react-resize-detector";
 
-import EditMapModal from "./EditMapModal";
 import ConfirmModal from "./ConfirmModal";
 
 import Modal from "../components/Modal";
@@ -55,7 +54,6 @@ function SelectMapModal({ isOpen, onDone, onMapSelect }: SelectMapProps) {
     mapsLoading,
     getMap,
     updateMapGroups,
-    updateMap,
     mapsById,
   } = useMapData();
   const { addAssets } = useAssets();
@@ -170,7 +168,6 @@ function SelectMapModal({ isOpen, onDone, onMapSelect }: SelectMapProps) {
     }
   }
 
-  const [editingMapId, setEditingMapId] = useState<string>();
 
   const [isDraggingMap, setIsDraggingMap] = useState(false);
 
@@ -200,8 +197,6 @@ function SelectMapModal({ isOpen, onDone, onMapSelect }: SelectMapProps) {
     }
   }
 
-  const editingMap =
-    editingMapId && maps.find((map) => map.id === editingMapId);
 
   return (
     <Modal
@@ -262,7 +257,6 @@ function SelectMapModal({ isOpen, onDone, onMapSelect }: SelectMapProps) {
                     )}
                     <MapTiles
                       mapsById={mapsById}
-                      onMapEdit={setEditingMapId}
                       onMapSelect={handleMapSelect}
                     />
                   </TilesContainer>
@@ -276,14 +270,13 @@ function SelectMapModal({ isOpen, onDone, onMapSelect }: SelectMapProps) {
                   <TilesOverlay modalSize={modalSize}>
                     <MapTiles
                       mapsById={mapsById}
-                      onMapEdit={setEditingMapId}
                       onMapSelect={handleMapSelect}
                       subgroup
                     />
                   </TilesOverlay>
                 </TileDragProvider>
                 <MapEditBar
-                  disabled={isLoading || !!editingMapId}
+                  disabled={isLoading}
                   onLoad={setIsLoading}
                 />
               </Box>
@@ -296,16 +289,6 @@ function SelectMapModal({ isOpen, onDone, onMapSelect }: SelectMapProps) {
         </ReactResizeDetector>
       </ImageDrop>
       <>{(isLoading || mapsLoading) && <LoadingOverlay bg="overlay" />}</>
-      <>
-        {editingMap && (
-          <EditMapModal
-            isOpen={!!editingMapId}
-            onDone={() => setEditingMapId(undefined)}
-            map={editingMap}
-            onUpdateMap={updateMap}
-          />
-        )}
-      </>
       <ConfirmModal
         isOpen={isLargeImageWarningModalOpen}
         onRequestClose={handleLargeImageWarningCancel}

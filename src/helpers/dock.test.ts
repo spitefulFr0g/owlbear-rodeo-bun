@@ -1,4 +1,4 @@
-import { dockTabs, libraryFilters, mayChangeAsset, mayFileIn, moveAction, quotaBars } from "./dock";
+import { dockTabs, libraryFilters, mayChangeAsset, mayFileIn, moveActions, quotaBars } from "./dock";
 import { libraryDefaults } from "./library";
 import { LibraryAsset } from "../sceneRules/library";
 
@@ -60,9 +60,14 @@ test("only the GM or the uploader may change an asset, and an asset files only i
   expect(mayFileIn(asset, { ...folder, library: { kind: "account", id: "room" } })).toBe(false);
 });
 
-test("the GM moves room assets to their library and back, and nobody else moves anything", () => {
+test("the GM adds room assets to their library and back, takes over player uploads, and nobody else moves anything", () => {
   const asset = upload("ann");
-  expect(moveAction(asset, "gm")).toEqual({ destination: "account", label: "Move to my library" });
-  expect(moveAction({ ...asset, library: { kind: "account", id: "account" } }, "gm")?.destination).toBe("room");
-  expect(moveAction(asset, "trusted")).toBeUndefined();
+  expect(moveActions({ ...asset, uploader: null }, "gm")).toEqual([{ destination: "account", label: "Add to my library" }]);
+  expect(moveActions(asset, "gm")).toEqual([
+    { destination: "room", label: "Take into this room" },
+    { destination: "account", label: "Add to my library" },
+  ]);
+  expect(moveActions({ ...asset, library: { kind: "account", id: "account" } }, "gm")).toEqual([{ destination: "room", label: "Move to this room" }]);
+  expect(moveActions(asset, "trusted")).toEqual([]);
+  expect(moveActions(asset, "player")).toEqual([]);
 });

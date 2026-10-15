@@ -10,7 +10,7 @@ import { tokenSources } from "../../tokens";
 const defaultSources = { ...mapSources, ...tokenSources };
 
 /** The smallest stored image of an asset, fetched into the byte cache once */
-function Thumbnail({ asset }: { asset: LibraryViewAsset }) {
+export function Thumbnail({ asset, size = 24 }: { asset: LibraryViewAsset; size?: number }) {
   const { fetchFile } = useLibrary();
   const fileId = "files" in asset ? (asset.files.thumbnail || asset.files.original).id : null;
   useEffect(() => {
@@ -26,8 +26,8 @@ function Thumbnail({ asset }: { asset: LibraryViewAsset }) {
   return (
     <Box
       sx={{
-        width: "24px",
-        height: "24px",
+        width: `${size}px`,
+        height: `${size}px`,
         flexShrink: 0,
         borderRadius: round ? "50%" : "2px",
         overflow: "hidden",
