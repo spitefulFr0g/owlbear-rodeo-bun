@@ -6,16 +6,24 @@ import {
   AdministratorRoom,
   ApiError,
   deleteRoom,
+  getLibraryQuotas,
   listAdministratorRooms,
+  setRoomQuota,
 } from "../../network/api";
 import DeleteRoomModal from "../../modals/DeleteRoomModal";
 import FormError from "../account/FormError";
 import LoadingOverlay from "../LoadingOverlay";
+import QuotaField from "../QuotaField";
+import LibraryQuotaLine from "../LibraryQuotaLine";
+import { AdministratorLibraryQuotas } from "../../sceneRules/library";
+
+type RoomLibrary = AdministratorLibraryQuotas["rooms"][number];
 
 function AdministratorRoomList({ revision }: { revision: number }) {
   const [data, setData] = useState<{
     rooms: AdministratorRoom[];
     totalBytes: number;
+    libraries: Map<string, RoomLibrary>;
   }>();
   const [error, setError] = useState<ApiError>();
   const [deleting, setDeleting] = useState<AdministratorRoom>();
@@ -23,7 +31,15 @@ function AdministratorRoomList({ revision }: { revision: number }) {
   async function load() {
     setError(undefined);
     try {
-      setData(await listAdministratorRooms());
+      const [{ rooms, totalBytes }, quotas] = await Promise.all([
+        listAdministratorRooms(),
+        getLibraryQuotas(),
+      ]);
+      setData({
+        rooms,
+        totalBytes,
+        libraries: new Map(quotas.rooms.map((room) => [room.id, room])),
+      });
     } catch (error) {
       setError(
         error instanceof ApiError
@@ -36,6 +52,11 @@ function AdministratorRoomList({ revision }: { revision: number }) {
   useEffect(() => {
     load();
   }, [revision]);
+
+  async function handleQuota(room: AdministratorRoom, bytes: number) {
+    await setRoomQuota(room.id, bytes);
+    await load();
+  }
 
   async function handleDelete() {
     if (!deleting) return;
@@ -103,6 +124,13 @@ function AdministratorRoomList({ revision }: { revision: number }) {
                       ? "Size unavailable"
                       : prettyBytes(room.sizeBytes)}
                   </Text>
+                  {data.libraries.has(room.id) && (
+                    <RoomQuota
+                      room={room}
+                      library={data.libraries.get(room.id)!}
+                      onSave={(bytes) => handleQuota(room, bytes)}
+                    />
+                  )}
                 </Box>
                 <Button
                   variant="secondary"
@@ -124,6 +152,35 @@ function AdministratorRoomList({ revision }: { revision: number }) {
         room={deleting}
         onRequestClose={() => setDeleting(undefined)}
         onConfirm={handleDelete}
+      />
+    </Box>
+  );
+}
+
+/** A room library's usage and the quota an administrator alone sets */
+function RoomQuota({
+  room,
+  library,
+  onSave,
+}: {
+  room: AdministratorRoom;
+  library: RoomLibrary;
+  onSave: (bytes: number) => Promise<void>;
+}) {
+  return (
+    <Box mt={1}>
+      <LibraryQuotaLine
+        label="Room library"
+        usage={{ ...library.usage, quota: library.quota }}
+      />
+      <Text as="p" variant="caption" m={0}>
+        Player quota: {prettyBytes(library.playerQuota)}, set by the GM
+      </Text>
+      <QuotaField
+        id={`room-quota-${room.id}`}
+        label={`Quota for ${room.name}`}
+        bytes={library.quota}
+        onSave={onSave}
       />
     </Box>
   );
