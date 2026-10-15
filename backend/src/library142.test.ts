@@ -287,3 +287,20 @@ test("fixed library caps include incomplete uploads and every player's folders",
     expect((await refused.json() as any).error).toBe("Library asset count limit reached");
   } finally { await server.dispose(); }
 }, 600000);
+
+test("growing incomplete image metadata does not delay reservations or publish incomplete assets", async () => {
+  const f = await fixture(); const { server, gm } = f;
+  try {
+    const outline = { type: "path", points: Array.from({ length: 20000 }, (_, i) => i % 100) };
+    const deltas: any[] = [];
+    gm.socket.on("library_delta", delta => deltas.push(delta));
+    for (let i = 0; i < 512; i++) {
+      const response = await beginLibrary(server, gm.token, { outline, files: { original: { size: 1, mime: "image/png" } } });
+      expect(response.status).toBe(201);
+    }
+    // Await the socket event rather than assuming HTTP and socket delivery order.
+    while (deltas.at(-1)?.usage.room.reservedBytes !== 512) await nextMessage(gm.socket, "library_delta");
+    expect(deltas.at(-1).usage.room).toMatchObject({ bytes: 0, reservedBytes: 512 });
+    expect(deltas.every(delta => Object.values(delta.assets).every((records: any) => records.length === 0))).toBe(true);
+  } finally { await server.dispose(); }
+}, 10000);
