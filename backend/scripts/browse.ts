@@ -1,44 +1,54 @@
-/**
- * Starts the server from source for a look in a browser, already set up: an
- * administrator and one room on a fresh temporary data directory. The server
- * keeps running after this script exits; it prints how to stop it.
- *
- *   bun run browse                 on port 9100
- *   bun run browse --port <port>
- */
-import { mkdtemp } from "fs/promises";
+/** Starts an owned, provisioned temporary server. Stop it with the printed PID. */
+import { mkdtemp, readFile, rm } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
-import { createRoom, setupAdministrator } from "../src/testing/serverHelpers";
 
-const args = process.argv.slice(2);
-const portFlag = args.indexOf("--port");
-const port = portFlag < 0 ? "9100" : args[portFlag + 1];
-if (!port) throw new Error("--port needs a number");
+type Ready = { address: string; pid: number; roomId: string; username: string; password: string };
 
-const dataDir = await mkdtemp(join(tmpdir(), "owlbear-browse-"));
-const log = join(dataDir, "server.log");
-const server = Bun.spawn(["bun", join(import.meta.dir, "..", "src", "index.ts"), "--port", port, "--data-dir", dataDir], {
-  stdout: Bun.file(log), stderr: Bun.file(log), stdin: "ignore", detached: true,
-});
-server.unref();
-
-const address = `http://localhost:${port}`;
-const deadline = Date.now() + 15_000;
-while (!(await fetch(address).then(response => response.ok, () => false))) {
-  if (server.exitCode !== null || Date.now() > deadline) {
-    throw new Error(`The server did not start:\n${await Bun.file(log).text()}`);
+export async function launchBrowse(port = 0) {
+  if (!Number.isInteger(port) || port < 0 || port > 65535) throw new Error("--port needs an integer from 0 to 65535");
+  const dataDir = await mkdtemp(join(tmpdir(), "owlbear-browse-"));
+  const log = join(dataDir, "server.log");
+  const child = Bun.spawn([process.execPath, join(import.meta.dir, "browse-server.ts"), dataDir, String(port)], {
+    stdout: Bun.file(log), stderr: Bun.file(log), stdin: "ignore", detached: true,
+  });
+  child.unref();
+  async function stop() {
+    if (child.exitCode === null) child.kill("SIGTERM");
+    const timer = setTimeout(() => { if (child.exitCode === null) child.kill("SIGKILL"); }, 2000);
+    try { await child.exited; }
+    finally { clearTimeout(timer); await rm(dataDir, { recursive: true, force: true }); }
   }
-  await Bun.sleep(200);
+  const interrupted = () => { void stop().finally(() => process.exit(130)); };
+  process.once("SIGINT", interrupted);
+  process.once("SIGTERM", interrupted);
+  try {
+    const deadline = Date.now() + 15000;
+    while (child.exitCode === null && Date.now() < deadline) {
+      let ready: Ready | undefined;
+      try { ready = JSON.parse(await readFile(join(dataDir, "ready.json"), "utf8")) as Ready; }
+      catch (error: any) { if (error.code !== "ENOENT") throw error; }
+      if (ready && ready.pid === child.pid && child.exitCode === null) return { ...ready, dataDir, log, stop };
+      await Bun.sleep(50);
+    }
+    throw new Error("The server did not start");
+  } catch (error) {
+    const details = await readFile(log, "utf8").catch(() => "");
+    await stop();
+    throw Object.assign(new Error(`${error instanceof Error ? error.message : error}\n${details}`), { pid: child.pid, dataDir });
+  } finally {
+    process.removeListener("SIGINT", interrupted);
+    process.removeListener("SIGTERM", interrupted);
+  }
 }
 
-const username = "Administrator";
-const password = "browse-password";
-const { cookie } = await setupAdministrator({ address }, username, password);
-const room = await createRoom({ address }, cookie, "Browse room");
-
-console.log(`Server:   ${address}  (pid ${server.pid}, log ${log})
-Sign in:  ${username} / ${password}
-Room:     ${address}/game/${room.id}
-Stop it:  kill ${server.pid}`);
-process.exit(0);
+if (import.meta.main) {
+  const args = process.argv.slice(2), flag = args.indexOf("--port");
+  if (flag >= 0 && !args[flag + 1]) throw new Error("--port needs a number");
+  const fixture = await launchBrowse(flag < 0 ? 0 : Number(args[flag + 1]));
+  console.log(`Server:   ${fixture.address}  (pid ${fixture.pid}, log ${fixture.log})
+Sign in:  ${fixture.username} / ${fixture.password}
+Room:     ${fixture.address}/game/${fixture.roomId}
+Stop it:  kill ${fixture.pid}`);
+  process.exit(0);
+}

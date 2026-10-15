@@ -67,6 +67,7 @@
     "uuid": "^8.3.2"
   },
   "scripts": {
+    "check": "node scripts/checks.cjs all",
     "start": "vite",
     "build": "vite build",
     "test": "vitest",

@@ -49,6 +49,17 @@ install locally with Yarn.
 prints only on failure. Backend changes also run the real-server smoke check. A fresh clone turns it on with
 `git config core.hooksPath .githooks`; worktrees share that setting.
 
+`node scripts/checks.cjs all` runs the full integration checks. Guarded merges
+can share a temporary `OWLBEAR_CHECK_RECEIPT` with their commit hook. Reuse
+requires the same source contents, staged tree, command, build, environment
+and installed dependency versions. Ordinary commits run fresh checks.
+
+Backend test runs print `CHECK_TIMINGS` and save a report beneath the worktree's
+Git directory at `check-reports/backend-tests.json`. A test taking at least
+30 seconds and half the measured test time fails the check for investigation,
+even when its assertions pass. Preserve the count boundary and diagnose the
+production path before proceeding with dependent merges.
+
 Frontend checks end with a Vite build, so a broken import fails the commit.
 
 Vitest runs the helper tests in `src/helpers` in a browser environment.
@@ -57,7 +68,8 @@ Bun runs the tests in `src/scene` and `src/sceneRules`, from `backend/`.
 
 Tests hash passwords at the lowest bcrypt cost (`backend/scripts/test-setup.ts`).
 
-Tests run on a test clock, so they never run the runtime's own timers.
+Server behaviour tests run on a test clock. Browser fixture lifecycle checks
+start owned processes on the real clock.
 `bun run smoke` in `backend/` does: it starts the real server, joins a room as
 the GM, restarts, and fails on anything unexpected on stderr. Give it a
 compiled executable to check a release: `bun scripts/smoke.ts dist/<file>`.
@@ -75,11 +87,13 @@ delete it after.
 
 ## Seeing it in a browser
 
-`bun run browse` in `backend/` starts the server on port 9100 (`--port` for
-another) with a temporary data directory, an administrator and a room already
+`bun run browse` in `backend/` starts the server on an automatically assigned
+port (`--port <number>` selects one) with a temporary data directory, an administrator and a room already
 made, and prints the sign-in, the room link and the server's pid. The server
 outlives the command; stop it with the `kill <pid>` it prints, since
 `pkill -f` matches the shell running it and ends that too.
+The fixture provisions through its own server address and removes its temporary
+data when stopped. Startup failures stop the owned child and remove its data.
 
 For changes to held drags, resizes, tool switching or authoritative-update
 reconciliation, run the [held interaction verification command](verification.md).
