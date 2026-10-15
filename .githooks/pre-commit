@@ -29,6 +29,7 @@ if [ -n "$backend" ]; then
   check bun run typecheck
   check bun run test
   check bun run lint
+  check bun run smoke
 fi
 
 if [ -n "$frontend" ]; then

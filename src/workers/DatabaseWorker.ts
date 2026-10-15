@@ -1,20 +1,10 @@
 import * as Comlink from "comlink";
-import {
-  importInto,
-  exportDB,
-  peakImportFile,
-} from "@mitchemmc/dexie-export-import";
-import { ExportProgress } from "@mitchemmc/dexie-export-import/dist/export";
 import { encode, decode } from "@msgpack/msgpack";
 
 import { getDatabase } from "../database";
-import blobToBuffer from "../helpers/blobToBuffer";
 
-import { Map } from "../types/Map";
-import { Token } from "../types/Token";
 import { Asset } from "../types/Asset";
 
-type ProgressCallback = (progress: ExportProgress) => boolean;
 
 // Worker to load large amounts of database data on a separate thread
 let service = {
@@ -62,135 +52,6 @@ let service = {
     } catch {
       return false;
     }
-  },
-
-  /**
-   * Export current database
-   * @param {function} progressCallback
-   * @param {string[]} mapIds An array of map ids to export
-   * @param {string[]} tokenIds An array of token ids to export
-   */
-  async exportData(
-    progressCallback: ProgressCallback,
-    mapIds: string[],
-    tokenIds: string[]
-  ) {
-    let db = getDatabase({});
-
-    // Add assets for selected maps and tokens
-    const maps: Map[] = await db
-      .table<Map>("maps")
-      .where("id")
-      .anyOf(mapIds)
-      .toArray();
-    const tokens = await db
-      .table<Token>("tokens")
-      .where("id")
-      .anyOf(tokenIds)
-      .toArray();
-    const assetIds: string[] = [];
-    for (let map of maps) {
-      if (map.type === "file") {
-        assetIds.push(map.file);
-        assetIds.push(map.thumbnail);
-        for (let res of Object.values(map.resolutions)) {
-          res && assetIds.push(res);
-        }
-      }
-    }
-    for (let token of tokens) {
-      if (token.type === "file") {
-        assetIds.push(token.file);
-        assetIds.push(token.thumbnail);
-      }
-    }
-
-    const filter = (table: string, value: any) => {
-      if (table === "maps") {
-        return mapIds.includes(value.id);
-      }
-      if (table === "tokens") {
-        return tokenIds.includes(value.id);
-      }
-      if (table === "assets") {
-        return assetIds.includes(value.id);
-      }
-      // Always include groups table
-      if (table === "groups") {
-        return true;
-      }
-
-      return false;
-    };
-
-    const data = await exportDB(db as any, {
-      progressCallback,
-      filter,
-      numRowsPerChunk: 1,
-      prettyJson: true,
-    });
-
-    const buffer = await blobToBuffer(data);
-
-    return Comlink.transfer(buffer, [buffer.buffer]);
-  },
-
-  /**
-   * Import into current database
-   * @param {Blob} data
-   * @param {string} databaseName The name of the database to import into
-   * @param {ProgressCallback} progressCallback
-   */
-  async importData(
-    data: Blob,
-    databaseName: string,
-    progressCallback: ProgressCallback
-  ) {
-    const importMeta = await peakImportFile(data);
-    if (!importMeta.data) {
-      throw new Error("Uanble to parse file");
-    }
-
-    let db = getDatabase({});
-
-    if (importMeta.data.databaseName !== db.name) {
-      throw new Error("Unable to import database, name mismatch");
-    }
-    if (importMeta.data.databaseVersion > db.verno) {
-      throw new Error(
-        `Database version differs. Current database is in version ${db.verno} but export is ${importMeta.data.databaseVersion}`
-      );
-    }
-
-    // Ensure import DB is cleared before importing new data
-    let importDB = getDatabase({ addons: [] }, databaseName, 0);
-    await importDB.delete();
-    importDB.close();
-
-    // Load import database up to it's desired version
-    importDB = getDatabase(
-      { addons: [] },
-      databaseName,
-      importMeta.data.databaseVersion,
-      false
-    );
-    await importInto(importDB as any, data, {
-      progressCallback,
-      acceptNameDiff: true,
-      overwriteValues: true,
-      filter: (table, value) => {
-        // Ensure values are of the correct form
-        if (table === "maps" || table === "tokens") {
-          return "id" in value && "owner" in value;
-        }
-        if (table === "states") {
-          return false;
-        }
-        return true;
-      },
-      acceptVersionDiff: true,
-    });
-    importDB.close();
   },
 
   /**

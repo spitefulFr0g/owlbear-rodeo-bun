@@ -24,8 +24,6 @@ import { useDatabase } from "../contexts/DatabaseContext";
 import { PlayerProvider } from "../contexts/PlayerContext";
 import { PartyProvider } from "../contexts/PartyContext";
 import { AssetsProvider, AssetURLsProvider } from "../contexts/AssetsContext";
-import { MapDataProvider } from "../contexts/MapDataContext";
-import { TokenDataProvider } from "../contexts/TokenDataContext";
 import { MapLoadingProvider } from "../contexts/MapLoadingContext";
 import { RoomProvider } from "../contexts/RoomContext";
 import { SceneProvider } from "../scene/SceneContext";
@@ -149,56 +147,52 @@ function Game() {
       <LibraryProvider session={session}>
         <AssetURLsProvider>
           <MapLoadingProvider>
-            <MapDataProvider>
-              <TokenDataProvider>
-                <PlayerProvider session={session}>
-                  <PartyProvider session={session}>
-                    <MapStageProvider value={mapStageRef}>
-                      <Flex
-                        sx={{
-                          justifyContent: "space-between",
-                          flexGrow: 1,
-                          height: "100%",
-                        }}
-                      >
-                        <SceneProvider session={session}>
-                          <LiveProvider session={session}>
-                            <NetworkedParty session={session} gameId={gameId} />
-                            <NetworkedMapAndTokens session={session} />
-                          </LiveProvider>
-                        </SceneProvider>
-                      </Flex>
-                      <OfflineBanner isOpen={sessionStatus === "offline"} />
-                      <ReconnectBanner
-                        isOpen={sessionStatus === "reconnecting"}
-                      />
-                      <AuthModal
-                        isOpen={sessionStatus === "auth"}
-                        waitUntil={authWaitUntil}
-                        refused={passwordRefused}
-                        onSubmit={handleAuthSubmit}
-                      />
-                      <GameExpiredModal
-                        isOpen={gameExpired}
-                        onRequestClose={() => setGameExpired(false)}
-                      />
-                      <ForceUpdateModal
-                        isOpen={sessionStatus === "needs_update"}
-                      />
-                      {!sessionStatus && <LoadingOverlay />}
-                      {sessionStatus && databaseStatus === "upgrading" && (
-                        <UpgradingLoadingOverlay />
-                      )}
-                      <MaintenanceModal
-                        isOpen={maintenance}
-                        onRequestClose={() => setMaintenance(false)}
-                      />
-                      <MapLoadingOverlay />
-                    </MapStageProvider>
-                  </PartyProvider>
-                </PlayerProvider>
-              </TokenDataProvider>
-            </MapDataProvider>
+            <PlayerProvider session={session}>
+              <PartyProvider session={session}>
+                <MapStageProvider value={mapStageRef}>
+                  <Flex
+                    sx={{
+                      justifyContent: "space-between",
+                      flexGrow: 1,
+                      height: "100%",
+                    }}
+                  >
+                    <SceneProvider session={session}>
+                      <LiveProvider session={session}>
+                        <NetworkedParty session={session} gameId={gameId} />
+                        <NetworkedMapAndTokens session={session} />
+                      </LiveProvider>
+                    </SceneProvider>
+                  </Flex>
+                  <OfflineBanner isOpen={sessionStatus === "offline"} />
+                  <ReconnectBanner
+                    isOpen={sessionStatus === "reconnecting"}
+                  />
+                  <AuthModal
+                    isOpen={sessionStatus === "auth"}
+                    waitUntil={authWaitUntil}
+                    refused={passwordRefused}
+                    onSubmit={handleAuthSubmit}
+                  />
+                  <GameExpiredModal
+                    isOpen={gameExpired}
+                    onRequestClose={() => setGameExpired(false)}
+                  />
+                  <ForceUpdateModal
+                    isOpen={sessionStatus === "needs_update"}
+                  />
+                  {!sessionStatus && <LoadingOverlay />}
+                  {sessionStatus && databaseStatus === "upgrading" && (
+                    <UpgradingLoadingOverlay />
+                  )}
+                  <MaintenanceModal
+                    isOpen={maintenance}
+                    onRequestClose={() => setMaintenance(false)}
+                  />
+                  <MapLoadingOverlay />
+                </MapStageProvider>
+              </PartyProvider>
+            </PlayerProvider>
           </MapLoadingProvider>
         </AssetURLsProvider>
       </LibraryProvider>
