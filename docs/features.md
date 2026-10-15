@@ -28,7 +28,7 @@ A row with a split verdict names which part is which.
 
 Ten steps, grouped into releases. They are built in number order, except that step 8 is built before step 7. Steps 1 to 5 run on today's canvas. Step 6 is the one large rewrite. Steps 7 to 10 build on it. The move from Create React App to Vite is done between steps 7 and 9 and is not a numbered step.
 
-The scope through v0.4.0 is implemented. See the [v0.4.0 release notes](releases/v0.4.0.md) for scenes, live play and upgrade instructions, and the [v0.4.1 release notes](releases/v0.4.1.md) for the fixes that followed. The v0.5.0 implementation is described in the [v0.5.0 release notes](releases/v0.5.0.md). v0.6.0 is a forecast.
+The scope through v0.5.0 is implemented. See the [v0.4.0 release notes](releases/v0.4.0.md) for scenes, live play and upgrade instructions, the [v0.4.1 release notes](releases/v0.4.1.md) for the fixes that followed, and the [v0.5.0 release notes](releases/v0.5.0.md) for libraries, the dock and upgrade instructions. v0.6.0 is a forecast.
 
 ### v0.1.0: the shared screen
 
