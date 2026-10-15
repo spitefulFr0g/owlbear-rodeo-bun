@@ -66,7 +66,7 @@ function AssetDetails({ asset, where, person, folders, onPlace, onEdit, onDelete
         )}
         {stored && <Detail label="Size">{prettyBytes(assetBytes(stored.files))}</Detail>}
         {stored && <Detail label="Pixels">{`${stored.width} × ${stored.height}`}</Detail>}
-        <Detail label="Added">{new Date(asset.created).toLocaleDateString()}</Detail>
+        {stored && <Detail label="Added">{new Date(asset.created).toLocaleDateString()}</Detail>}
         {stored && grid && stored.type === "map" && (
           <Detail label="Grid">{`${grid.size.x} × ${grid.size.y} ${gridTypeLabels[grid.type]}`}</Detail>
         )}

@@ -369,7 +369,7 @@ function AssetManager({ actions }: AssetManagerProps) {
                 </Droppable>
               ))}
               {view.assets.map((asset) => (
-                <Draggable key={asset.id} id={`asset:${asset.id}`} data={{ asset }}>
+                <Draggable interactiveChild key={asset.id} id={`asset:${asset.id}`} data={{ asset }}>
                   <AssetTile
                     asset={asset}
                     list={list}

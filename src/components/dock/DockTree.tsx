@@ -3,7 +3,7 @@ import { Box, Flex, Text } from "theme-ui";
 
 import Draggable from "../drag/Draggable";
 import Droppable from "../drag/Droppable";
-import DockRow from "./DockRow";
+import DockRow, { openKeyboardMenu } from "./DockRow";
 import ExpandMoreIcon from "../../icons/ExpandMoreIcon";
 
 import { useLibrary } from "../../contexts/LibraryContext";
@@ -74,7 +74,8 @@ function DockTree({
         roomId,
         accountId,
         assets: library.assets,
-        folders: library.folders,
+        // Player folders are private organisation; the GM sees their uploads ungrouped.
+        folders: person.role === "gm" ? library.folders.filter(folder => folder.owner === null) : library.folders,
         serverSet: library.serverSet,
         filter: filter || library.filter,
         order: library.order,
@@ -98,7 +99,7 @@ function DockTree({
   function row(asset: LibraryViewAsset, section: LibrarySection, depth: number) {
     const caption = section.id === "players" && "uploaderName" in asset ? asset.uploaderName : undefined;
     return (
-      <Draggable key={asset.id} id={`asset:${asset.id}`} data={{ asset }}>
+      <Draggable interactiveChild key={asset.id} id={`asset:${asset.id}`} data={{ asset }}>
         <DockRow
           asset={asset}
           caption={caption}
@@ -118,7 +119,7 @@ function DockTree({
     <Box>
       {sections.map((section) => {
         const colours = sectionColours[section.id];
-        const open = !closedSections.has(section.id);
+        const open = !!library.search.trim() || !closedSections.has(section.id);
         const count = section.assets.length + section.folders.reduce((total, folder) => total + folder.assets.length, 0);
         return (
           <Box key={section.id} as="section" aria-label={section.heading}>
@@ -158,6 +159,7 @@ function DockTree({
                         aria-expanded={folderOpen}
                         onClick={() => setOpenFolders((set) => toggle(set, folder.id))}
                         onKeyDown={(event) => {
+                          openKeyboardMenu(event);
                           if (event.key === "Enter" || event.key === " ") {
                             event.preventDefault();
                             setOpenFolders((set) => toggle(set, folder.id));

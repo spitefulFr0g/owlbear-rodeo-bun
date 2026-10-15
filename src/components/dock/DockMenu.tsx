@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Box, Divider, Flex, Select, Text } from "theme-ui";
 
@@ -86,6 +86,14 @@ function MenuSelect({ label, value, options, onChange }: {
 /** The actions on a dock row, opened by right-clicking it */
 function DockMenu({ target, person, onPlace, onError, onClose, onEdit }: DockMenuProps) {
   const { command, folders, openExtension } = useLibrary();
+  const menuRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const previous = document.activeElement;
+    menuRef.current?.querySelector<HTMLButtonElement>("button")?.focus();
+    return () => {
+      if (previous instanceof HTMLElement && previous.isConnected) previous.focus();
+    };
+  }, []);
   const [dialog, setDialog] = useState<"rename" | "delete" | null>(null);
 
   useEffect(() => {
@@ -180,13 +188,16 @@ function DockMenu({ target, person, onPlace, onError, onClose, onEdit }: DockMen
             onContextMenu={(event) => { event.preventDefault(); onClose(); }}
           >
             <Box
-              role="menu"
+              ref={menuRef}
+              role="dialog"
               aria-label={`${name} actions`}
               onClick={(event) => event.stopPropagation()}
               sx={{
                 position: "fixed",
-                left: Math.min(target.x, window.innerWidth - 230),
-                top: Math.min(target.y, window.innerHeight - 260),
+                left: `${Math.max(8, Math.min(target.x, window.innerWidth - 230))}px`,
+                top: `${Math.max(8, Math.min(target.y, window.innerHeight - 260))}px`,
+                maxHeight: "calc(100vh - 16px)",
+                overflowY: "auto",
                 width: "220px",
                 py: 1,
                 bg: "background",
