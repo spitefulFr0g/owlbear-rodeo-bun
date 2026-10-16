@@ -34,8 +34,15 @@ export function createAssetCache(maxBytes = 64 * 1024 * 1024, maxEntries = 256) 
     const request = load().then(asset => { put(asset); return asset; });
     pending.set(id, request);
     try { return await request; }
-    finally { pending.delete(id); }
+    finally {
+      // An earlier connection's completion must not remove its replacement.
+      if (pending.get(id) === request) pending.delete(id);
+    }
   }
 
-  return { get, put };
+  function resetPending() {
+    pending.clear();
+  }
+
+  return { get, put, resetPending };
 }

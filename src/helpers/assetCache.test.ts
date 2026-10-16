@@ -76,3 +76,29 @@ test("a failed image download can be retried", async () => {
   const result = asset("retry");
   expect(await cache.get("retry", async () => result)).toBe(result);
 });
+
+test("rejoining can replace an unfinished download without losing request sharing", async () => {
+  const cache = createAssetCache();
+  let failOld!: (reason: Error) => void;
+  const old = cache.get("same", () => new Promise<Asset>((_resolve, reject) => { failOld = reject; }));
+  const failure = expect(old).rejects.toThrow("old connection");
+  cache.resetPending();
+  let completeNew!: (value: Asset) => void;
+  const replacement = cache.get("same", () => new Promise<Asset>(resolve => { completeNew = resolve; }));
+  failOld(new Error("old connection"));
+  await failure;
+  let duplicateDownload = false;
+  const shared = cache.get("same", async () => { duplicateDownload = true; return asset("same"); });
+  const result = asset("same");
+  completeNew(result);
+  expect(await Promise.all([replacement, shared])).toEqual([result, result]);
+  expect(duplicateDownload).toBe(false);
+});
+
+test("rejoining keeps successfully cached files", async () => {
+  const cache = createAssetCache();
+  const result = asset("same");
+  cache.put(result);
+  cache.resetPending();
+  expect(await cache.get("same", async () => { throw new Error("unnecessary download"); })).toBe(result);
+});

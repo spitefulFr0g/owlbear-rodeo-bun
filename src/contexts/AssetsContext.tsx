@@ -7,7 +7,7 @@ import { Asset } from "../types/Asset";
 import { createAssetCache } from "../helpers/assetCache";
 import { downloadAsset } from "../network/assetStore";
 import { sessionLibraryAccess } from "../network/library";
-import Session from "../network/Session";
+import Session, { SessionStatus } from "../network/Session";
 
 export type GetAssetEventHanlder = (
   assetId: string
@@ -29,6 +29,16 @@ const AssetsContext =
 export function AssetsProvider({ session, children }: { session: Session; children: React.ReactNode }) {
   const assets = useRef(createAssetCache());
   const [assetVersion, setAssetVersion] = useState(0);
+  useEffect(() => {
+    const retryDownloads = (status: SessionStatus) => {
+      if (status !== "joined") return;
+      // The new join token can retry missing URLs even if an old request hangs.
+      assets.current.resetPending();
+      setAssetVersion(version => version + 1);
+    };
+    session.on("status", retryDownloads);
+    return () => { session.off("status", retryDownloads); };
+  }, [session]);
   const getAsset = useCallback<GetAssetEventHanlder>(async id =>
     assets.current.get(id, () => downloadAsset(sessionLibraryAccess(session), id)), [session]);
   const addAssets = useCallback<AddAssetsEventHandler>(async incoming => {
@@ -93,7 +103,7 @@ export function AssetURLsProvider({ children }: { children: React.ReactNode }) {
     }
     let keysToLoad: string[] = [];
     for (let url of Object.values(loadingDebouncedAssetURLs)) {
-      if (url.url === null) {
+      if (url.url === null && url.references > 0) {
         keysToLoad.push(url.id);
       }
     }
