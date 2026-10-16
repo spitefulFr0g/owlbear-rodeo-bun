@@ -6,9 +6,9 @@ import { getGridDefaultInset } from "../helpers/grid";
 import { Map } from "../types/Map";
 
 /**
- * Changes to a map of the browser library, held until they are saved to its
- * record. Saving changes no scene. The changes belong to the map they were
- * made to, and are dropped when another map, or none, takes its place.
+ * Changes to a map in the scene importer, held until its alignment is saved.
+ * The changes belong to the map they were made to, and are dropped when
+ * another map, or none, takes its place.
  */
 function useMapEdits<M extends Map | undefined>(
   map: M,
