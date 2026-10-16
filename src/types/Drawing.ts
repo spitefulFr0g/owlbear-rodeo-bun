@@ -11,11 +11,14 @@ export type DrawingToolType =
   | "triangle"
   | "erase";
 
+export type DrawingStrokeWidth = "thin" | "normal" | "thick";
+
 export type DrawingToolSettings = {
   type: DrawingToolType;
   color: Color;
   useBlending: boolean;
   useShapeFill: boolean;
+  strokeWidth: DrawingStrokeWidth;
 };
 
 export type PointsData = {
