@@ -10,6 +10,7 @@ export type MapToolId =
   | "measure"
   | "pointer"
   | "note"
+  | "text"
   | "undo"
   | "redo";
 

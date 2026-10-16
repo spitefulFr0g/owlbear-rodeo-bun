@@ -10,6 +10,7 @@ import BrushToolIcon from "../../icons/BrushToolIcon";
 import MeasureToolIcon from "../../icons/MeasureToolIcon";
 import PointerToolIcon from "../../icons/PointerToolIcon";
 import NoteToolIcon from "../../icons/NoteToolIcon";
+import TextToolIcon from "../../icons/TextToolIcon";
 import FogToolSettings from "../controls/FogToolSettings";
 import DrawingToolSettings from "../controls/DrawingToolSettings";
 
@@ -57,5 +58,7 @@ export function createToolEntries({
       shortcut: shortcuts.pointerTool, mayUse: permissions.pointer },
     { id: "note", icon: <NoteToolIcon />, title: "Note Tool (N)",
       shortcut: shortcuts.noteTool, mayUse: !readOnly && permissions.notes },
+    { id: "text", icon: <TextToolIcon />, title: "Text Tool (X)",
+      shortcut: shortcuts.textTool, mayUse: !readOnly && permissions.notes },
   ];
 }

@@ -11,6 +11,7 @@
 | Q                   | Pointer Tool            |
 | Right Mouse Button  | Pointer Tool            |
 | N                   | Note Tool               |
+| X                   | Text Tool               |
 | +                   | Zoom In                 |
 | -                   | Zoom Out                |
 | Shift + Zoom        | Precision Zoom          |

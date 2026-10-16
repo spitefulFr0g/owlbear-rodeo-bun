@@ -85,6 +85,11 @@ function loadVersions(settings: Settings) {
       strokeWidth: "normal",
     },
   }));
+  // v0.6.0 - Add the Text tool's colour and size
+  settings.version(11, (prev: any) => ({
+    ...prev,
+    text: { color: "white", size: "medium" },
+  }));
 }
 
 export function getSettings() {

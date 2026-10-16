@@ -3,6 +3,8 @@ import { DrawingToolSettings } from "./Drawing";
 import { FogToolSettings } from "./Fog";
 import { PointerToolSettings } from "./Pointer";
 import { SelectToolSettings } from "./Select";
+import { Color } from "../helpers/colors";
+import { TextSize } from "../helpers/textItem";
 
 export type DrawingSettings = DrawingToolSettings;
 export type FogSettings = FogToolSettings & {
@@ -24,6 +26,10 @@ export type MapSettings = {
 export type PointerSettings = PointerToolSettings;
 export type TimerSettings = Duration;
 export type SelectSettings = SelectToolSettings;
+export type TextSettings = {
+  color: Color;
+  size: TextSize;
+};
 
 export type Settings = {
   dice: DiceSettings;
@@ -34,4 +40,5 @@ export type Settings = {
   pointer: PointerSettings;
   timer: TimerSettings;
   select: SelectSettings;
+  text: TextSettings;
 };
