@@ -60,7 +60,7 @@ test("moving a mixed selection changes only positions by the same world delta", 
   expect(items[0].position).toEqual({ x: 10, y: 20 });
 });
 test("copying notes, fog and drawings preserves geometry and flags with new identities", () => {
-  const copied = copySelection(items, { x: 30, y: 40 }, ["a", "b", "c"]);
+  const copied = copySelection(items, { x: 30, y: 40 }, ["a", "b", "c"], items);
   expect(copied).toEqual(
     items.map((item, index) => ({
       ...item,
@@ -159,4 +159,14 @@ test("a character carries nearby attachments but not other characters", () => {
     )
   ).toBe(false);
   expect(attachesTo(rider, { ...rider, id: "other" }, 150)).toBe(false);
+});
+
+test("mixed copies number only images against the supplied visible scene", () => {
+  const source: Item[] = [{ ...rider, label: "Goblin 1" }, ...items, { ...mount, label: "Goblin 2" }];
+  const visible = [...source, { ...rider, id: "other", label: "Goblin 3" }];
+  const copied = copySelection(source, { x: 0, y: 0 }, source.map((_, i) => `copy-${i}`), visible);
+  expect(copied[0]).toEqual({ ...source[0], id: "copy-0", label: "Goblin 4" });
+  expect(copied[4]).toEqual({ ...source[4], id: "copy-4", label: "Goblin 5" });
+  expect(copied.slice(1, 4)).toEqual(items.map((item, i) => ({ ...item, id: `copy-${i + 1}` })));
+  expect(copySelection([source[0]], { x: 0, y: 0 }, ["again"], [source[0]])[0]).toEqual({ ...source[0], id: "again", label: "Goblin 2" });
 });

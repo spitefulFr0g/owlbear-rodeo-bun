@@ -263,7 +263,8 @@ export default function SceneItemMenu({
                   x: scene.grid.unitsPerCell / 4,
                   y: scene.grid.unitsPerCell / 4,
                 },
-                items.map(() => uuid())
+                items.map(() => uuid()),
+                Object.values(scene.items)
               );
               if (act(copies.map((item) => ({ type: "add", item }))))
                 setSelection(copies.map((item) => item.id));
