@@ -1,6 +1,6 @@
 {
   "name": "owlbear-rodeo",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "private": true,
   "packageManager": "yarn@1.22.22",
   "engines": {
@@ -11,7 +11,6 @@
     "@babylonjs/loaders": "4.2.1",
     "@dnd-kit/core": "^3.1.1",
     "@dnd-kit/sortable": "^4.0.0",
-    "@mitchemmc/dexie-export-import": "^1.0.1",
     "@msgpack/msgpack": "^2.8.0",
     "@react-spring/konva": "9.4.4",
     "@tensorflow/tfjs": "^3.15.0",
@@ -19,10 +18,8 @@
     "ammo.js": "kripken/ammo.js#85c0614cd5338aa0843814fe7bbd2df48164ece7",
     "case": "^1.6.3",
     "color": "^3.2.1",
-    "comlink": "^4.3.1",
     "deep-diff": "^1.0.2",
     "dexie": "^3.2.1",
-    "dexie-react-hooks": "^1.0.7",
     "err-code": "^3.0.1",
     "events": "^3.2.0",
     "fake-indexeddb": "^3.1.7",

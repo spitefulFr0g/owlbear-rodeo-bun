@@ -50,22 +50,13 @@ const compactSelect = {
 };
 const footerButton = { px: 2, py: 1, fontSize: 1 };
 
-type AssetManagerProps = {
-  /**
-   * Entries added to the footer beside Upload and New folder, such as the
-   * one-time browser library import. They open their own work through the
-   * library's extension requests.
-   */
-  actions?: React.ReactNode;
-};
-
 /**
  * The room's floating Asset Manager: every library a person may use as
  * sources, browsed by folder in tiles or a list, with the selected asset's
  * details and actions beside it. It shares search, filter and selection
  * with the dock.
  */
-function AssetManager({ actions }: AssetManagerProps) {
+function AssetManager() {
   const { person } = useScene();
   const room = useRoom();
   const { id: roomId } = useParams<{ id: string }>();
@@ -431,7 +422,6 @@ function AssetManager({ actions }: AssetManagerProps) {
                   </Button>
                 </>
               )}
-              {actions}
               <input ref={fileInput} type="file" accept="image/*" multiple hidden onChange={handleUpload} />
             </Flex>
           </Box>
