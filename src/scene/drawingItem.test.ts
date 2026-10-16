@@ -1,5 +1,5 @@
-import { drawingItem, drawingsInOrder, deleteDrawings } from "./drawingItem";
-import { Drawing } from "../types/Drawing";
+import { drawingItem, drawingsInOrder, deleteDrawings, drawingToolStrokes, toolStrokeWidth } from "./drawingItem";
+import { Drawing, DrawingStrokeWidth, DrawingToolType } from "../types/Drawing";
 import { Change, defaultSceneGrid, maxChanges } from "../sceneRules";
 
 const style = { id: "drawing", color: "red" as const, blend: true, strokeWidth: 1 };
@@ -30,6 +30,37 @@ test("world drawing geometry becomes local without changing its position or styl
 test("marker strokes are closed and filled while retaining blending", () => {
   expect(drawingItem({ ...style, strokeWidth: 0, type: "path", pathType: "fill", data: { points: [{ x: 0, y: 0 }, { x: 150, y: 150 }] } }, "gm", 15))
     .toMatchObject({ kind: "curve", closed: true, fill: true, blend: true, strokeWidth: 0 });
+});
+
+const presets: [DrawingStrokeWidth, number][] = [["thin", 7.5], ["normal", 15], ["thick", 30]];
+const tool = (type: DrawingToolType, strokeWidth: DrawingStrokeWidth, useShapeFill = false) =>
+  ({ type, strokeWidth, useShapeFill });
+
+test("each stroke width preset scales the brush, the line and outlined shapes from today's width", () => {
+  for (const [preset, width] of presets) {
+    const brush = drawingItem({ ...style, strokeWidth: toolStrokeWidth(tool("brush", preset, true)), type: "path", pathType: "stroke", data: { points: [{ x: 0, y: 0 }, { x: 150, y: 150 }] } }, "gm", 15);
+    const line = drawingItem({ ...style, strokeWidth: toolStrokeWidth(tool("line", preset, true)), type: "shape", shapeType: "line", data: { points: [{ x: 0, y: 0 }, { x: 150, y: 150 }] } }, "gm", 15);
+    const outline = drawingItem({ ...style, strokeWidth: toolStrokeWidth(tool("rectangle", preset)), type: "shape", shapeType: "rectangle", data: { x: 0, y: 0, width: 150, height: 150 } }, "gm", 15);
+    expect([brush.strokeWidth, line.strokeWidth, outline.strokeWidth]).toEqual([width, width, width]);
+    expect(outline).toMatchObject({ kind: "shape", fill: false });
+  }
+});
+
+test("filled shapes and marker strokes keep no stroke width at any preset", () => {
+  for (const [preset] of presets) {
+    const filled = drawingItem({ ...style, strokeWidth: toolStrokeWidth(tool("circle", preset, true)), type: "shape", shapeType: "circle", data: { x: 0, y: 0, radius: 75 } }, "gm", 15);
+    const marker = drawingItem({ ...style, strokeWidth: toolStrokeWidth(tool("paint", preset)), type: "path", pathType: "fill", data: { points: [{ x: 0, y: 0 }, { x: 150, y: 150 }] } }, "gm", 15);
+    expect(filled).toMatchObject({ kind: "shape", fill: true, strokeWidth: 0 });
+    expect(marker).toMatchObject({ kind: "curve", fill: true, strokeWidth: 0 });
+  }
+});
+
+test("the width is offered only for the brush, the line and outlined shapes", () => {
+  const offered = (["grab", "brush", "paint", "line", "rectangle", "circle", "triangle", "erase"] as DrawingToolType[])
+    .filter(type => drawingToolStrokes(tool(type, "normal")));
+  expect(offered).toEqual(["brush", "line", "rectangle", "circle", "triangle"]);
+  expect(drawingToolStrokes(tool("triangle", "normal", true))).toBe(false);
+  expect(drawingToolStrokes(tool("line", "normal", true))).toBe(true);
 });
 
 test("only drawing items are erased, in server order, within the batch cap", () => {

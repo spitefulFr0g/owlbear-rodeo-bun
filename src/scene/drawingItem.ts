@@ -1,4 +1,4 @@
-import { Drawing } from "../types/Drawing";
+import { Drawing, DrawingStrokeWidth, DrawingToolSettings } from "../types/Drawing";
 import { Change, CurveItem, LineItem, ShapeItem, Scene, maxChanges } from "../sceneRules";
 
 export type DrawingItem = ShapeItem | CurveItem | LineItem;
@@ -8,6 +8,21 @@ export function drawingsInOrder(scene: Scene): DrawingItem[] {
   return Object.values(scene.items).filter((item): item is DrawingItem =>
     item.layer === "drawing" && (item.kind === "shape" || item.kind === "curve" || item.kind === "line")
   ).sort((a, b) => a.order - b.order);
+}
+
+export const strokeWidthMultipliers: Record<DrawingStrokeWidth, number> = { thin: 0.5, normal: 1, thick: 2 };
+
+type StrokeSettings = Pick<DrawingToolSettings, "type" | "useShapeFill" | "strokeWidth">;
+
+/** The brush, the line and outlined shapes have a stroke; the marker and filled shapes do not. */
+export function drawingToolStrokes({ type, useShapeFill }: StrokeSettings): boolean {
+  return type === "brush" || type === "line"
+    || ((type === "rectangle" || type === "circle" || type === "triangle") && !useShapeFill);
+}
+
+/** The new drawing's stroke width multiplier for the chosen width, 0 for fills. */
+export function toolStrokeWidth(settings: StrokeSettings): number {
+  return drawingToolStrokes(settings) ? strokeWidthMultipliers[settings.strokeWidth] : 0;
 }
 
 /** Convert the tool's world geometry to the item's local geometry. */
