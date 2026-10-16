@@ -14,7 +14,6 @@ import Modal from "../components/Modal";
 import Slider from "../components/Slider";
 import LoadingOverlay from "../components/LoadingOverlay";
 
-import { useUserId } from "../contexts/UserIdContext";
 import { useDatabase } from "../contexts/DatabaseContext";
 
 import useSetting from "../hooks/useSetting";
@@ -30,7 +29,6 @@ type SettingsModalProps = {
 
 function SettingsModal({ isOpen, onRequestClose }: SettingsModalProps) {
   const { database } = useDatabase();
-  const userId = useUserId();
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [labelSize, setLabelSize] = useSetting<number>("map.labelSize");
   const [gridSnappingSensitivity, setGridSnappingSensitivity] =
@@ -77,15 +75,6 @@ function SettingsModal({ isOpen, onRequestClose }: SettingsModalProps) {
     setIsLoading(true);
     // Clear saved settings
     localStorage.clear();
-
-    if (database && userId) {
-      const assets = await database
-        .table("assets")
-        .where("owner")
-        .notEqual(userId)
-        .toArray();
-      await database.table("assets").bulkDelete(assets.map((asset) => asset.id));
-    }
 
     window.location.reload();
   }

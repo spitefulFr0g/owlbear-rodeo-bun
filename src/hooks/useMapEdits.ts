@@ -3,7 +3,6 @@ import { useState } from "react";
 import { isEmpty } from "../helpers/shared";
 import { getGridDefaultInset } from "../helpers/grid";
 
-import { UpdateMapEventHanlder } from "../contexts/MapDataContext";
 import { Map } from "../types/Map";
 
 /**
@@ -13,7 +12,7 @@ import { Map } from "../types/Map";
  */
 function useMapEdits<M extends Map | undefined>(
   map: M,
-  onUpdateMap: UpdateMapEventHanlder
+  onUpdateMap: (id: string, update: Partial<Map>) => Promise<void>
 ) {
   const mapId = map?.id;
   const [held, setHeld] = useState<{ mapId?: string; changes: Partial<Map> }>({

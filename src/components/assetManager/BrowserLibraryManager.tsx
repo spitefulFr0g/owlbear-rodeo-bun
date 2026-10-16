@@ -37,7 +37,8 @@ export default function BrowserLibraryManager() {
   const [skipped, setSkipped] = useState<string[]>([]);
   const [error, setError] = useState("");
   const records = useLiveQuery(async () => {
-    if (!database || role !== "gm") return [];
+    // Temporary bridge until the import UI is removed by task I.
+    if (!database || role !== "gm" || !database.tables.some(table => table.name === "maps")) return [];
     const [maps, tokens, mapGroups, tokenGroups] = await Promise.all([
       database.table<BrowserMap>("maps").toArray(), database.table<Token>("tokens").toArray(),
       database.table("groups").get("maps"), database.table("groups").get("tokens"),
