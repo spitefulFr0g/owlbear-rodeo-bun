@@ -28,7 +28,7 @@ A row with a split verdict names which part is which.
 
 Ten steps, grouped into releases. They are built in number order, except that step 8 is built before step 7. Steps 1 to 5 run on today's canvas. Step 6 is the one large rewrite. Steps 7 to 10 build on it. The move from Create React App to Vite is done between steps 7 and 9 and is not a numbered step.
 
-The scope through v0.5.0 is implemented. See the [v0.4.0 release notes](releases/v0.4.0.md) for scenes, live play and upgrade instructions, the [v0.4.1 release notes](releases/v0.4.1.md) for the fixes that followed, and the [v0.5.0 release notes](releases/v0.5.0.md) for libraries, the dock and upgrade instructions. v0.6.0 is a forecast.
+The scope through v0.5.0 is implemented. See the [v0.4.0 release notes](releases/v0.4.0.md) for scenes, live play and upgrade instructions, the [v0.4.1 release notes](releases/v0.4.1.md) for the fixes that followed, and the [v0.5.0 release notes](releases/v0.5.0.md) for libraries, the dock and upgrade instructions. v0.6.0 is planned and not built.
 
 ### v0.1.0: the shared screen
 
@@ -194,6 +194,19 @@ Decided for this release, in [Plan v0.5.0: libraries and dock](https://github.co
 | 10. Small tools | The text tool, with colour and size. Notes and text that start hidden. Adjustable stroke width. Duplicate numbering. Double-click to select a locked item. A check that Space pans mid-shape. |
 
 The browser library import ships in v0.5.0 and is removed in v0.6.0, with the rest of the browser library code. See [Decide how the existing browser library is imported into the account library](https://github.com/spitefulFr0g/owlbear-rodeo-bun/issues/27). The id a browser keeps for its player, the nickname and the settings are stored beside the browser library and stay where they are.
+
+Decided for this release, in [Plan v0.6.0: small tools](https://github.com/spitefulFr0g/owlbear-rodeo-bun/issues/158):
+
+- **One spec:** step 10 and the browser library removal. The removal is its own ticket and lands last, so the import keeps working on `main` as long as possible.
+- **Shipping:** the release ships once everyone at the table has run the import. The release notes say first that an import not run before upgrading cannot be run after.
+- **No prototype and no database layout change:** the server already accepts text items and any stroke width, so a server rolled back to v0.5.0 still opens v0.6.0 rooms.
+- **Text tool:** a click places a text item and opens the note's editing menu without the square. Its key is `x`. Colour comes from the note palette and size is one of four presets in proportion to a grid cell, both remembered per browser. The "notes and text" room switch covers it. Typing directly on the canvas is Later.
+- **Starting hidden:** every new note and text starts hidden, the GM's included, and placed ones keep their state. Who may show one is unchanged. A player who is not trusted sees a disabled "Show" entry with the hint "Only the GM can show this".
+- **Stroke width:** thin, normal and thick (half, today's and double) for the brush, the line and outlined shapes, applied to new drawings and remembered per browser. Fog has no width setting. Changing a placed drawing's width is Later.
+- **Duplicate numbering:** a trailing number in a token's label becomes the next free number among the labels the duplicating person can see, for Alt-drag, Duplicate, and copy and paste. A label with no trailing number stays as it is. Several tokens are numbered in order. A clash with a hidden label is accepted, because the server picking numbers would reveal hidden items.
+- **Locked items:** for the GM, a single click passes through a locked item and a double-click selects it instead of opening the context menu. A selection box skips locked items. Players still cannot select them.
+- **Space while drawing:** checked in the fog and drawing tools, fixed if broken, and covered by a test either way.
+- **Browser library removal:** a new browser database version keeps only the `user` table, with the player id and nickname, and deletes the old maps, tokens, groups, states and assets tables. The 1.x migrations, the default maps and tokens put into a new browser, and the import go with them. The "Browser library" glossary entry is deleted by the same change.
 
 ### Not scheduled
 
