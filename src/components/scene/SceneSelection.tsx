@@ -99,7 +99,8 @@ export default function SceneSelection({
     const added = copySelection(
       source,
       { x: dx, y: dy },
-      source.map(() => uuid())
+      source.map(() => uuid()),
+      Object.values(sceneRef.current?.items || {})
     );
     if (act(added.map((item) => ({ type: "add", item }))))
       setSelection(added.map((item) => item.id));
@@ -306,7 +307,10 @@ export default function SceneSelection({
           ? selectedRef.current
           : [id];
         setSelection(ids);
-        moving = nodes().filter((value) => ids.includes(value.id()));
+        const available = nodes();
+        moving = ids.flatMap((selectedId) =>
+          available.filter((value) => value.id() === selectedId)
+        );
         // Higher token layers attach by overlap at the start of the action.
         for (const candidate of nodes()) {
           const item = currentScene().items[candidate.id()];

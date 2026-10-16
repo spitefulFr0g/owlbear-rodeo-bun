@@ -1,3 +1,4 @@
+import { duplicateLabels } from "../helpers/duplicateLabels";
 import { Change, Item, Vector2 } from "../sceneRules";
 
 /** A common translation preserves the spacing of a mixed selection. */
@@ -15,10 +16,17 @@ export function moveSelection(items: Item[], delta: Vector2): Change[] {
 export function copySelection(
   items: Item[],
   delta: Vector2,
-  ids: string[]
+  ids: string[],
+  visibleItems: Item[]
 ): Item[] {
+  const labels = duplicateLabels(
+    items.flatMap((item) => item.kind === "image" ? [item.label] : []),
+    visibleItems.flatMap((item) => item.kind === "image" ? [item.label] : [])
+  );
+  let imageIndex = 0;
   return items.map((item, index) => ({
     ...item,
+    ...(item.kind === "image" ? { label: labels[imageIndex++] } : {}),
     id: ids[index],
     position: {
       x: item.position.x + delta.x,
