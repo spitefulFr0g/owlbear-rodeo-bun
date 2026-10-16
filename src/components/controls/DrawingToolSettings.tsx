@@ -16,6 +16,7 @@ import BrushRectangleIcon from "../../icons/BrushRectangleIcon";
 import BrushCircleIcon from "../../icons/BrushCircleIcon";
 import BrushTriangleIcon from "../../icons/BrushTriangleIcon";
 import EraseIcon from "../../icons/EraseToolIcon";
+import StrokeWidthIcon from "../../icons/StrokeWidthIcon";
 
 import MoveIcon from "../../icons/MoveToolIcon";
 import Divider from "../Divider";
@@ -25,9 +26,11 @@ import { useKeyboard } from "../../contexts/KeyboardContext";
 import shortcuts from "../../shortcuts";
 
 import {
+  DrawingStrokeWidth,
   DrawingToolSettings as DrawingToolSettingsType,
   DrawingToolType,
 } from "../../types/Drawing";
+import { drawingToolStrokes } from "../../scene/drawingItem";
 import EraseAllButton from "./shared/EraseAllButton";
 
 type DrawingToolSettingsProps = {
@@ -115,6 +118,17 @@ function DrawingToolSettings({
     },
   ];
 
+  const strokeWidths = [
+    { id: "thin", title: "Thin Stroke", iconWidth: 1.5 },
+    { id: "normal", title: "Normal Stroke", iconWidth: 3 },
+    { id: "thick", title: "Thick Stroke", iconWidth: 6 },
+  ].map(({ id, title, iconWidth }) => ({
+    id,
+    title,
+    isSelected: settings.strokeWidth === id,
+    icon: <StrokeWidthIcon width={iconWidth} />,
+  }));
+
   return (
     <Flex sx={{ alignItems: "center" }}>
       <RadioIconButton
@@ -159,6 +173,18 @@ function DrawingToolSettings({
         useShapeFill={settings.useShapeFill}
         onShapeFillChange={(useShapeFill) => onSettingChange({ useShapeFill })}
       />
+      {drawingToolStrokes(settings) && (
+        <>
+          <Divider vertical />
+          <ToolSection
+            tools={strokeWidths}
+            onToolClick={(tool) =>
+              onSettingChange({ strokeWidth: tool.id as DrawingStrokeWidth })
+            }
+            collapse={isSmallScreen}
+          />
+        </>
+      )}
     </Flex>
   );
 }

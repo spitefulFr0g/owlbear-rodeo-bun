@@ -77,6 +77,14 @@ function loadVersions(settings: Settings) {
       useShapeFill: true,
     },
   }));
+  // v0.6.0 - Add drawing stroke width
+  settings.version(10, (prev: any) => ({
+    ...prev,
+    drawing: {
+      ...prev.drawing,
+      strokeWidth: "normal",
+    },
+  }));
 }
 
 export function getSettings() {
