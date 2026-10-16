@@ -18,7 +18,7 @@ function checkEnvironment(env) {
   return result;
 }
 
-// Receipts exist only during a guarded merge. Ordinary commits run fresh checks.
+// Receipts are scoped to one guarded merge or verified commit, then removed.
 function fingerprint(repo, command, cwd, env) {
   const hash = crypto.createHash("sha256");
   const add = value => {
@@ -157,10 +157,32 @@ async function checks(mode) {
   if (frontend) await runCheck([process.execPath, "scripts/frontend.cjs", "check"]);
 }
 
-module.exports = { fingerprint, runCheck, testTimings, writeJson };
+function prepare(repo = root) {
+  require("./frontend.cjs").prepare(repo);
+  execFileSync("bun", ["install", "--frozen-lockfile"], { cwd: path.join(repo, "backend"), stdio: "inherit", env: checkEnvironment(process.env) });
+}
+
+function verifiedCommit(args, { repo = root, env = process.env, command = [process.execPath, path.join(repo, "scripts/checks.cjs"), "all"] } = {}) {
+  if (!args.length) throw new Error("commit needs git commit arguments, such as -- -m 'message'");
+  const cleanEnv = checkEnvironment(env);
+  if (git(repo, "diff", "--name-only") || git(repo, "ls-files", "--others", "--exclude-standard")) {
+    throw new Error("stage the intended files and resolve unstaged/untracked work before verified commit");
+  }
+  const gitDirectory = path.resolve(repo, git(repo, "rev-parse", "--git-dir"));
+  const directory = fs.mkdtempSync(path.join(gitDirectory, "worker-check-"));
+  const receiptEnv = { ...cleanEnv, OWLBEAR_CHECK_RECEIPT: path.join(directory, "receipt.json") };
+  try {
+    execFileSync(command[0], command.slice(1), { cwd: repo, env: receiptEnv, stdio: "inherit" });
+    execFileSync("git", ["commit", ...args], { cwd: repo, env: receiptEnv, stdio: "inherit" });
+  } finally { fs.rmSync(directory, { recursive: true, force: true }); }
+}
+
+module.exports = { fingerprint, runCheck, testTimings, writeJson, prepare, verifiedCommit };
 if (require.main === module) {
   const mode = process.argv[2];
   const action = mode === "backend-test" ? backendTests(process.argv.slice(3)) :
-    ["all", "staged"].includes(mode) ? checks(mode) : Promise.reject(new Error("Usage: node scripts/checks.cjs all|staged|backend-test [test flags]"));
-  action.catch(error => { console.error(error.message); process.exitCode = error.exitCode || 1; });
+    mode === "prepare" ? Promise.resolve().then(() => prepare()) :
+    mode === "commit" ? Promise.resolve().then(() => verifiedCommit(process.argv.slice(process.argv[3] === "--" ? 4 : 3))) :
+    ["all", "staged"].includes(mode) ? checks(mode) : Promise.reject(new Error("Usage: node scripts/checks.cjs all|staged|prepare|commit -- [git commit arguments]|backend-test [test flags]"));
+  action.catch(error => { console.error(error.message); process.exitCode = error.exitCode || error.status || 1; });
 }

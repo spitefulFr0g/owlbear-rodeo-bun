@@ -119,3 +119,28 @@ test("the maintained test command rejects slow passing tests and preserves test 
   assert.equal(run("(fail) count caps [418432.85ms]", 7), 7);
   assert.equal(run("(pass) count caps [12000ms]", 0), 0);
 });
+
+test("verified worker commits share receipts with hooks and discard the receipt afterward", async t => {
+  const { verifiedCommit } = require("./checks.cjs");
+  const repo = fs.mkdtempSync(path.join(os.tmpdir(), "worker-commit-"));
+  t.after(() => fs.rmSync(repo, { recursive: true, force: true }));
+  const git = (...args) => execFileSync("git", args, { cwd: repo, stdio: "pipe" });
+  git("init"); git("config", "user.name", "Fixture"); git("config", "user.email", "fixture@example.invalid");
+  const counter = path.join(repo, ".git", "executions");
+  const command = [process.execPath, "-e", `require('fs').appendFileSync(${JSON.stringify(counter)}, 'x')`];
+  const runner = path.join(repo, "verify.cjs");
+  fs.writeFileSync(runner, `require(${JSON.stringify(path.join(__dirname, "checks.cjs"))}).runCheck(${JSON.stringify(command)}, {repo: process.cwd(), cwd: process.cwd(), quiet: true}).catch(() => process.exit(1));`);
+  git("add", ".");
+  const hook = path.join(repo, ".git", "hooks", "pre-commit");
+  fs.writeFileSync(hook, `#!/bin/sh\nexec '${process.execPath}' verify.cjs\n`, { mode: 0o755 });
+  git("config", "core.hooksPath", path.dirname(hook));
+  verifiedCommit(["-m", "verified"], { repo, command: [process.execPath, runner] });
+  assert.equal(fs.readFileSync(counter, "utf8"), "x");
+  assert.equal(fs.readdirSync(path.join(repo, ".git")).some(name => name.startsWith("worker-check-")), false);
+  fs.writeFileSync(path.join(repo, "unstaged"), "unfinished");
+  assert.throws(() => verifiedCommit(["-m", "unsafe"], { repo }), /unstaged\/untracked/);
+  git("add", ".");
+  assert.throws(() => verifiedCommit(["-m", "failed"], { repo, command: [process.execPath, "-e", "process.exit(7)"] }));
+  assert.equal(git("log", "--format=%s").toString().trim(), "verified");
+  assert.equal(fs.readdirSync(path.join(repo, ".git")).some(name => name.startsWith("worker-check-")), false);
+});
