@@ -1,4 +1,4 @@
-import { Box, Button, Input, Label, Select, Textarea, Flex } from "theme-ui";
+import { Box, Button, Input, Label, Select, Text, Textarea, Flex } from "theme-ui";
 import { v4 as uuid } from "uuid";
 import { useParty } from "../../contexts/PartyContext";
 import { itemOwners } from "../../helpers/itemOwners";
@@ -12,6 +12,7 @@ import {
   statusRingsKey,
 } from "../../sceneRules";
 import { copySelection } from "../../scene/selection";
+import { visibilityEntry } from "../../helpers/visibilityEntry";
 import colors, { colorOptions } from "../../helpers/colors";
 
 export default function SceneItemMenu({
@@ -35,6 +36,8 @@ export default function SceneItemMenu({
   );
   const mayUpdate = (fields: ItemFields) => all(item =>
     canChange({ type: "update", id: item.id, fields }));
+  const visibility = visibilityEntry(person, items, (item, hidden) =>
+    canChange({ type: "update", id: item.id, fields: { hidden } }));
   function update(fields: ItemFields) {
     act(items.map((item) => ({ type: "update", id: item.id, fields })));
   }
@@ -233,11 +236,13 @@ export default function SceneItemMenu({
           </>
         )}
         <Button
-          disabled={!mayUpdate({ hidden: !items.every(item => item.hidden) })}
-          onClick={() => update({ hidden: !items.every(item => item.hidden) })}
+          disabled={!visibility.enabled}
+          title={visibility.hint}
+          onClick={() => update({ hidden: visibility.label === "Hide" })}
         >
-          {items.every(item => item.hidden) ? "Show" : "Hide"}
+          {visibility.label}
         </Button>
+        {visibility.hint && <Text variant="caption" as="p">{visibility.hint}</Text>}
         {all(
           (item) =>
             item.layer === "fog" &&

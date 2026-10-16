@@ -52,7 +52,7 @@ function NoteTool({
         order: 0,
         owner: person.id,
         locked: false,
-        hidden: false,
+        hidden: true,
         metadata: {},
         text: "",
         color: "yellow",
