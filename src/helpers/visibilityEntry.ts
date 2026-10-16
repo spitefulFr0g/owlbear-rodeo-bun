@@ -19,5 +19,6 @@ export function visibilityEntry(
   const label = hidden ? "Show" : "Hide";
   const enabled = items.length > 0 && items.every(item => mayChangeHidden(item, !hidden));
   const ownHiddenText = hidden && items.every(item => item.kind === "text" && item.owner === person.id);
-  return !enabled && ownHiddenText ? { label, enabled, hint: onlyGmShowsHint } : { label, enabled };
+  return person.role === "player" && !enabled && ownHiddenText
+    ? { label, enabled, hint: onlyGmShowsHint } : { label, enabled };
 }

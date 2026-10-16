@@ -46,3 +46,8 @@ test("a shown item offers Hide", () => {
   expect(entry({ role: "gm", id: "gm" }, [{ ...note, hidden: false }])).toEqual({ label: "Hide", enabled: true });
   expect(entry({ role: "player", id: "ann" }, [{ ...note, hidden: false }])).toEqual({ label: "Hide", enabled: false });
 });
+
+test("a trusted owner's locked note does not claim only the GM may show their writing", () => {
+  expect(entry({ role: "trusted", id: "ann" }, [{ ...note, locked: true }]))
+    .toEqual({ label: "Show", enabled: false });
+});
