@@ -123,6 +123,10 @@ _Avoid_: Condition marker, status effect, aura
 A short piece of plain text on a coloured square, placed on the Note layer.
 _Avoid_: Sticky, memo, comment
 
+**Text**:
+A piece of plain text placed on the Text layer, with no square behind it.
+_Avoid_: Label, caption, annotation
+
 **Hidden item**:
 An item that only its owner and the GM can see. New notes and text start hidden, and only the GM or a trusted player can show theirs to everyone.
 _Avoid_: Private item, invisible item, secret item
