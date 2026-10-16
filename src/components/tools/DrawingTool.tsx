@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import shortid from "shortid";
 
 import {
+  useSpacePanTool,
   useDebouncedStageScale,
   useInteractionEmitter,
   leftMouseButton,
@@ -9,6 +10,7 @@ import {
 } from "../../contexts/MapInteractionContext";
 import { useMapStage } from "../../contexts/MapStageContext";
 
+import { spacePanTransition } from "../../helpers/spacePan";
 import Vector2 from "../../helpers/Vector2";
 import {
   getDefaultShapeData,
@@ -58,6 +60,7 @@ function DrawingTool({
   const gridStrokeWidth = (scene?.grid.unitsPerCell || 150) / 10;
   const mapStageRef = useMapStage();
   const [drawing, setDrawing] = useState<Drawing | null>(null);
+  const panFrom = useSpacePanTool();
   const [isBrushDown, setIsBrushDown] = useState(false);
   const [erasingDrawings, setErasingDrawings] = useState<string[]>([]);
 
@@ -74,12 +77,15 @@ function DrawingTool({
   const snapPositionToGrid = useSceneSnapping();
 
   useEffect(() => {
+    setDrawing(shape => spacePanTransition({
+      tool: "drawing", panFrom, shape,
+    }, { type: "availability", active, editable: !readOnly }).shape);
     if (!active || readOnly) {
-      setDrawing(null);
-      setIsBrushDown(false);
       setErasingDrawings([]);
+      // A held stroke resumes after Space; pan mouse events never reach the tool.
+      if (panFrom !== "drawing" || readOnly) setIsBrushDown(false);
     }
-  }, [active, readOnly]);
+  }, [active, readOnly, panFrom]);
 
   useEffect(() => {
     if (!active || readOnly) {
@@ -105,6 +111,10 @@ function DrawingTool({
 
     function handleBrushDown(props: MapDragEvent) {
       if (!leftMouseButton(props)) {
+        return;
+      }
+      if (drawing) {
+        setIsBrushDown(true);
         return;
       }
       const brushPosition = getBrushPosition();

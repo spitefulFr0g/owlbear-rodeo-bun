@@ -3,6 +3,7 @@ import { FullGestureState } from "react-use-gesture/dist/types";
 import useDebounce from "../hooks/useDebounce";
 import { TypedEmitter } from "tiny-typed-emitter";
 import Konva from "konva";
+import { MapToolId } from "../types/Map";
 
 export type MapDragEvent = Omit<FullGestureState<"drag">, "event"> & {
   event: React.PointerEvent<Element> | PointerEvent;
@@ -18,7 +19,14 @@ export interface MapInteractionEvents {
 
 export class MapInteractionEmitter extends TypedEmitter<MapInteractionEvents> {}
 
+export const SpacePanContext = React.createContext<MapToolId | null>(null);
+
+export function useSpacePanTool() {
+  return useContext(SpacePanContext);
+}
+
 type MapInteraction = {
+  spacePanTool: MapToolId | null;
   stageScale: number;
   stageWidth: number;
   stageHeight: number;
@@ -61,6 +69,7 @@ export function MapInteractionProvider({
   children: React.ReactNode;
 }) {
   const {
+    spacePanTool,
     stageScale,
     stageWidth,
     stageHeight,
@@ -71,27 +80,29 @@ export function MapInteractionProvider({
   } = value;
   const debouncedStageScale = useDebounce(stageScale, 200);
   return (
-    <InteractionEmitterContext.Provider value={interactionEmitter}>
-      <SetPreventMapInteractionContext.Provider
-        value={setPreventMapInteraction}
-      >
-        <StageWidthContext.Provider value={stageWidth}>
-          <StageHeightContext.Provider value={stageHeight}>
-            <MapWidthContext.Provider value={mapWidth}>
-              <MapHeightContext.Provider value={mapHeight}>
-                <StageScaleContext.Provider value={stageScale}>
-                  <DebouncedStageScaleContext.Provider
-                    value={debouncedStageScale || 1}
-                  >
-                    {children}
-                  </DebouncedStageScaleContext.Provider>
-                </StageScaleContext.Provider>
-              </MapHeightContext.Provider>
-            </MapWidthContext.Provider>
-          </StageHeightContext.Provider>
-        </StageWidthContext.Provider>
-      </SetPreventMapInteractionContext.Provider>
-    </InteractionEmitterContext.Provider>
+    <SpacePanContext.Provider value={spacePanTool}>
+      <InteractionEmitterContext.Provider value={interactionEmitter}>
+        <SetPreventMapInteractionContext.Provider
+          value={setPreventMapInteraction}
+        >
+          <StageWidthContext.Provider value={stageWidth}>
+            <StageHeightContext.Provider value={stageHeight}>
+              <MapWidthContext.Provider value={mapWidth}>
+                <MapHeightContext.Provider value={mapHeight}>
+                  <StageScaleContext.Provider value={stageScale}>
+                    <DebouncedStageScaleContext.Provider
+                      value={debouncedStageScale || 1}
+                    >
+                      {children}
+                    </DebouncedStageScaleContext.Provider>
+                  </StageScaleContext.Provider>
+                </MapHeightContext.Provider>
+              </MapWidthContext.Provider>
+            </StageHeightContext.Provider>
+          </StageWidthContext.Provider>
+        </SetPreventMapInteractionContext.Provider>
+      </InteractionEmitterContext.Provider>
+    </SpacePanContext.Provider>
   );
 }
 

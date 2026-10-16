@@ -1,3 +1,4 @@
+import { spacePanTransition } from "../../helpers/spacePan";
 import SceneFogFill from "../scene/SceneFogFill";
 import { useState, useEffect, useCallback, useMemo } from "react";
 import shortid from "shortid";
@@ -9,6 +10,7 @@ import Konva from "konva";
 import diagonalPattern from "../../images/DiagonalPattern.png";
 
 import {
+  useSpacePanTool,
   useDebouncedStageScale,
   useInteractionEmitter,
   MapDragEvent,
@@ -85,6 +87,7 @@ function FogTool({ onShapeError, active, toolSettings, editable: permitted, visi
   const mapStageRef = useMapStage();
 
   const [drawingShape, setDrawingShape] = useState<Fog | null>(null);
+  const panFrom = useSpacePanTool();
   const [isBrushDown, setIsBrushDown] = useState(false);
   const [hoveredShapes, setHoveredShapes] = useState<Fog[]>([]);
 
@@ -111,8 +114,15 @@ function FogTool({ onShapeError, active, toolSettings, editable: permitted, visi
   const [patternImage] = useImage(diagonalPattern);
 
   useEffect(() => {
-    if (!active || !editable) { setDrawingShape(null); setHoveredShapes([]); setIsBrushDown(false); }
-  }, [active, editable]);
+    setDrawingShape(shape => spacePanTransition({
+      tool: "fog", panFrom, shape,
+    }, { type: "availability", active, editable }).shape);
+    if (!active || !editable) {
+      setHoveredShapes([]);
+      // A held stroke resumes after Space; pan mouse events never reach the tool.
+      if (panFrom !== "fog" || !editable) setIsBrushDown(false);
+    }
+  }, [active, editable, panFrom]);
 
   useEffect(() => {
     if (!active || !editable) {
@@ -147,6 +157,10 @@ function FogTool({ onShapeError, active, toolSettings, editable: permitted, visi
 
     function handleBrushDown(props: MapDragEvent) {
       if (!leftMouseButton(props)) {
+        return;
+      }
+      if (drawingShape) {
+        setIsBrushDown(true);
         return;
       }
       if (toolSettings.type === "brush") {
@@ -396,6 +410,7 @@ function FogTool({ onShapeError, active, toolSettings, editable: permitted, visi
 
   // Add keyboard shortcuts
   function handleKeyDown(event: KeyboardEvent) {
+    if (!active || !editable) return;
     if (
       shortcuts.fogFinishPolygon(event) &&
       toolSettings.type === "polygon" &&

@@ -1,6 +1,8 @@
 import React, { useContext } from "react";
 
 import {
+  SpacePanContext,
+  useSpacePanTool,
   InteractionEmitterContext,
   SetPreventMapInteractionContext,
   StageWidthContext,
@@ -74,6 +76,7 @@ function KonvaBridge({
   const setAssetURLs = useContext(AssetURLsUpdaterContext);
   const keyboardValue = useContext(KeyboardContext);
 
+  const spacePanTool = useSpacePanTool();
   const stageScale = useStageScale();
   const stageWidth = useStageWidth();
   const stageHeight = useStageHeight();
@@ -100,6 +103,7 @@ function KonvaBridge({
   const live = useContext(LiveContext);
 
   return stageRender(
+    <SpacePanContext.Provider value={spacePanTool}>
     <SceneContext.Provider value={scene}>
     <LiveContext.Provider value={live}>
     <PlayerStateContext.Provider value={player}>
@@ -183,6 +187,7 @@ function KonvaBridge({
     </PlayerStateContext.Provider>
     </LiveContext.Provider>
     </SceneContext.Provider>
+    </SpacePanContext.Provider>
   );
 }
 
