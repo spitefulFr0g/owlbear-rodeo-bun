@@ -206,8 +206,8 @@ function useStageInteraction(
       },
     },
     {
-      // Fix drawing using old pointer end position on touch devices when drawing new shapes
-      drag: { delay: 300 },
+      // Notes and text place on a click; drawing retains its touch delay.
+      drag: { delay: tool === "note" || tool === "text" ? 0 : 300 },
       domTarget: window,
       eventOptions: {
         passive: false,
