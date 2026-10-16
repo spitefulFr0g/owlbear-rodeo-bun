@@ -35,6 +35,32 @@ export function copySelection(
   }));
 }
 
+/**
+ * What a pointer press picks from the items under it, given bottom to top in
+ * drawing order. A single press passes locked items to the topmost unlocked
+ * item beneath; a double-click picks a locked item and nothing otherwise, so
+ * an unlocked item's menu opens; a menu press picks the topmost item. Items
+ * the person may not select are always passed.
+ */
+export function pressPick(
+  under: Item[],
+  maySelect: (item: Item) => boolean,
+  press: "single" | "double" | "menu"
+): Item | undefined {
+  const permitted = under.filter(maySelect).reverse();
+  if (press === "menu") return permitted[0];
+  if (press === "double") return permitted[0]?.locked ? permitted[0] : undefined;
+  return permitted.find((item) => !item.locked);
+}
+
+/** What a selection box takes from the items it touches: never a locked item. */
+export function boxSelection(
+  touched: Item[],
+  maySelect: (item: Item) => boolean
+): Item[] {
+  return touched.filter((item) => !item.locked && maySelect(item));
+}
+
 /** Attaching layers follow today's mount outline and character centre rules. */
 export function attachesTo(
   base: Item,
