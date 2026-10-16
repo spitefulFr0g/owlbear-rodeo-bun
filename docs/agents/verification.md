@@ -4,7 +4,7 @@ Run this command when changing the lifetime of canvas drags or transforms, inclu
 
 ## Prepare
 
-Use a worktree with frontend and backend dependencies set up as described in [Dev environment](dev-environment.md). Build its frontend with `bun run build:frontend` in `backend/`.
+Use a clean committed worktree with frontend and backend dependencies set up as described in [Dev environment](dev-environment.md). Build its frontend with `bun run build:frontend` in `backend/`. The verifier refuses tracked, staged or untracked source changes before starting and checks the clean source and build again before accepting the result.
 
 The command requires T3's collaborative preview tools and an incognito profile. It creates its own tab, temporary data directory, account and room. It drives DOM mouse events, observes rendered Konva geometry, and uses public HTTP/socket messages for authoritative changes. A marker in each peer change batch provides a browser rendering barrier; there are no guessed sleeps between a competing change and its assertion. After each release, a harmless refused request is sent over the application's own WebSocket and its acknowledgement is awaited before reading saved state. This orders the assertion after preceding browser changes, including cancellation cases where the expected state was already saved. The wire packet and decoder use the installed Socket.IO MessagePack dependencies.
 

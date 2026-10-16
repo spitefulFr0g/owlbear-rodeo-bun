@@ -12,6 +12,7 @@ test("browser provenance identifies the verified source and changes with built a
   const git = (...args) => execFileSync("git", args, { cwd: repo, stdio: "pipe" }).toString().trim();
   git("init");
   fs.writeFileSync(path.join(repo, ".gitignore"), "build/\n");
+  fs.writeFileSync(path.join(repo, "source"), "committed source");
   git("add", ".");
   git("-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "-c", "core.hooksPath=/dev/null", "commit", "-m", "fixture");
   assert.throws(() => provenance(repo), /ENOENT/);
@@ -24,6 +25,15 @@ test("browser provenance identifies the verified source and changes with built a
   assert.deepEqual(provenance(repo), first);
   fs.writeFileSync(path.join(repo, "build", "app.js"), "second build");
   assert.notEqual(provenance(repo).buildFingerprint, first.buildFingerprint);
-  fs.writeFileSync(path.join(repo, "source"), "uncommitted change");
-  assert.equal(provenance(repo).sourceDirty, true);
+  fs.writeFileSync(path.join(repo, "untracked"), "uncommitted source");
+  assert.throws(() => provenance(repo), /clean committed worktree/);
+  fs.rmSync(path.join(repo, "untracked"));
+  fs.writeFileSync(path.join(repo, "source"), "first uncommitted change");
+  assert.throws(() => provenance(repo), /clean committed worktree/);
+  fs.writeFileSync(path.join(repo, "source"), "another uncommitted change");
+  assert.throws(() => provenance(repo), /clean committed worktree/);
+  git("add", "source");
+  assert.throws(() => provenance(repo), /clean committed worktree/);
+  git("reset", "--hard", "HEAD");
+  assert.equal(provenance(repo).sourceDirty, false);
 });

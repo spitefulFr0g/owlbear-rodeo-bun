@@ -5,6 +5,10 @@ const { execFileSync } = require("node:child_process");
 
 function provenance(repo = path.resolve(__dirname, "..")) {
   const git = (...args) => execFileSync("git", args, { cwd: repo, encoding: "utf8" }).trim();
+  if (git("status", "--porcelain")) {
+    throw new Error("Browser verification requires a clean committed worktree");
+  }
+  const sourceSha = git("rev-parse", "HEAD");
   const directory = path.join(repo, "build");
   const files = [];
   function visit(folder) {
@@ -21,7 +25,10 @@ function provenance(repo = path.resolve(__dirname, "..")) {
     const digest = crypto.createHash("sha256").update(fs.readFileSync(path.join(directory, name))).digest("hex");
     hash.update(JSON.stringify([name, digest]));
   }
-  return { sourceSha: git("rev-parse", "HEAD"), sourceDirty: Boolean(git("status", "--porcelain")), buildFingerprint: hash.digest("hex") };
+  if (git("status", "--porcelain") || git("rev-parse", "HEAD") !== sourceSha) {
+    throw new Error("Verified source changed while recording browser provenance");
+  }
+  return { sourceSha, sourceDirty: false, buildFingerprint: hash.digest("hex") };
 }
 module.exports = { provenance };
 if (require.main === module) {

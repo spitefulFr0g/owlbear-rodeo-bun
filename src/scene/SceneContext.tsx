@@ -23,7 +23,7 @@ import { MapRect } from "../helpers/displayView";
 import { PlayerView } from "../helpers/playerView";
 import { SceneList } from "../helpers/sceneList";
 
-import { downloadAsset, hasAsset, uploadAsset } from "../network/assetStore";
+import { hasAsset, uploadAsset } from "../network/assetStore";
 import Session, { SessionStatus } from "../network/Session";
 
 import {
@@ -168,7 +168,7 @@ export function SceneProvider({
   const userId = useUserId();
   const role = useRole();
   const room = useRoom();
-  const { getAsset, putAsset } = useAssets();
+  const { getAsset } = useAssets();
 
   const [selection, setSelection] = useState<string[]>([]);
   const [held, setHeld] = useState(nothingHeld);
@@ -262,34 +262,6 @@ export function SceneProvider({
   }, [session.socket]);
 
   const waiting = role !== "gm" && room.session === false;
-
-  // Fetch the files the scene's images name, the local database then draws them
-  const fetchedRef = useRef(new Set<string>());
-  useEffect(() => {
-    const token = session.joinToken;
-    if (!scene || !connected || !token) {
-      return;
-    }
-    const access = { url: session.brokerUrl, token };
-    async function fetchFile(file: string) {
-      try {
-        if (!(await getAsset(file))) {
-          await putAsset(await downloadAsset(access, file));
-        }
-      } catch (error) {
-        // Try again the next time the scene changes or the connection returns
-        fetchedRef.current.delete(file);
-      }
-    }
-    for (const item of imagesInOrder(scene)) {
-      for (const file of imageFiles(item)) {
-        if (!fetchedRef.current.has(file)) {
-          fetchedRef.current.add(file);
-          fetchFile(file);
-        }
-      }
-    }
-  }, [scene, connected, session, getAsset, putAsset]);
 
   const readOnly = !connected || !scene || !!asking;
 
@@ -481,8 +453,6 @@ export function SceneProvider({
           throw new Error(`Unable to share file ${file}: not stored here`);
         }
         await uploadAsset(access, asset);
-        // No need to fetch back what this browser already holds
-        fetchedRef.current.add(file);
       }
     },
     [session, getAsset]

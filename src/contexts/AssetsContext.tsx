@@ -4,10 +4,14 @@ import useDebounce from "../hooks/useDebounce";
 import { omit } from "../helpers/shared";
 import { shownFile } from "../helpers/shownFile";
 import { Asset } from "../types/Asset";
+import { createAssetCache } from "../helpers/assetCache";
+import { downloadAsset } from "../network/assetStore";
+import { sessionLibraryAccess } from "../network/library";
+import Session from "../network/Session";
 
 export type GetAssetEventHanlder = (
   assetId: string
-) => Promise<Asset | undefined>;
+) => Promise<Asset>;
 export type AddAssetsEventHandler = (assets: Asset[]) => Promise<void>;
 export type PutAssetEventsHandler = (asset: Asset) => Promise<void>;
 
@@ -22,16 +26,17 @@ const AssetsContext =
   React.createContext<AssetsContextValue | undefined>(undefined);
 
 // Server assets are cached for this page only, never in the browser database.
-export function AssetsProvider({ children }: { children: React.ReactNode }) {
-  const assets = useRef(new Map<string, Asset>());
+export function AssetsProvider({ session, children }: { session: Session; children: React.ReactNode }) {
+  const assets = useRef(createAssetCache());
   const [assetVersion, setAssetVersion] = useState(0);
-  const getAsset = useCallback<GetAssetEventHanlder>(async id => assets.current.get(id), []);
+  const getAsset = useCallback<GetAssetEventHanlder>(async id =>
+    assets.current.get(id, () => downloadAsset(sessionLibraryAccess(session), id)), [session]);
   const addAssets = useCallback<AddAssetsEventHandler>(async incoming => {
-    for (const asset of incoming) assets.current.set(asset.id, asset);
+    for (const asset of incoming) assets.current.put(asset);
     setAssetVersion(version => version + 1);
   }, []);
   const putAsset = useCallback<PutAssetEventsHandler>(async asset => {
-    assets.current.set(asset.id, asset);
+    assets.current.put(asset);
     setAssetVersion(version => version + 1);
   }, []);
   return <AssetsContext.Provider value={{ getAsset, addAssets, putAsset, assetVersion }}>{children}</AssetsContext.Provider>;
@@ -92,15 +97,13 @@ export function AssetURLsProvider({ children }: { children: React.ReactNode }) {
         keysToLoad.push(url.id);
       }
     }
-    if (keysToLoad.length > 0) {
-      setAssetKeys(keysToLoad);
-    }
+    setAssetKeys(keysToLoad);
   }, [loadingDebouncedAssetURLs]);
 
   useEffect(() => {
     let cancelled = false;
     if (!assetKeys.length) return;
-    Promise.all(assetKeys.map(getAsset)).then(assets => {
+    Promise.all(assetKeys.map(id => getAsset(id).catch(() => undefined))).then(assets => {
       if (cancelled) return;
       setAssetURLs(prev => {
         const next = { ...prev };

@@ -126,7 +126,7 @@ function Display() {
 
   return (
     <RoomProvider session={session}>
-    <AssetsProvider>
+    <AssetsProvider session={session}>
       <AssetURLsProvider>
         <MapLoadingProvider>
           <PartyProvider session={session}>
