@@ -65,7 +65,7 @@ test("one forbidden field refuses a whole update and only trusted owners can cha
         expect(mayChange({ role, id: "player" }, rules, { ...base, owner }, { type: "update", id: base.id, fields: { layer } })).toBe(role === "gm" || (role === "trusted" && owner === "player" && layer !== "map"));
       }
     }
-    for (const flags of [{ locked: true }, { hidden: true }]) {
+    for (const flags of [{ locked: true }, { locked: true, hidden: true }]) {
       expect(mayChange({ role, id: "player" }, rules, undefined, { type: "add", item: { ...base, ...flags } })).toBe(role === "gm");
     }
   }
@@ -206,6 +206,47 @@ test("welcome-screen scenes permit only the GM for every role, item kind, layer 
           expect(mayChange({ role, id: "player" }, { ...rules, viewOnly: false, welcomeScreen: true },
             change.type === "add" ? undefined : item, change)).toBe(role === "gm");
         }
+      }
+    }
+  }
+});
+
+for (const square of [false, true]) {
+  test(`players add their own hidden ${square ? "notes" : "text"} subject to the notes switch`, () => {
+    for (const role of ["player", "trusted"] as const) {
+      for (const notes of [false, true]) {
+        for (const owner of ["player", "other"]) {
+          for (const locked of [false, true]) {
+            const item = { ...base, square, layer: square ? "note" as const : "text" as const, hidden: true, owner, locked };
+            expect(mayChange({ role, id: "player" }, { switches: { ...rules.switches, notes } }, undefined,
+              { type: "add", item })).toBe(!locked && owner === "player" && (role === "trusted" || notes));
+          }
+        }
+      }
+    }
+  });
+  test(`only trusted owners can show hidden ${square ? "notes" : "text"}, while owners can edit and delete`, () => {
+    for (const role of ["player", "trusted"] as const) {
+      for (const owner of ["player", "other"]) {
+        const item = { ...base, square, hidden: true, owner };
+        for (const change of [
+          { type: "update" as const, id: item.id, fields: { text: "Edited" } },
+          { type: "update" as const, id: item.id, fields: { position: { x: 1, y: 2 } } },
+          { type: "delete" as const, id: item.id },
+        ]) expect(mayChange({ role, id: "player" }, rules, item, change)).toBe(owner === "player");
+        expect(mayChange({ role, id: "player" }, rules, item,
+          { type: "update", id: item.id, fields: { hidden: false } })).toBe(role === "trusted" && owner === "player");
+      }
+    }
+  });
+}
+
+test("players cannot add hidden images, drawings or fog items", () => {
+  for (const role of ["player", "trusted"] as const) {
+    for (const example of examples.filter(item => item.kind !== "text")) {
+      for (const layer of [example.layer, "fog"] as const) {
+        const item = { ...example, layer, hidden: true };
+        expect(mayChange({ role, id: "player" }, rules, undefined, { type: "add", item })).toBe(false);
       }
     }
   }
