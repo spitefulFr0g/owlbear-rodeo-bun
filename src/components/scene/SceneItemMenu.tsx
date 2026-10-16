@@ -13,7 +13,9 @@ import {
 } from "../../sceneRules";
 import { copySelection } from "../../scene/selection";
 import { visibilityEntry } from "../../helpers/visibilityEntry";
-import colors, { colorOptions } from "../../helpers/colors";
+import colors, { Color, colorOptions } from "../../helpers/colors";
+import { useSettings } from "../../contexts/SettingsContext";
+import { textLineHeight, TextSize, textSizeOf, textSizes } from "../../helpers/textItem";
 
 export default function SceneItemMenu({
   position,
@@ -24,6 +26,7 @@ export default function SceneItemMenu({
 }) {
   const { scene, selection, act, readOnly, setSelection, canChange, person } = useScene();
   const party = useParty();
+  const { setSettings } = useSettings();
   const items = selection
     .map((id) => scene?.items[id])
     .filter((item): item is Item => !!item);
@@ -40,6 +43,12 @@ export default function SceneItemMenu({
     canChange({ type: "update", id: item.id, fields: { hidden } }));
   function update(fields: ItemFields) {
     act(items.map((item) => ({ type: "update", id: item.id, fields })));
+  }
+  const plainText = all((item) => item.kind === "text" && !item.square);
+  /** The Text tool places its next text in the colour and size last chosen here. */
+  function rememberText(change: { color?: Color; size?: TextSize }) {
+    if (plainText)
+      setSettings((settings) => ({ ...settings, text: { ...settings.text, ...change } }));
   }
   const rings = (item: Item): string[] =>
     Array.isArray(item.metadata[statusRingsKey])
@@ -167,7 +176,10 @@ export default function SceneItemMenu({
               aria-label="Item colour"
                 disabled={!mayUpdate({ color: "red" })}
               value={"color" in items[0] ? items[0].color : ""}
-              onChange={(event) => update({ color: event.target.value })}
+              onChange={(event) => {
+                update({ color: event.target.value });
+                rememberText({ color: event.target.value as Color });
+              }}
             >
               {colorOptions.map((color) => (
                 <option key={color} value={color}>
@@ -187,6 +199,31 @@ export default function SceneItemMenu({
               value={items[0].kind === "text" ? items[0].text : ""}
               onChange={(event) => update({ text: event.target.value })}
             />
+          </Label>
+        )}
+        {plainText && scene && (
+          <Label>
+            Size
+            <Select
+              aria-label="Text size"
+              disabled={!mayUpdate({ size: 1 })}
+              value={sameValue(items.map((item) =>
+                item.kind === "text" ? textSizeOf(item.size, scene.grid.unitsPerCell) : ""))}
+              onChange={(event) => {
+                const size = event.target.value as TextSize;
+                update({ size: textLineHeight(size, scene.grid.unitsPerCell) });
+                rememberText({ size });
+              }}
+            >
+              <option value="" disabled>
+                Mixed sizes
+              </option>
+              {textSizes.map((size) => (
+                <option key={size} value={size}>
+                  {size[0].toUpperCase() + size.slice(1)}
+                </option>
+              ))}
+            </Select>
           </Label>
         )}
         <Label>
@@ -292,4 +329,9 @@ export default function SceneItemMenu({
       </Box>
     </MapMenu>
   );
+}
+
+/** The value every entry shares, or "" when they differ. */
+function sameValue(values: string[]): string {
+  return values.every((value) => value === values[0]) ? values[0] ?? "" : "";
 }

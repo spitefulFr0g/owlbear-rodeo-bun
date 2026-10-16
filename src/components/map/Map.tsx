@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { Box } from "theme-ui";
 import { useToasts } from "react-toast-notifications";
 
@@ -25,6 +25,8 @@ import Session from "../../network/Session";
 import { MapToolId } from "../../types/Map";
 import { Settings } from "../../types/Settings";
 import NoteTool from "../tools/NoteTool";
+import TextTool from "../tools/TextTool";
+import Konva from "konva";
 import SceneItemMenu from "../scene/SceneItemMenu";
 import SceneNotice from "../scene/SceneNotice";
 import ScenePointers from "../scene/ScenePointers";
@@ -58,6 +60,16 @@ function Map({ session }: MapProps) {
     null
   );
   const { scene, act, readOnly, setSelection } = useScene();
+  const editPlaced = useCallback((id: string, node: Konva.Node) => {
+    setSelection([id]);
+    const rect = node.getClientRect();
+    const mapRect = document.querySelector(".map")?.getBoundingClientRect();
+    if (mapRect)
+      setItemMenu({
+        x: mapRect.left + rect.x,
+        y: mapRect.top + rect.y + rect.height,
+      });
+  }, [setSelection]);
   function handleToolAction(action: string) {
     if (action === "eraseAll" && scene && permissions.drawing && !readOnly) {
       deleteDrawings(
@@ -113,18 +125,12 @@ function Map({ session }: MapProps) {
         <SceneItems placement="aboveGrid" />
         <NoteTool
           active={selectedToolId === "note" && permissions.notes}
-          onEdit={(id, node) => {
-            setSelection([id]);
-            const rect = node.getClientRect();
-            const mapRect = document
-              .querySelector(".map")
-              ?.getBoundingClientRect();
-            if (mapRect)
-              setItemMenu({
-                x: mapRect.left + rect.x,
-                y: mapRect.top + rect.y + rect.height,
-              });
-          }}
+          onEdit={editPlaced}
+        />
+        <TextTool
+          active={selectedToolId === "text" && permissions.notes}
+          onEdit={editPlaced}
+          settings={settings.text}
         />
         <SceneRulers />
         <SceneMovement movement={movement} />

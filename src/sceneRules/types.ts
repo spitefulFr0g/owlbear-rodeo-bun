@@ -102,7 +102,9 @@ export type TextItem = BaseItem & {
   kind: "text";
   text: string;
   color: string; // the square's colour, or the text's when there is no square
-  size: number; // side of the square, in world units at scale 1
+  // In world units at scale 1: a note's is the side of its square, and text's
+  // with no square is the height of one line, drawn as wide as it needs
+  size: number;
   square: boolean; // true: a note (Note layer). false: text only (Text layer)
 };
 

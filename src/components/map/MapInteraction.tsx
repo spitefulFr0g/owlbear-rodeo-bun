@@ -181,6 +181,7 @@ function MapInteraction({
       case "measure":
       case "pointer":
       case "note":
+      case "text":
       case "select":
         return "crosshair";
       default:
