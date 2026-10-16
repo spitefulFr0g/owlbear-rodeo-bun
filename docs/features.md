@@ -28,7 +28,7 @@ A row with a split verdict names which part is which.
 
 Ten steps, grouped into releases. They are built in number order, except that step 8 is built before step 7. Steps 1 to 5 run on today's canvas. Step 6 is the one large rewrite. Steps 7 to 10 build on it. The move from Create React App to Vite is done between steps 7 and 9 and is not a numbered step.
 
-The scope through v0.5.0 is implemented. See the [v0.4.0 release notes](releases/v0.4.0.md) for scenes, live play and upgrade instructions, the [v0.4.1 release notes](releases/v0.4.1.md) for the fixes that followed, and the [v0.5.0 release notes](releases/v0.5.0.md) for libraries, the dock and upgrade instructions. v0.6.0 is planned and not built.
+The scope through v0.6.0 is implemented. See the [v0.4.0 release notes](releases/v0.4.0.md) for scenes, live play and upgrade instructions, the [v0.4.1 release notes](releases/v0.4.1.md) for the fixes that followed, and the [v0.5.0 release notes](releases/v0.5.0.md) for libraries, the dock and upgrade instructions. See the [v0.6.0 release notes](releases/v0.6.0.md) for small tools and the browser library removal.
 
 ### v0.1.0: the shared screen
 
@@ -193,11 +193,11 @@ Decided for this release, in [Plan v0.5.0: libraries and dock](https://github.co
 | --- | --- |
 | 10. Small tools | The text tool, with colour and size. Notes and text that start hidden. Adjustable stroke width. Duplicate numbering. Double-click to select a locked item. A check that Space pans mid-shape. |
 
-The browser library import ships in v0.5.0 and is removed in v0.6.0, with the rest of the browser library code. See [Decide how the existing browser library is imported into the account library](https://github.com/spitefulFr0g/owlbear-rodeo-bun/issues/27). The id a browser keeps for its player, the nickname and the settings are stored beside the browser library and stay where they are.
+The browser library import shipped in v0.5.0 and is removed in v0.6.0, with the rest of the browser library code. See [Decide how the existing browser library is imported into the account library](https://github.com/spitefulFr0g/owlbear-rodeo-bun/issues/27). The id a browser keeps for its player, the nickname and the settings are stored beside the browser library and stay where they are.
 
 Decided for this release, in [Plan v0.6.0: small tools](https://github.com/spitefulFr0g/owlbear-rodeo-bun/issues/158):
 
-- **One spec:** step 10 and the browser library removal. The removal is its own ticket and lands last, so the import keeps working on `main` as long as possible.
+- **One spec:** step 10 and the browser library removal. The removal landed last, after the small tools.
 - **Shipping:** the release ships once everyone at the table has run the import. The release notes say first that an import not run before upgrading cannot be run after.
 - **No prototype and no database layout change:** the server already accepts text items and any stroke width, so a server rolled back to v0.5.0 still opens v0.6.0 rooms.
 - **Text tool:** a click places a text item and opens the note's editing menu without the square. Its key is `x`. Colour comes from the note palette and size is one of four presets in proportion to a grid cell, both remembered per browser. The "notes and text" room switch covers it. Typing directly on the canvas is Later.
@@ -317,7 +317,7 @@ Decisions: [Decide the access model: server password, local accounts, or both](h
 | Storage manager: usage | In | 4 | Per room on the room list; the server total for the administrator. An image used in two rooms counts in both, and the server total counts disk space actually used. |
 | Storage manager: quotas | In: a quota per room library and per account library, and a player quota per room. Later: a quota for the whole server | 9 | Today's per-file size cap stays. |
 | Storage manager: backup export and import | In as a copy of the data directory. Later: in-app export and import of one room | 3 | Taken with the server stopped. A snapshot written by the running server is Later. |
-| Converter from 1.0 data | Out for placed state. In: the browser library import | 9 | Read from the browser's own database by any signed-in account; there is no file route. |
+| Converter from 1.0 data | Out | 9 | The browser library import shipped in v0.5.0 and was removed in v0.6.0. Placed state was never imported. |
 | Room metadata bag | Later | | With extensions. |
 
 Added by the decisions:
@@ -415,10 +415,10 @@ Decision: [Screen asset manager and image features (sections F and G)](https://g
 | --- | --- | --- | --- |
 | Move with grid snapping, a key to suspend it, snap sensitivity | Have | | |
 | Hide and show, lock and unlock, duplicate, delete, copy | Have | | |
-| Locked items need a double-click to select | In | 10 | |
+| Locked items need a double-click to select | Have | 10 | |
 | Resize and rotate handles | In | 6 | Comes with the one transform system. |
 | Label under the image, or rich text over it | Have: plain label. Later: rich text | | |
-| Duplicate increments a trailing number in the label | In | 10 | |
+| Duplicate increments a trailing number in the label | Have | 10 | |
 | Layer menu item | In | 6 | |
 | Replace Image | Later | | |
 | Align Image on a placed map | Later | | |
@@ -481,7 +481,7 @@ Decision: [Screen grid, fog, drawing, text and presentation features (sections H
 | Polygon and hexagon modes | Later | | |
 | Grab mode | In | 6 | |
 | Separate fill and stroke colours with opacity | Later | | |
-| Stroke width and dash style | In: adjustable width. Later: dash style | 10 | |
+| Stroke width and dash style | Have: adjustable width. Later: dash style | 10 | |
 | Custom colour palette | Later | | |
 | Point editing | Later | | |
 | Move a drawing to another layer | In | 6 | Through the Layer menu. |
@@ -493,9 +493,9 @@ Decision: [Screen grid, fog, drawing, text and presentation features (sections H
 
 | Feature | Verdict | Step | Note |
 | --- | --- | --- | --- |
-| Text tool: click and type on the canvas | In | 10 | Plain text. |
+| Text tool | Have | 10 | Click to place plain text; edit in its menu. Typing directly on the canvas is Later. |
 | Rich text | Later | | |
-| Text colour, outline, font family, size | In: colour and size. Later: outline and font family | 10 | |
+| Text colour, outline, font family, size | Have: colour and size. Later: outline and font family | 10 | |
 | Emoji picker | Out | | |
 | Markdown-style shortcuts | Later | | |
 | Note image type | Later | | Notes stay plain text on a coloured square. |
@@ -505,8 +505,8 @@ Added by the decision:
 
 | Feature | Verdict | Step | Note |
 | --- | --- | --- | --- |
-| New notes and text start hidden | In | 10 | Seen by their owner and the GM. |
-| The GM and trusted players can show their notes and text to everyone | In | 10 | A player who is not trusted cannot. |
+| New notes and text start hidden | Have | 10 | Seen by their owner and the GM. |
+| The GM and trusted players can show their notes and text to everyone | Have | 10 | A player who is not trusted cannot. |
 
 ### M. Presentation
 

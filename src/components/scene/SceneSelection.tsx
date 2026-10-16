@@ -9,8 +9,10 @@ import { heldDrag, itemsInDrags } from "../../scene/live";
 import { worldNodeId } from "../../scene/worldPosition";
 import {
   attachesTo,
+  boxSelection,
   copySelection,
   moveSelection,
+  pressPick,
 } from "../../scene/selection";
 import { Change, Item, Layer, layers, LiveTransform, TokenMovement, tokenMovement } from "../../sceneRules";
 import { useMapStage } from "../../contexts/MapStageContext";
@@ -26,6 +28,29 @@ import { SceneImage } from "./SceneImages";
 import SceneText from "./SceneText";
 import SceneDrawing from "./SceneDrawing";
 import { coveredFog, fogItem, fogItems, fogShape } from "../../scene/fogItem";
+
+/** The items under the pointer, bottom to top in drawing order. */
+function itemsUnderPointer(stage: Konva.Stage, items: Record<string, Item>): Item[] {
+  const pointer = stage.getPointerPosition();
+  if (!pointer) return [];
+  return stage.find(".scene-item").flatMap((node) => {
+    // The bounds come first, since each exact test draws the shape once
+    const bounds = node.getClientRect();
+    if (
+      pointer.x < bounds.x ||
+      pointer.y < bounds.y ||
+      pointer.x > bounds.x + bounds.width ||
+      pointer.y > bounds.y + bounds.height
+    )
+      return [];
+    const shapes = node instanceof Konva.Shape
+      ? [node]
+      : (node as Konva.Container).find<Konva.Shape>("Shape");
+    return items[node.id()] && shapes.some((shape) => shape.intersects(pointer))
+      ? [items[node.id()]]
+      : [];
+  });
+}
 
 /** All kinds share one interaction, preview and final batch. */
 export default function SceneSelection({
@@ -71,17 +96,36 @@ export default function SceneSelection({
   useEffect(() => {
     const stage = stageRef.current;
     if (!scene || !stage) return;
+    // Konva reports a double-click whose second press dragged; that was a drag
+    let pressedAt = { x: 0, y: 0 };
+    function press() {
+      pressedAt = stage!.getPointerPosition() || pressedAt;
+    }
     function context(event: Konva.KonvaEventObject<MouseEvent>) {
       event.evt.preventDefault();
       if (readOnly) return;
-      let node: Konva.Node | null = event.target;
-      while (node && !scene!.items[node.id()]) node = node.getParent();
-      if (!node || !canSelect(scene!.items[node.id()]) || (layer && scene!.items[node.id()].layer !== layer)) return;
-      if (!selectedRef.current.includes(node.id())) setSelection([node.id()]);
-      const rect = stage!.container().getBoundingClientRect();
       const pointer = stage!.getPointerPosition() || { x: 0, y: 0 };
+      if (
+        event.type !== "contextmenu" &&
+        Math.hypot(pointer.x - pressedAt.x, pointer.y - pressedAt.y) > 4
+      )
+        return;
+      const under = itemsUnderPointer(stage!, scene!.items);
+      const maySelect = (item: Item) => canSelect(item) && (!layer || item.layer === layer);
+      // A double-click selects a locked item instead of opening its menu
+      const locked = event.type === "contextmenu" ? undefined : pressPick(under, maySelect, "double");
+      if (locked) {
+        setSelection([locked.id]);
+        onMenuOpen(null);
+        return;
+      }
+      const item = pressPick(under, maySelect, "menu");
+      if (!item) return;
+      if (!selectedRef.current.includes(item.id)) setSelection([item.id]);
+      const rect = stage!.container().getBoundingClientRect();
       onMenuOpen({ x: rect.left + pointer.x, y: rect.top + pointer.y });
     }
+    stage.on("mousedown.itemMenu touchstart.itemMenu", press);
     stage.on("contextmenu.itemMenu dblclick.itemMenu dbltap.itemMenu", context);
     return () => {
       stage.off(".itemMenu");
@@ -99,7 +143,8 @@ export default function SceneSelection({
     const added = copySelection(
       source,
       { x: dx, y: dy },
-      source.map(() => uuid())
+      source.map(() => uuid()),
+      Object.values(sceneRef.current?.items || {})
     );
     if (act(added.map((item) => ({ type: "add", item }))))
       setSelection(added.map((item) => item.id));
@@ -130,6 +175,7 @@ export default function SceneSelection({
     // Every event reads the latest scene; pickup geometry stays fixed until release.
     const initialScene = sceneRef.current;
     const canSelect = (item: Item) => canSelectRef.current(item);
+    const maySelect = (item: Item) => canSelect(item) && (!layer || item.layer === layer);
     if (!active || !initialScene || !root.current || !stageRef.current) return;
     const currentScene = () => sceneRef.current!;
     const world = root.current;
@@ -140,8 +186,7 @@ export default function SceneSelection({
         .filter(
           (node) =>
             !!currentScene().items[node.id()] &&
-            canSelect(currentScene().items[node.id()]) &&
-            (!layer || currentScene().items[node.id()].layer === layer)
+            maySelect(currentScene().items[node.id()])
         );
     const selectedNodes = () =>
       nodes().filter((node) => selectedRef.current.includes(node.id()));
@@ -278,20 +323,20 @@ export default function SceneSelection({
       )
         return;
       let node: Konva.Node | null = event.target;
-      while (node && !currentScene().items[node.id()] && node !== transformer)
-        node = node.getParent();
+      while (node && node !== transformer) node = node.getParent();
       if (node === transformer) return;
-      if (node && currentScene().items[node.id()] && (!canSelect(currentScene().items[node.id()]) || (layer && currentScene().items[node.id()].layer !== layer)))
-        node = null;
+      // A press passes locked items to the topmost unlocked item beneath
+      const under = itemsUnderPointer(stage, currentScene().items);
+      const picked = pressPick(under, maySelect, "single");
       onMenuOpen(null);
-      if (!node && !boxSelect) {
+      if (!picked && !boxSelect) {
         setSelection([]);
         return;
       }
       start = point();
       prevent(true);
-      if (node && currentScene().items[node.id()]) {
-        const id = node.id();
+      if (picked) {
+        const id = picked.id;
         if (event.evt.shiftKey) {
           setSelection((prev) =>
             prev.includes(id)
@@ -306,7 +351,10 @@ export default function SceneSelection({
           ? selectedRef.current
           : [id];
         setSelection(ids);
-        moving = nodes().filter((value) => ids.includes(value.id()));
+        const available = nodes();
+        moving = ids.flatMap((selectedId) =>
+          available.filter((value) => value.id() === selectedId)
+        );
         // Higher token layers attach by overlap at the start of the action.
         for (const candidate of nodes()) {
           const item = currentScene().items[candidate.id()];
@@ -371,16 +419,15 @@ export default function SceneSelection({
     function up() {
       if (!start) return;
       if (box) {
-        setSelection(
-          nodes()
-            .filter((node) =>
-              Konva.Util.haveIntersection(
-                box!.getClientRect(),
-                node.getClientRect()
-              )
+        const touched = nodes()
+          .filter((node) =>
+            Konva.Util.haveIntersection(
+              box!.getClientRect(),
+              node.getClientRect()
             )
-            .map((node) => node.id())
-        );
+          )
+          .map((node) => currentScene().items[node.id()]);
+        setSelection(boxSelection(touched, maySelect).map((item) => item.id));
         box.destroy();
         box = undefined;
       } else if (moving.length) {
@@ -411,7 +458,7 @@ export default function SceneSelection({
       if (landing || sceneRef.current?.id !== initialScene.id) return;
       const held = transformer.isTransforming() ? transformer.nodes() : start ? moving : [];
       if (!heldTransformsAllowed(heldTransforms, currentScene().items,
-        item => canSelect(item) && (!layer || item.layer === layer))) {
+        maySelect)) {
         restore(held);
         transformer.off("transformend", finishTransform);
         transformer.stopTransform();

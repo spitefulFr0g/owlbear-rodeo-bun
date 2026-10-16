@@ -1,23 +1,22 @@
-import React, { useState, useContext, useCallback, useEffect } from "react";
-import * as Comlink from "comlink";
-import { encode } from "@msgpack/msgpack";
-import { useLiveQuery } from "dexie-react-hooks";
-
-import { useDatabase } from "./DatabaseContext";
-
+import React, { useState, useContext, useCallback, useEffect, useRef } from "react";
 import useDebounce from "../hooks/useDebounce";
 
 import { omit } from "../helpers/shared";
 import { shownFile } from "../helpers/shownFile";
 import { Asset } from "../types/Asset";
+import { createAssetCache } from "../helpers/assetCache";
+import { downloadAsset } from "../network/assetStore";
+import { sessionLibraryAccess } from "../network/library";
+import Session, { SessionStatus } from "../network/Session";
 
 export type GetAssetEventHanlder = (
   assetId: string
-) => Promise<Asset | undefined>;
+) => Promise<Asset>;
 export type AddAssetsEventHandler = (assets: Asset[]) => Promise<void>;
 export type PutAssetEventsHandler = (asset: Asset) => Promise<void>;
 
 type AssetsContextValue = {
+  assetVersion: number;
   getAsset: GetAssetEventHanlder;
   addAssets: AddAssetsEventHandler;
   putAsset: PutAssetEventsHandler;
@@ -26,67 +25,31 @@ type AssetsContextValue = {
 const AssetsContext =
   React.createContext<AssetsContextValue | undefined>(undefined);
 
-// 100 MB max cache size
-const maxCacheSize = 1e8;
-
-export function AssetsProvider({ children }: { children: React.ReactNode }) {
-  const { worker, database, databaseStatus } = useDatabase();
-
+// Server assets are cached for this page only, never in the browser database.
+export function AssetsProvider({ session, children }: { session: Session; children: React.ReactNode }) {
+  const assets = useRef(createAssetCache());
+  const [assetVersion, setAssetVersion] = useState(0);
   useEffect(() => {
-    if (databaseStatus === "loaded") {
-      worker.cleanAssetCache(maxCacheSize);
-    }
-  }, [worker, databaseStatus]);
-
-  const getAsset = useCallback<GetAssetEventHanlder>(
-    async (assetId) => {
-      if (database) {
-        return await database.table("assets").get(assetId);
-      }
-    },
-    [database]
-  );
-
-  const addAssets = useCallback<AddAssetsEventHandler>(
-    async (assets) => {
-      if (database) {
-        await database.table("assets").bulkAdd(assets);
-      }
-    },
-    [database]
-  );
-
-  const putAsset = useCallback<PutAssetEventsHandler>(
-    async (asset) => {
-      if (database) {
-        // Check for broadcast channel and attempt to use worker to put map to avoid UI lockup
-        // Safari doesn't support BC so fallback to single thread
-        if (window.BroadcastChannel) {
-          const packedAsset = encode(asset);
-          const success = await worker.putData(
-            Comlink.transfer(packedAsset, [packedAsset.buffer]),
-            "assets"
-          );
-          if (!success) {
-            await database.table("assets").put(asset);
-          }
-        } else {
-          await database.table("assets").put(asset);
-        }
-      }
-    },
-    [database, worker]
-  );
-
-  const value = {
-    getAsset,
-    addAssets,
-    putAsset,
-  };
-
-  return (
-    <AssetsContext.Provider value={value}>{children}</AssetsContext.Provider>
-  );
+    const retryDownloads = (status: SessionStatus) => {
+      if (status !== "joined") return;
+      // The new join token can retry missing URLs even if an old request hangs.
+      assets.current.resetPending();
+      setAssetVersion(version => version + 1);
+    };
+    session.on("status", retryDownloads);
+    return () => { session.off("status", retryDownloads); };
+  }, [session]);
+  const getAsset = useCallback<GetAssetEventHanlder>(async id =>
+    assets.current.get(id, () => downloadAsset(sessionLibraryAccess(session), id)), [session]);
+  const addAssets = useCallback<AddAssetsEventHandler>(async incoming => {
+    for (const asset of incoming) assets.current.put(asset);
+    setAssetVersion(version => version + 1);
+  }, []);
+  const putAsset = useCallback<PutAssetEventsHandler>(async asset => {
+    assets.current.put(asset);
+    setAssetVersion(version => version + 1);
+  }, []);
+  return <AssetsContext.Provider value={{ getAsset, addAssets, putAsset, assetVersion }}>{children}</AssetsContext.Provider>;
 }
 
 export function useAssets() {
@@ -125,7 +88,7 @@ export const AssetURLsUpdaterContext =
  */
 export function AssetURLsProvider({ children }: { children: React.ReactNode }) {
   const [assetURLs, setAssetURLs] = useState<AssetURLs>({});
-  const { database } = useDatabase();
+  const { getAsset, assetVersion } = useAssets();
 
   // Keep track of the assets that need to be loaded
   const [assetKeys, setAssetKeys] = useState<string[]>([]);
@@ -140,45 +103,32 @@ export function AssetURLsProvider({ children }: { children: React.ReactNode }) {
     }
     let keysToLoad: string[] = [];
     for (let url of Object.values(loadingDebouncedAssetURLs)) {
-      if (url.url === null) {
+      if (url.url === null && url.references > 0) {
         keysToLoad.push(url.id);
       }
     }
-    if (keysToLoad.length > 0) {
-      setAssetKeys(keysToLoad);
-    }
+    setAssetKeys(keysToLoad);
   }, [loadingDebouncedAssetURLs]);
 
-  // Get the new assets whenever the keys change
-  const assets = useLiveQuery<Asset[]>(
-    () => database?.table("assets").bulkGet(assetKeys) || [],
-    [database, assetKeys]
-  );
-
-  // Update asset URLs when assets are loaded
   useEffect(() => {
-    if (!assets || assets.length === 0) {
-      return;
-    }
-
-    // Assets are about to be loaded so clear the keys to load
-    setAssetKeys([]);
-
-    setAssetURLs((prevURLs) => {
-      let newURLs = { ...prevURLs };
-      for (let asset of assets) {
-        if (asset && newURLs[asset.id]?.url === null) {
-          newURLs[asset.id] = {
-            ...newURLs[asset.id],
-            url: URL.createObjectURL(
-              new Blob([asset.file], { type: asset.mime })
-            ),
-          };
+    let cancelled = false;
+    if (!assetKeys.length) return;
+    Promise.all(assetKeys.map(id => getAsset(id).catch(() => undefined))).then(assets => {
+      if (cancelled) return;
+      setAssetURLs(prev => {
+        const next = { ...prev };
+        let changed = false;
+        for (const asset of assets) {
+          if (asset && next[asset.id]?.url === null) {
+            changed = true;
+            next[asset.id] = { ...next[asset.id], url: URL.createObjectURL(new Blob([asset.file], { type: asset.mime })) };
+          }
         }
-      }
-      return newURLs;
+        return changed ? next : prev;
+      });
     });
-  }, [assets]);
+    return () => { cancelled = true; };
+  }, [assetKeys, getAsset, assetVersion]);
 
   // Clean up asset URLs every minute
   const cleanUpDebouncedAssetURLs = useDebounce(assetURLs, 60 * 1000);

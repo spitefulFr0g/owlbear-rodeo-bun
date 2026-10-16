@@ -32,6 +32,19 @@ function borrowedModules(repo = root) {
   return modules;
 }
 
+function prepare(repo = root, install = (cwd) => execFileSync("corepack", ["yarn", "install", "--frozen-lockfile", "--non-interactive"], { cwd, stdio: "inherit" })) {
+  const modules = path.join(repo, "node_modules");
+  try {
+    if (borrowedModules(repo)) return setup(repo);
+  } catch (error) {
+    // Only replace our known borrowed link. Other links and local directories stay intact.
+    if (!error.message.startsWith("frontend dependencies differ")) throw error;
+    fs.unlinkSync(modules);
+  }
+  install(repo);
+  return setup(repo);
+}
+
 function setup(repo = root) {
   const borrowed = borrowedModules(repo);
   const modules = path.join(repo, "node_modules");
@@ -47,7 +60,7 @@ function run(command) {
   if (command === "check") execFileSync(process.execPath, [path.join(root, "scripts/frontend.test.cjs")], {
     cwd: root, stdio: "inherit",
   });
-  if (command === "check") execFileSync(process.execPath, ["--test", path.join(root, "scripts/checks.test.cjs"), path.join(root, "scripts/release-notes.test.cjs")], {
+  if (command === "check") execFileSync(process.execPath, ["--test", path.join(root, "scripts/checks.test.cjs"), path.join(root, "scripts/release-notes.test.cjs"), path.join(root, "scripts/verification-provenance.test.cjs")], {
     cwd: root, stdio: "inherit",
   });
   const commands = {
@@ -72,11 +85,12 @@ function run(command) {
   }
 }
 
-module.exports = { borrowedModules, setup };
+module.exports = { borrowedModules, setup, prepare };
 
 if (require.main === module) {
   try {
     if (process.argv[2] === "setup") setup();
+    else if (process.argv[2] === "prepare") prepare();
     else run(process.argv[2]);
   } catch (error) {
     if (!error.status) console.error(`frontend: ${error.message}`);

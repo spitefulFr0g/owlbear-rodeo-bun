@@ -184,7 +184,3 @@ _Avoid_: Token bar, sidebar, tray
 **Asset Manager**:
 The floating window in a room where a person organises the assets they can see: naming them, setting their asset type, filing them in folders, moving them between libraries and deleting them.
 _Avoid_: Map picker, token picker, library dialog
-
-**Browser library**:
-The maps and tokens a person uploaded before libraries moved to the server, kept in their own browser. It is brought into their account library once, by an import.
-_Avoid_: Local library, old library, 1.0 library

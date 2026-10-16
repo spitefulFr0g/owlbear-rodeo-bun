@@ -5,10 +5,9 @@ import { libraryCommand, PreparedLibraryUpload, sessionLibraryAccess, uploadLibr
 import { prepareLibraryUpload } from "../helpers/libraryUpload";
 import { BundledLibraryAsset, bundledServerSet } from "../helpers/serverSet";
 import { useAssets } from "./AssetsContext";
-import { downloadAsset } from "../network/assetStore";
 import useSetting from "../hooks/useSetting";
 
-export type LibraryExtension = "manager" | "new-scene" | "upload" | "import";
+export type LibraryExtension = "manager" | "new-scene" | "upload";
 export type LibraryExtensionRequest = { extension: LibraryExtension; asset?: LibraryAsset | BundledLibraryAsset; files?: File[] };
 
 function useLibraryStore(session: Session) {
@@ -35,15 +34,11 @@ function useLibraryStore(session: Session) {
     return uploadPrepared({ ...prepared, metadata: { ...prepared.metadata, ...options } });
   }, [uploadPrepared]);
   const fetchFile = useCallback(async (id: string) => {
-    const cached = await getAsset(id);
-    if (cached) return cached;
-    const asset = await downloadAsset(sessionLibraryAccess(session), id);
-    await putAsset(asset);
-    return asset;
-  }, [session, getAsset, putAsset]);
+    return getAsset(id);
+  }, [getAsset]);
   return { snapshot, assets: snapshot?.assets || [], folders: snapshot?.folders || [], usage: snapshot?.usage,
     loading: snapshot === null, serverSet, filter, setFilter, search, setSearch, order, setOrder: saveOrder,
-    selection, setSelection, command, upload, uploadPrepared, fetchFile,
+    selection, setSelection, command, upload, fetchFile,
     extensionRequest: request, openExtension: setRequest, closeExtension: () => setRequest(null) };
 }
 

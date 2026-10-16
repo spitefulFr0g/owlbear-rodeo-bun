@@ -102,6 +102,7 @@ function MapEditor({ map, onSettingsChange }: MapEditorProps) {
   const [showGridControls, setShowGridControls] = useState(true);
 
   const mapInteraction = {
+    spacePanTool: null,
     stageScale,
     stageWidth,
     stageHeight,

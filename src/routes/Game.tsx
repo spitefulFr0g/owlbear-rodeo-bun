@@ -143,7 +143,7 @@ function Game() {
 
   return (
     <RoomProvider session={session}>
-      <AssetsProvider>
+      <AssetsProvider session={session}>
       <LibraryProvider session={session}>
         <AssetURLsProvider>
           <MapLoadingProvider>

@@ -3,7 +3,7 @@ const fs = require("fs");
 const os = require("os");
 const path = require("path");
 const { execFileSync } = require("child_process");
-const { borrowedModules, setup } = require("./frontend.cjs");
+const { borrowedModules, setup, prepare } = require("./frontend.cjs");
 
 // Hooks export Git paths for the caller; fixture repositories own their state.
 for (const key of Object.keys(process.env)) {
@@ -37,7 +37,17 @@ try {
   setup(worktree); // Existing links are reusable and validated again.
   write(worktree, "yarn.lock", "changed lock");
   assert.throws(() => setup(worktree), /dependencies differ/);
-  fs.unlinkSync(link);
+  let installs = 0;
+  prepare(worktree, repo => {
+    installs++;
+    assert.strictEqual(repo, worktree);
+    assert.strictEqual(fs.existsSync(link), false);
+    fs.mkdirSync(path.join(link, ".bin"), { recursive: true });
+    write(link, ".bin/vite", "installed bundler fixture");
+  });
+  assert.strictEqual(installs, 1);
+  assert.strictEqual(fs.existsSync(path.join(modules, ".bin/vite")), true);
+  fs.rmSync(link, { recursive: true });
   assert.strictEqual(borrowedModules(worktree), undefined);
   assert.throws(() => setup(worktree), /dependencies are missing/);
   write(worktree, "yarn.lock", "same lock");
@@ -48,6 +58,8 @@ try {
   fs.mkdirSync(unrelated);
   fs.symlinkSync(unrelated, link, "dir");
   assert.throws(() => setup(worktree), /somewhere other than the main checkout/);
+  assert.throws(() => prepare(worktree, () => { throw new Error("must not install"); }), /somewhere other than the main checkout/);
+  assert.strictEqual(fs.readlinkSync(link), unrelated);
   fs.unlinkSync(link);
   fs.mkdirSync(path.join(link, ".bin"), { recursive: true });
   write(link, ".bin/vite", "local bundler fixture");

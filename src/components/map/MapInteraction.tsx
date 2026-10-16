@@ -1,4 +1,5 @@
 import React, { useMemo, useRef, useState } from "react";
+import { unstable_batchedUpdates } from "react-dom";
 import { Box } from "theme-ui";
 import ReactResizeDetector from "react-resize-detector";
 import { Stage, Layer, Group } from "react-konva";
@@ -22,6 +23,8 @@ import {
 import { useMapStage } from "../../contexts/MapStageContext";
 import { GridProvider } from "../../contexts/GridContext";
 import { useKeyboard } from "../../contexts/KeyboardContext";
+
+import { spacePanTransition } from "../../helpers/spacePan";
 
 import shortcuts from "../../shortcuts";
 import { MapToolId } from "../../types/Map";
@@ -94,6 +97,9 @@ function MapInteraction({
     setStageScale
   );
 
+  const [spacePanTool, setSpacePanTool] = useState<MapToolId | null>(null);
+  const spacePanToolRef = useRef<MapToolId | null>(null);
+
   const previousSelectedToolRef = useRef(selectedToolId);
   const [currentMouseButtons, setCurentMouseButtons] = useState(0);
 
@@ -133,26 +139,29 @@ function MapInteraction({
     }
   );
 
+  function handleSpace(event: KeyboardEvent, type: "down" | "up") {
+    if (!shortcuts.move(event)) return;
+    event.preventDefault();
+    const next = spacePanTransition({
+      tool: selectedToolId,
+      panFrom: spacePanToolRef.current,
+      shape: null,
+    }, type === "down" ? { type, repeat: event.repeat } : { type });
+    spacePanToolRef.current = next.panFrom;
+    // Keyboard events come from an emitter, outside React 17 event batching.
+    // Publish the restored tool and its suspension together.
+    unstable_batchedUpdates(() => {
+      setSpacePanTool(next.panFrom);
+      if (next.tool !== selectedToolId) onSelectedToolChange(next.tool);
+    });
+  }
+
   function handleKeyDown(event: KeyboardEvent) {
-    // Change to move tool when pressing space
-    if (shortcuts.move(event) && selectedToolId === "move") {
-      // Stop active state on move icon from being selected
-      event.preventDefault();
-    }
-    if (shortcuts.move(event) && selectedToolId !== "move") {
-      event.preventDefault();
-      previousSelectedToolRef.current = selectedToolId;
-      onSelectedToolChange("move");
-    }
-    if (!event.repeat && shortcuts.move(event) && selectedToolId === "move") {
-      previousSelectedToolRef.current = "move";
-    }
+    handleSpace(event, "down");
   }
 
   function handleKeyUp(event: KeyboardEvent) {
-    if (shortcuts.move(event) && selectedToolId === "move") {
-      onSelectedToolChange(previousSelectedToolRef.current);
-    }
+    handleSpace(event, "up");
   }
 
   useKeyboard(handleKeyDown, handleKeyUp);
@@ -172,6 +181,7 @@ function MapInteraction({
       case "measure":
       case "pointer":
       case "note":
+      case "text":
       case "select":
         return "crosshair";
       default:
@@ -180,6 +190,7 @@ function MapInteraction({
   }
 
   const mapInteraction = {
+    spacePanTool: selectedToolId === "move" ? spacePanTool : null,
     stageScale,
     stageWidth,
     stageHeight,

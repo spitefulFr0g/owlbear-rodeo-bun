@@ -1,13 +1,9 @@
 import React, { useState, useEffect, useContext } from "react";
 import Dexie from "dexie";
-import * as Comlink from "comlink";
 
 import ErrorBanner from "../components/banner/ErrorBanner";
 
 import { getDatabase } from "../database";
-
-import DatabaseWorker from "../workers/DatabaseWorker?worker";
-import { DatabaseWorkerService } from "../workers/DatabaseWorker";
 
 export type DatabaseStatus = "loading" | "disabled" | "upgrading" | "loaded";
 
@@ -15,15 +11,10 @@ type DatabaseContextValue = {
   database: Dexie | undefined;
   databaseStatus: DatabaseStatus;
   databaseError: Error | undefined;
-  worker: Comlink.Remote<DatabaseWorkerService>;
 };
 
 const DatabaseContext =
   React.createContext<DatabaseContextValue | undefined>(undefined);
-
-const worker: Comlink.Remote<DatabaseWorkerService> = Comlink.wrap(
-  new DatabaseWorker()
-);
 
 export function DatabaseProvider({ children }: { children: React.ReactNode }) {
   const [database, setDatabase] = useState<Dexie>();
@@ -36,15 +27,7 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
     let testDBRequest = window.indexedDB.open("__test");
     testDBRequest.onsuccess = async function () {
       testDBRequest.result.close();
-      let db = getDatabase(
-        { autoOpen: false },
-        undefined,
-        undefined,
-        true,
-        () => {
-          setDatabaseStatus("upgrading");
-        }
-      );
+      let db = getDatabase({ autoOpen: false });
       setDatabase(db);
       db.on("ready", () => {
         setDatabaseStatus("loaded");
@@ -111,7 +94,6 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
     database,
     databaseStatus,
     databaseError,
-    worker,
   };
   return (
     <DatabaseContext.Provider value={value}>

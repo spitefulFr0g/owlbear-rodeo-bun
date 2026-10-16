@@ -15,12 +15,23 @@ import { TextItem } from "../../sceneRules";
 import SceneText from "../scene/SceneText";
 import World from "../scene/World";
 
+export type TextStyle = Pick<TextItem, "layer" | "color" | "size" | "square">;
+
+const noteStyle = (unitsPerCell: number): TextStyle =>
+  ({ layer: "note", color: "yellow", size: unitsPerCell * 2, square: true });
+
+/**
+ * A click places a hidden text item at the snapped pointer and opens its
+ * editing menu: a note, or with another style, text with no square.
+ */
 function NoteTool({
   active,
   onEdit,
+  style = noteStyle,
 }: {
   active: boolean;
   onEdit: (id: string, node: Konva.Node) => void;
+  style?: (unitsPerCell: number) => TextStyle;
 }) {
   const { scene, person, readOnly, act } = useScene();
   const emitter = useInteractionEmitter();
@@ -45,19 +56,16 @@ function NoteTool({
       draft.current = {
         id: shortid.generate(),
         kind: "text",
-        layer: "note",
         position: point,
         rotation: 0,
         scale: { x: 1, y: 1 },
         order: 0,
         owner: person.id,
         locked: false,
-        hidden: false,
+        hidden: true,
         metadata: {},
         text: "",
-        color: "yellow",
-        size: scene.grid.unitsPerCell * 2,
-        square: true,
+        ...style(scene.grid.unitsPerCell),
       };
       setPreview(draft.current);
     }
@@ -71,8 +79,7 @@ function NoteTool({
       if (!leftMouseButton(event) || !draft.current) return;
       const item = draft.current;
       const node = stage.current?.findOne(`#${item.id}`);
-      act([{ type: "add", item }]);
-      if (node) onEdit(item.id, node);
+      if (act([{ type: "add", item }]) && node) onEdit(item.id, node);
       draft.current = null;
       setPreview(null);
     }
@@ -84,7 +91,7 @@ function NoteTool({
       emitter?.off("drag", move);
       emitter?.off("dragEnd", up);
     };
-  }, [active, readOnly, scene, person.id, stage, snap, emitter, act, onEdit]);
+  }, [active, readOnly, scene, person.id, stage, snap, emitter, act, onEdit, style]);
   return (
     <World>{preview && <SceneText item={preview} listening={false} />}</World>
   );

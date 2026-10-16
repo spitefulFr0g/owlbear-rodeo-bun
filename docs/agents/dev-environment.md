@@ -35,13 +35,14 @@ TypeScript stays at 4.3, which cannot read Vitest's own types, so `test` and
 
 Worktrees may be inside or outside the main checkout. In a new one:
 
-- run `node scripts/frontend.cjs setup` at the root, then
-  `bun install --frozen-lockfile` in `backend/`.
+- run `node scripts/checks.cjs prepare` at the root. It prepares both halves
+  with frozen lockfiles and validates any borrowed frontend dependencies.
 
 Frontend setup links the main checkout's dependencies when `yarn.lock` and
 the package dependency declarations match. Checks and the frontend build
-repeat that validation. When they differ, remove the borrowed link and
-install locally with Yarn.
+repeat that validation. When they differ, `prepare` removes only the known
+borrowed link and installs locally with Yarn. Other symlinks are preserved and reported as setup errors.
+Checks validate dependencies without installing them.
 
 ## Checks
 
@@ -52,7 +53,12 @@ prints only on failure. Backend changes also run the real-server smoke check. A 
 `node scripts/checks.cjs all` runs the full integration checks. Guarded merges
 can share a temporary `OWLBEAR_CHECK_RECEIPT` with their commit hook. Reuse
 requires the same source contents, staged tree, command, build, environment
-and installed dependency versions. Ordinary commits run fresh checks.
+and installed dependency versions.
+
+For a worker's final check and commit, stage the intended changes and run
+`node scripts/checks.cjs commit -- -m "message"`. This runs the full checks and
+shares temporary receipts with the hook, then removes them even on failure.
+It refuses unstaged or untracked work. Direct `git commit` runs fresh checks.
 
 Backend test runs print `CHECK_TIMINGS` and save a report beneath the worktree's
 Git directory at `check-reports/backend-tests.json`. A test taking at least

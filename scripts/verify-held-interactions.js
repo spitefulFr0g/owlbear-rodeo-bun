@@ -99,7 +99,7 @@
   };
   return {async run({repo, report, onProgress = () => {}}) {
     const configPath = `/tmp/owlbear-held-${Date.now()}-${Math.random().toString(16).slice(2)}.json`;
-    let config, tabId, startup;
+    let config, tabId, startup, provenance;
     const results = [];
     const evaluate = async args => unwrap(await tools.mcp__t3_code__preview_evaluate({tabId,
       expression: `(${page.toString()})(${JSON.stringify(args)})`, awaitPromise: true})).value;
@@ -123,7 +123,9 @@
       equal(item?.position ?? null, expected.position, 'Released position differs from the public scene');
       equal(item?.scale ?? null, expected.scale, 'Released scale differs from the public scene');
     };
+    const readProvenance = () => command({cmd: `node ${quote(repo + '/scripts/verification-provenance.cjs')}`}).then(JSON.parse);
     try {
+      provenance = await readProvenance();
       const status = unwrap(await tools.mcp__t3_code__preview_status({}));
       const profile = status.profiles?.find(p => p.incognito);
       if (!profile) throw new Error('An isolated incognito T3 preview profile is required');
@@ -194,11 +196,12 @@
       if (locked.selected.length || locked.transforming) throw new Error('Permission loss left an active transformer');
       await evaluate({action: 'continue'}); await release(); await savedGeometry(unlocked);
       results.push({case: 'permission-loss', status: 'pass'});
-      const response = {status: 'pass', cases: results};
+      if (JSON.stringify(await readProvenance()) !== JSON.stringify(provenance)) throw new Error('Verified source or build changed during browser verification');
+      const response = {status: 'pass', cases: results, provenance};
       if (report) await command({cmd: `cat > ${quote(report)} <<'HELD_REPORT_JSON'\n${JSON.stringify(response, null, 2)}\nHELD_REPORT_JSON`});
       return response;
     } catch (error) {
-      const response = {status: 'fail', cases: results, error: String(error)};
+      const response = {status: 'fail', cases: results, provenance, error: String(error)};
       if (report) await command({cmd: `cat > ${quote(report)} <<'HELD_REPORT_JSON'\n${JSON.stringify(response, null, 2)}\nHELD_REPORT_JSON`});
       return response;
     } finally {

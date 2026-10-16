@@ -1,10 +1,8 @@
 import { sceneLibraryMap } from "./libraryScene";
 import { sceneFromMap } from "../scene/mapItem";
-import { applyLibraryDelta, browserImportRecord, dropPositions, filenameGridSize, importedAsset, libraryDefaults, libraryImage, libraryItem } from "./library";
+import { applyLibraryDelta, dropPositions, filenameGridSize, libraryDefaults, libraryImage, libraryItem } from "./library";
 import { defaultSceneGrid } from "../sceneRules";
 import { LibraryAsset, LibrarySnapshot } from "../sceneRules/library";
-import { FileMap } from "../types/Map";
-import { FileToken } from "../types/Token";
 
 const asset: LibraryAsset = {
   id: "entry", library: { kind: "room", id: "room" }, name: "Cave", type: "map", folderId: null,
@@ -50,33 +48,6 @@ test("placing a token copies its type, size and label without changing saved map
   expect(token.defaults.grid.size).toEqual({ x: 10, y: 8 });
 });
 
-const token: FileToken = { id: "token", name: "Horse", type: "file", file: "old-file", thumbnail: "old-thumb",
-  defaultSize: 2, defaultCategory: "vehicle", defaultLabel: "Pony", hideInSidebar: true,
-  width: 100, height: 100, owner: "browser", created: 1, lastModified: 1,
-  outline: { type: "circle", x: 50, y: 50, radius: 50 } };
-const map: FileMap = { id: "map", name: "Cave", type: "file", file: "old-map", thumbnail: "old-thumb",
-  width: 100, height: 80, owner: "browser", created: 1, lastModified: 1, grid: libraryDefaults({ x: 10, y: 8 }).grid,
-  resolutions: {}, quality: "original", showGrid: false, snapToGrid: true };
-
-test("browser import keeps token defaults and converts vehicle to Mount and groups to folder names", () => {
-  const converted = browserImportRecord(token, [{ type: "group", id: "group", name: "Party", items: [{ type: "item", id: token.id }] }])!;
-  expect(converted.type).toBe("mount");
-  expect(converted.folderName).toBe("Party");
-  expect(converted.defaults.defaultSize).toBe(2);
-  expect(converted.defaults.defaultLabel).toBe("Pony");
-  expect(converted.originalId).toBe("old-file");
-  expect(converted).not.toHaveProperty("hideInSidebar");
-  expect(browserImportRecord({ ...token, type: "default", key: "horse" }, [])).toBeUndefined();
-});
-
-test("browser import keeps the map's saved alignment and leaves ungrouped images at the top", () => {
-  const converted = browserImportRecord(map, [])!;
-  expect(converted.type).toBe("map");
-  expect(converted.defaults.grid).toEqual(map.grid);
-  expect(converted.folderName).toBeUndefined();
-  expect(map.file).toBe("old-map");
-});
-
 test("library deltas replace records, remove departed entries and refresh quota usage", () => {
   const snapshot: LibrarySnapshot = { assets: [asset], folders: [], usage: { player: { bytes: 160, reservedBytes: 0, quota: 200 } } };
   const usage = { player: { bytes: 0, reservedBytes: 0, quota: 200 } };
@@ -96,15 +67,4 @@ test("a new scene aligns the saved small grid and retains every stored quality c
   expect(scene.map.scale).toEqual({ x: 1.5, y: 1.5 });
   expect(scene.map.locked).toBe(true);
   expect(asset.defaults.grid.size).toEqual({ x: 10, y: 8 });
-});
-
-test("a rerun skips an original only while the asset it became is still in the account library", () => {
-  const imported: LibraryAsset = { ...asset, id: "imported", library: { kind: "account", id: "account" } };
-  const marks = { "old-file": "imported" };
-  expect(importedAsset(marks, [imported], "account", "old-file")).toBe(imported);
-  expect(importedAsset(marks, [imported], "account", "other-file")).toBeUndefined();
-  expect(importedAsset(marks, [], "account", "old-file")).toBeUndefined();
-  expect(importedAsset(marks, [{ ...imported, library: { kind: "room", id: "room" } }], "account", "old-file")).toBeUndefined();
-  expect(importedAsset(marks, [imported], "another account", "old-file")).toBeUndefined();
-  expect(importedAsset(marks, [{ ...imported, uploading: true }], "account", "old-file")).toBeUndefined();
 });
