@@ -24,6 +24,7 @@ import {
   drawingItem,
   drawingsInOrder,
   deleteDrawings,
+  toolStrokeWidth,
 } from "../../scene/drawingItem";
 import SceneDrawing from "../scene/SceneDrawing";
 import World from "../scene/World";
@@ -121,7 +122,7 @@ function DrawingTool({
           type: "path",
           pathType: type === "brush" ? "stroke" : "fill",
           data: { points: [brushPosition] },
-          strokeWidth: type === "brush" ? 1 : 0,
+          strokeWidth: toolStrokeWidth(toolSettings),
           ...commonShapeData,
         });
       } else if (isShape && drawingToolIsShape(type)) {
@@ -129,8 +130,7 @@ function DrawingTool({
           type: "shape",
           shapeType: type,
           data: getDefaultShapeData(type, brushPosition),
-          strokeWidth:
-            toolSettings.type === "line" || !toolSettings.useShapeFill ? 1 : 0,
+          strokeWidth: toolStrokeWidth(toolSettings),
           ...commonShapeData,
         } as Shape);
       }
