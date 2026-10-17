@@ -1,0 +1,313 @@
+{
+  "note": "Real maps for map alignment, measured by hand. The images are not in the repository; node scripts/alignment-maps.cjs --real <folder> copies any whose bytes match into the generated set. Each printed line was located on its own and fitted as position = origin + n * cell; tolerance is twice the largest line's distance from that fit, rounded up to a quarter pixel and at least 1 px.",
+  "maps": [
+    {
+      "file": "47v7yv2fmtvh1.jpg",
+      "sha256": "37b9e0bf3239224284732994ca0670e078dafa6399f2d6db71310eda2a0e5eea",
+      "kind": "square",
+      "width": 1680,
+      "height": 1680,
+      "cell": {
+        "width": 70.007,
+        "height": 70.008
+      },
+      "origin": {
+        "x": 0.11,
+        "y": 0.12
+      },
+      "columns": 23.9976,
+      "rows": 23.9973,
+      "lines": "dark",
+      "tolerance": 1.25,
+      "about": "Faint dark lines."
+    },
+    {
+      "file": "8avrf3kcfruh1.jpeg",
+      "sha256": "a8bbbbf45b8e9da0c61dfeb70d370af7471488022563b40a097de4fda368f3fa",
+      "kind": "square",
+      "width": 4480,
+      "height": 7000,
+      "cell": {
+        "width": 140,
+        "height": 140.002
+      },
+      "origin": {
+        "x": 0,
+        "y": -0.03
+      },
+      "columns": 32,
+      "rows": 49.9993,
+      "lines": "light",
+      "tolerance": 1.25,
+      "about": "A large export with pale lines, 140 px cells."
+    },
+    {
+      "file": "9CCCA2A0-595A-49AC-AEA2-5C782359506F.webp",
+      "sha256": "65fc42e5a019b653379c1dbf09541292bf87c99b3643499167ec451c739323d3",
+      "kind": "square",
+      "width": 1656,
+      "height": 1152,
+      "cell": {
+        "width": 45.747,
+        "height": 44.414
+      },
+      "origin": {
+        "x": 2.27,
+        "y": 0.59
+      },
+      "columns": 36.1991,
+      "rows": 25.9378,
+      "lines": "light",
+      "tolerance": 1,
+      "about": "Cells not square: the image was stretched after the grid was printed."
+    },
+    {
+      "file": "ArcticTundra_digital_grid.webp",
+      "sha256": "385270b1a0a7970c39a2779f7bbdac77d139de8f7788eae02e799ebd1c2b19cf",
+      "kind": "square",
+      "width": 600,
+      "height": 417,
+      "cell": {
+        "width": 26.095,
+        "height": 26.094
+      },
+      "origin": {
+        "x": -0.21,
+        "y": 0
+      },
+      "columns": 22.9929,
+      "rows": 15.9807,
+      "lines": "dark",
+      "tolerance": 1.75,
+      "about": "A downscaled map of 23 by 16 cells, so its lines are blurred."
+    },
+    {
+      "file": "ForestWaterfallIsometric_digital_grid_day.webp",
+      "sha256": "4dc540880b8573505280038a0b48bd584dcfd5825583ee9eefb1744e06ff2af8",
+      "kind": "square",
+      "width": 2160,
+      "height": 1512,
+      "cell": {
+        "width": 72.013,
+        "height": 72.018
+      },
+      "origin": {
+        "x": -3.81,
+        "y": 0.66
+      },
+      "columns": 29.9946,
+      "rows": 20.9948,
+      "lines": "dark",
+      "tolerance": 1,
+      "about": "A square top-down grid, despite the file name."
+    },
+    {
+      "file": "PyramidLevel1_digital.webp",
+      "sha256": "26c4c076e5c4b663368d390fd5cb5d5b7b8e098a5470e0c9292441856bf52e4c",
+      "kind": "none",
+      "width": 2200,
+      "height": 2200,
+      "about": "No printed grid, though its floor slabs are regular."
+    },
+    {
+      "file": "Sailing_Ship_Lower_Deck_800x533px.webp",
+      "sha256": "c256b9a492948df1e2e098e16824576baadc6704540c16d61b4ec487e8e82cd2",
+      "kind": "square",
+      "width": 800,
+      "height": 533,
+      "cell": {
+        "width": 26.672,
+        "height": 26.651
+      },
+      "origin": {
+        "x": -0.2,
+        "y": 0.16
+      },
+      "columns": 29.994,
+      "rows": 19.9992,
+      "lines": "dark",
+      "tolerance": 1,
+      "about": "A small map of 30 by 20 cells."
+    },
+    {
+      "file": "TrainEngineCar_digital_day_grid.webp",
+      "sha256": "42eb97e35bdae06afad5994d7527b0b36bbded00239f1638d0a8a6a465f349db",
+      "kind": "square",
+      "width": 2200,
+      "height": 1530,
+      "cell": {
+        "width": 95.688,
+        "height": 95.644
+      },
+      "origin": {
+        "x": -0.93,
+        "y": 0.37
+      },
+      "columns": 22.9914,
+      "rows": 15.9968,
+      "lines": "dark",
+      "tolerance": 2,
+      "about": "Dark lines over busy art."
+    },
+    {
+      "file": "UnderneaththeCity_digital_grid_clutter.webp",
+      "sha256": "93d793d98991e8290c4450d6e929499fe8fd12de9e04587eaf16d213e4c234a0",
+      "kind": "square",
+      "width": 2160,
+      "height": 1440,
+      "cell": {
+        "width": 71.933,
+        "height": 71.956
+      },
+      "origin": {
+        "x": 1.44,
+        "y": 0.04
+      },
+      "columns": 30.0279,
+      "rows": 20.0122,
+      "lines": "dark",
+      "tolerance": 1.75,
+      "about": "Clutter drawn over the grid."
+    },
+    {
+      "file": "Wizard_sTower_basement1_digital_grid.webp",
+      "sha256": "c0e082908443d56a130d9b334111456af267e1e66a1720173c3ebe792abf0f07",
+      "kind": "square",
+      "width": 800,
+      "height": 567,
+      "cell": {
+        "width": 37.868,
+        "height": 37.817
+      },
+      "origin": {
+        "x": 1.7,
+        "y": 2.02
+      },
+      "columns": 21.126,
+      "rows": 14.9933,
+      "lines": "dark",
+      "tolerance": 1.25,
+      "about": "The grid is printed only over the dungeon; the margins are blank."
+    },
+    {
+      "file": "c15c9cv7o0wh1.png",
+      "sha256": "0177ff3ea580ba220ae85dcaa46f5958243e7dbda33b7a0bd838cd76c82b2576",
+      "kind": "square",
+      "width": 1167,
+      "height": 876,
+      "cell": {
+        "width": 29.299,
+        "height": 29.299
+      },
+      "origin": {
+        "x": 0.01,
+        "y": 0.9
+      },
+      "columns": 39.8307,
+      "rows": 29.8986,
+      "lines": "dark",
+      "tolerance": 1,
+      "about": "Dark lines with a pale halo."
+    },
+    {
+      "file": "ctwure0c1rt11.png",
+      "sha256": "78e2b86fdef15451ea42920f2ce884a88507478714cd52cd3fef79febc631c44",
+      "kind": "square",
+      "width": 4200,
+      "height": 4200,
+      "cell": {
+        "width": 140,
+        "height": 140
+      },
+      "origin": {
+        "x": 1.51,
+        "y": 1.5
+      },
+      "columns": 30,
+      "rows": 30,
+      "lines": "dark",
+      "tolerance": 1,
+      "about": "A large export with wide lines."
+    },
+    {
+      "file": "e3niwoc1twvh1.jpeg",
+      "sha256": "4a6d6673c3a3d782a28aacf165df8b8c317058143a1d7d96d364c8f8f6192951",
+      "kind": "square",
+      "width": 3640,
+      "height": 5460,
+      "cell": {
+        "width": 140,
+        "height": 140
+      },
+      "origin": {
+        "x": 0.39,
+        "y": 0.37
+      },
+      "columns": 26,
+      "rows": 39,
+      "lines": "dark",
+      "tolerance": 1,
+      "about": "A large export with very faint lines."
+    },
+    {
+      "file": "gp0vsgrqa1wh1.jpg",
+      "sha256": "e72223d1e56b98af1ccbb3bce3ee2f28e9fa9762681b331ba4b302ccffb47cc9",
+      "kind": "square",
+      "width": 6300,
+      "height": 6300,
+      "cell": {
+        "width": 150,
+        "height": 150
+      },
+      "origin": {
+        "x": -1,
+        "y": -1
+      },
+      "columns": 42,
+      "rows": 42,
+      "lines": "dark",
+      "tolerance": 1,
+      "about": "A large export, 150 px cells."
+    },
+    {
+      "file": "qd55vzgd3uvh1.jpg",
+      "sha256": "8193d438da2287163b2386bad0155eebb052c00caadad3f6169c7acefb302bcf",
+      "kind": "square",
+      "width": 2100,
+      "height": 3151,
+      "cell": {
+        "width": 70,
+        "height": 70
+      },
+      "origin": {
+        "x": 0,
+        "y": 0
+      },
+      "columns": 30,
+      "rows": 45.0143,
+      "lines": "dark",
+      "tolerance": 1,
+      "about": "Starts on a cell corner."
+    },
+    {
+      "file": "ty114w7v3kqh1.jpeg",
+      "sha256": "59ec70656a35ea7e65b6e7e2a42558c227d049084539953ed0270a213cb06da8",
+      "kind": "square",
+      "width": 4620,
+      "height": 6440,
+      "cell": {
+        "width": 140,
+        "height": 140
+      },
+      "origin": {
+        "x": 0,
+        "y": -0.02
+      },
+      "columns": 33,
+      "rows": 46,
+      "lines": "light",
+      "tolerance": 1,
+      "about": "A large export with pale lines."
+    }
+  ]
+}

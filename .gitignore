@@ -29,3 +29,6 @@ tsconfig.tsbuildinfo
 
 # agent worktrees
 /.claude/worktrees/
+
+# generated map alignment test maps (node scripts/alignment-maps.cjs)
+/alignment-maps/
