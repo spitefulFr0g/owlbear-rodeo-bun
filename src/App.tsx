@@ -13,6 +13,7 @@ import Setup from "./routes/Setup";
 import Invite from "./routes/Invite";
 import Admin from "./routes/Admin";
 import Reset from "./routes/Reset";
+import PrototypeGridMeasure from "./routes/PrototypeGridMeasure";
 
 import { AuthProvider } from "./contexts/AuthContext";
 import { SettingsProvider } from "./contexts/SettingsContext";
@@ -29,6 +30,11 @@ import LoadingOverlay from "./components/LoadingOverlay";
 
 function Routes() {
   const { setup, offline } = useServerStatus();
+
+  // PROTOTYPE (#178): needs no server, so it skips the server gate
+  if (import.meta.env.DEV && window.location.pathname === "/prototype/grid-measure") {
+    return <Router><PrototypeGridMeasure /></Router>;
+  }
 
   // A server that cannot be reached is left to each page to report
   if (setup === undefined && !offline) {

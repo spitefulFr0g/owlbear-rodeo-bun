@@ -32,3 +32,4 @@ tsconfig.tsbuildinfo
 
 # generated map alignment test maps (node scripts/alignment-maps.cjs)
 /alignment-maps/
+/public/prototype-alignment-maps/
