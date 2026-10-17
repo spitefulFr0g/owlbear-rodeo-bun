@@ -91,6 +91,14 @@ A scene setting, on by default, that shows a line and the distance moved while a
 An image item on the Map layer. It is a picture only; the grid and everything placed on top belong to the scene.
 _Avoid_: Background, battlemap
 
+**Printed grid**:
+The grid drawn into a map's image, as opposed to the scene's grid. A map may have none.
+_Avoid_: Baked grid, image grid
+
+**Alignment**:
+How a map is scaled and placed so that its printed grid, or its intended size, lies on the scene's grid. Aligning a map never changes the size of the scene's cells.
+_Avoid_: Calibration, fitting, snapping
+
 **Item**:
 One thing placed on the canvas, such as an image, a shape or a piece of text. Every item has a position, a layer and an owner.
 _Avoid_: Object, element, node, entity
